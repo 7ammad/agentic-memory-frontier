@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__superclaude-memory__memory_load_session"
+    ]
+  }
+}
