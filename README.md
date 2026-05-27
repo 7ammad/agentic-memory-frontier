@@ -276,3 +276,13 @@ python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bund
 ```
 
 The adapter normalizes ordered `questions`, `answers`, and optional `backgrounds` into multi-subtask task records. It emits progress score and task success rate, matching MemoryArena's action-coupled evaluation shape without claiming a full benchmark result yet.
+
+## LongMemEval-V2 Adapter Smoke
+
+Inspect a local LongMemEval-V2 dataset root:
+
+```powershell
+python scripts/run_longmemeval_v2_adapter.py path\to\longmemeval-v2
+```
+
+The adapter expects `questions.jsonl`, `trajectories.jsonl`, and optional `haystacks/*.json`. It normalizes questions, browser/workflow trajectories, state screenshots, haystack maps, exact answer scoring, haystack-member retrieval scoring, and trajectory-to-`AgentTrace` conversion.

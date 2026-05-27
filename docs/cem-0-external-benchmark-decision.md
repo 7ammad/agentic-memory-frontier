@@ -61,3 +61,21 @@ python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bund
 ```
 
 This is not a full MemoryArena result yet. It is the local adapter layer needed before wiring real agent execution and CEM-0 action-brief ablations over MemoryArena tasks.
+
+## LongMemEval-V2 Adapter Slice
+
+CEM-0 also has a local LongMemEval-V2 adapter that:
+
+- loads a dataset root with `questions.jsonl`, `trajectories.jsonl`, and optional `haystacks/*.json`;
+- normalizes questions, environments, question types, trajectory states, browser actions, screenshots, and haystack maps;
+- converts trajectories into `AgentTrace` records with observation and action turns;
+- scores exact answer predictions against reference answers;
+- scores retrieval outputs against configured haystack membership;
+- provides a reference upper-bound score for adapter sanity checks;
+- includes a CLI smoke command:
+
+```powershell
+python scripts/run_longmemeval_v2_adapter.py path\to\longmemeval-v2
+```
+
+This is not a full LongMemEval-V2 benchmark result yet. It is the local adapter layer needed before CEM-0 can compare action briefs, raw trajectory retrieval, and unvalidated memory against the real web-environment tasks.

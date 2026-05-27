@@ -227,6 +227,14 @@ Smoke command:
 python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
+CEM-0 also includes a local LongMemEval-V2 adapter that loads a dataset root with `questions.jsonl`, `trajectories.jsonl`, and optional `haystacks/*.json`, converts trajectories into `AgentTrace` records, and scores exact answers plus haystack-member retrieval.
+
+Smoke command:
+
+```powershell
+python scripts/run_longmemeval_v2_adapter.py path\to\longmemeval-v2
+```
+
 ## Not Proven Yet
 
 The current report does not prove:
