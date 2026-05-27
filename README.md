@@ -32,6 +32,15 @@ Run the current synthetic corruption eval:
 python scripts/run_synthetic_eval.py
 ```
 
+Render the machine-readable eval result as markdown from Python:
+
+```python
+from cem_eval import render_synthetic_eval_markdown, run_synthetic_corruption_eval
+
+result = run_synthetic_corruption_eval("tmp/cem-synthetic")
+print(render_synthetic_eval_markdown(result))
+```
+
 Current expected signal:
 
 ```json
