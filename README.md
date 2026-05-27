@@ -22,6 +22,8 @@ The public foundation is in [research/2026-05-27-plan-1-causal-experience-memory
 
 The implementation kickoff spec is in [specs/2026-05-27-cem-0-memguard-kernel-spec.md](specs/2026-05-27-cem-0-memguard-kernel-spec.md).
 
+The active build queue is in [TODO.md](TODO.md). Codex should update it and continue to the next unchecked item after each verified commit unless blocked or redirected.
+
 ## CEM-0 Quick Smoke
 
 Run the current synthetic corruption eval:
