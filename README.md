@@ -36,18 +36,18 @@ Current expected signal:
 
 ```json
 {
-  "fixture_case_count": 9,
-  "proposed_count": 9,
+  "fixture_case_count": 11,
+  "proposed_count": 11,
   "quarantined_count": 4,
-  "promoted_count": 5,
+  "promoted_count": 6,
   "false_memory_resistance": 1.0,
   "contradiction_recall": 1.0,
   "false_quarantine_rate": 0.0,
   "unvalidated_memory": {
-    "trusted_false_memory_count": 4,
+    "trusted_false_memory_count": 5,
     "metrics": {
-      "promoted_count": 9,
-      "action_brief_card_count": 9
+      "promoted_count": 11,
+      "action_brief_card_count": 11
     }
   },
   "cem0_validation": {
@@ -59,11 +59,13 @@ Current expected signal:
       "production deploy already finished": ["unsupported"]
     },
     "metrics": {
-      "promoted_count": 5,
-      "action_brief_card_count": 5,
+      "promoted_count": 6,
+      "action_brief_card_count": 6,
+      "stale_memory_suppression": 1.0,
       "false_memory_resistance_by_risk": {
         "assistant_hypothesis": 1.0,
         "contradiction": 1.0,
+        "stale_preference": 1.0,
         "unsupported": 1.0
       }
     }

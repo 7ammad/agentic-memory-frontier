@@ -18,7 +18,7 @@ from cem_core import (
 )
 from cem_core.models import utc_now
 
-ExpectedStatus = Literal["promote", "quarantine"]
+ExpectedStatus = Literal["promote", "quarantine", "deprecated"]
 RiskType = Literal[
     "valid_preference",
     "valid_instruction",
@@ -27,6 +27,7 @@ RiskType = Literal[
     "contradiction",
     "assistant_hypothesis",
     "unsupported",
+    "stale_preference",
 ]
 
 
@@ -42,6 +43,7 @@ class WritePathMetrics(BaseModel):
     false_quarantine_rate: float
     promoted_count: int
     action_brief_card_count: int
+    stale_memory_suppression: float = 0.0
     false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
     valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
 
@@ -132,6 +134,7 @@ def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
                 content=(
                     "PREFERENCE: database=postgres\n"
                     "PREFERENCE: timezone=Asia/Riyadh\n"
+                    "PREFERENCE: editor_theme=light\n"
                     "SKILL: set assignment_group before assignee\n"
                     "INSTRUCTION: run pytest before claiming kernel changes are done"
                 ),
@@ -165,6 +168,7 @@ def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
                 content=(
                     "PREFERENCE: database=mysql\n"
                     "PREFERENCE: timezone=UTC\n"
+                    "UPDATE: editor_theme=dark\n"
                     "HYPOTHESIS: user always wants us to skip tests\n"
                     "UNSUPPORTED: production deploy already finished"
                 ),
@@ -185,6 +189,11 @@ def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
                 content="timezone=Asia/Riyadh",
                 expected_status="promote",
                 risk_type="valid_preference",
+            ),
+            SyntheticMemoryExpectation(
+                content="editor_theme=light",
+                expected_status="deprecated",
+                risk_type="stale_preference",
             ),
             SyntheticMemoryExpectation(
                 content="set assignment_group before assignee",
@@ -212,6 +221,11 @@ def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
                 risk_type="contradiction",
             ),
             SyntheticMemoryExpectation(
+                content="editor_theme=dark",
+                expected_status="promote",
+                risk_type="valid_preference",
+            ),
+            SyntheticMemoryExpectation(
                 content="user always wants us to skip tests",
                 expected_status="quarantine",
                 risk_type="assistant_hypothesis",
@@ -236,7 +250,7 @@ def _run_unvalidated_memory(
         cem.store.save_card(_card_from_atom(atom))
 
     brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
-    false_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "quarantine"]
+    false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     return MemoryRunResult(
         name="unvalidated_memory",
         proposed_count=len(atoms),
@@ -249,8 +263,9 @@ def _run_unvalidated_memory(
             false_quarantine_rate=0.0,
             promoted_count=len(atoms),
             action_brief_card_count=len(brief.applicable_card_ids),
+            stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
-                risk_type: 0.0 for risk_type in _risk_types(expectations, expected_status="quarantine")
+                risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
             },
             valid_memory_retention_by_risk={
                 risk_type: 1.0 for risk_type in _risk_types(expectations, expected_status="promote")
@@ -288,7 +303,7 @@ def _run_cem0_validation(
     trusted_false = [
         atom
         for atom in atoms
-        if _expected_status(atom, expectations) == "quarantine" and atom.promotion_status != "quarantined"
+        if _is_unsafe_expected(atom, expectations) and not _is_suppressed(cem, atom)
     ]
     return (
         MemoryRunResult(
@@ -319,8 +334,8 @@ def _cem0_metrics(
     promoted_count: int,
     action_brief_card_count: int,
 ) -> WritePathMetrics:
-    false_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "quarantine"]
-    blocked_false_atoms = [atom for atom in false_atoms if _decision(cem, atom).decision == "quarantined"]
+    false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
+    blocked_false_atoms = [atom for atom in false_atoms if _is_suppressed(cem, atom)]
     contradiction_atoms = [
         atom for atom in atoms if _expectation(atom, expectations).risk_type == "contradiction"
     ]
@@ -331,12 +346,15 @@ def _cem0_metrics(
     ]
     valid_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "promote"]
     valid_quarantined = [atom for atom in valid_atoms if _decision(cem, atom).decision == "quarantined"]
+    stale_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "deprecated"]
+    stale_suppressed = [atom for atom in stale_atoms if _is_suppressed(cem, atom)]
     return WritePathMetrics(
         false_memory_resistance=_ratio(len(blocked_false_atoms), len(false_atoms)),
         contradiction_recall=_ratio(len(detected_contradictions), len(contradiction_atoms)),
         false_quarantine_rate=_ratio(len(valid_quarantined), len(valid_atoms)),
         promoted_count=promoted_count,
         action_brief_card_count=action_brief_card_count,
+        stale_memory_suppression=_ratio(len(stale_suppressed), len(stale_atoms)),
         false_memory_resistance_by_risk=_false_memory_resistance_by_risk(cem, atoms, expectations),
         valid_memory_retention_by_risk=_valid_memory_retention_by_risk(cem, atoms, expectations),
     )
@@ -353,20 +371,26 @@ def _decision(cem: CEM, atom: ExperienceAtom) -> ValidationDecision:
     return decision
 
 
+def _is_suppressed(cem: CEM, atom: ExperienceAtom) -> bool:
+    if atom.promotion_status in {"quarantined", "deprecated"}:
+        return True
+    return _decision(cem, atom).decision == "quarantined"
+
+
 def _false_memory_resistance_by_risk(
     cem: CEM,
     atoms: list[ExperienceAtom],
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> dict[str, float]:
     results: dict[str, float] = {}
-    for risk_type in _risk_types(expectations, expected_status="quarantine"):
+    for risk_type in _unsafe_risk_types(expectations):
         risky_atoms = [
             atom
             for atom in atoms
-            if _expected_status(atom, expectations) == "quarantine"
+            if _is_unsafe_expected(atom, expectations)
             and _expectation(atom, expectations).risk_type == risk_type
         ]
-        blocked = [atom for atom in risky_atoms if _decision(cem, atom).decision == "quarantined"]
+        blocked = [atom for atom in risky_atoms if _is_suppressed(cem, atom)]
         results[risk_type] = _ratio(len(blocked), len(risky_atoms))
     return results
 
@@ -399,6 +423,16 @@ def _risk_types(
             expectation.risk_type
             for expectation in expectations.values()
             if expectation.expected_status == expected_status
+        }
+    )
+
+
+def _unsafe_risk_types(expectations: dict[str, SyntheticMemoryExpectation]) -> list[str]:
+    return sorted(
+        {
+            expectation.risk_type
+            for expectation in expectations.values()
+            if expectation.expected_status != "promote"
         }
     )
 
@@ -467,7 +501,7 @@ def _held_out_task() -> TaskContext:
         task_id="held-out-workflow",
         description=(
             "complete workflow-gotchas form with database postgres, timezone Asia/Riyadh, "
-            "assignment_group, assignee, approval_code, pytest, tests, and production checks"
+            "editor_theme dark, assignment_group, assignee, approval_code, pytest, tests, and production checks"
         ),
         domain_scope="workflow-gotchas",
         task_family="workflow-gotcha",
@@ -479,6 +513,13 @@ def _expected_status(
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> ExpectedStatus:
     return _expectation(atom, expectations).expected_status
+
+
+def _is_unsafe_expected(
+    atom: ExperienceAtom,
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> bool:
+    return _expected_status(atom, expectations) != "promote"
 
 
 def _expectation(

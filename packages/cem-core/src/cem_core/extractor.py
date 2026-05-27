@@ -11,6 +11,7 @@ MARKERS = {
     "SKILL:": "skill",
     "FAILURE:": "failure_mode",
     "HYPOTHESIS:": "assistant_hypothesis",
+    "UPDATE:": "invalidation_event",
 }
 
 

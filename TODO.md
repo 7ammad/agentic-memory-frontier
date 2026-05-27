@@ -29,6 +29,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Refactor extractor and contradiction detector behind strategy interfaces.
 - [x] Expand synthetic corruption eval to 9 labeled fixture cases.
 - [x] Add validation decision aggregation, decision reason codes, and per-risk metric breakdown.
+- [x] Add stale-memory fixture cases with explicit update supersession.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -48,7 +49,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 
 ## Next Lane: Eval Suite Strength
 
-- [ ] Add stale-memory fixture cases.
+- [x] Add stale-memory fixture cases.
   - Example: later user preference supersedes old preference without treating historical truth as deleted.
   - Needed outcome: current memory is promoted or selected, stale memory is suppressed or marked contested.
 

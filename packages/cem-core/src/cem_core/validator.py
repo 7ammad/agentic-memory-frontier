@@ -101,6 +101,16 @@ class MemoryValidator:
             )
 
         atom.contradiction_links = sorted(set(atom.contradiction_links + match.conflicting_atom_ids))
+        if atom.epistemic_type == "invalidation_event":
+            self._supersede_conflicts(atom, match.conflicting_atom_ids)
+            self.store.save_atom(atom)
+            return ValidationResult(
+                atom_id=atom.atom_id,
+                check_name="temporal_supersession",
+                passed=True,
+                reason="supersedes stale active memory",
+            )
+
         self.store.save_atom(atom)
         return ValidationResult(
             atom_id=atom.atom_id,
@@ -108,6 +118,13 @@ class MemoryValidator:
             passed=False,
             reason=match.reason,
         )
+
+    def _supersede_conflicts(self, atom: ExperienceAtom, conflicting_atom_ids: list[str]) -> None:
+        for conflicting_atom_id in conflicting_atom_ids:
+            other = self.store.get_atom(conflicting_atom_id)
+            other.promotion_status = "deprecated"
+            other.superseded_by = sorted(set(other.superseded_by + [atom.atom_id]))
+            self.store.save_atom(other)
 
 
 def build_validation_decision(

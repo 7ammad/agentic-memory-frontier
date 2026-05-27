@@ -147,3 +147,32 @@ def test_contradiction_strategy_can_be_swapped(tmp_path):
     stored = cem.store.get_atom(second.atom_id)
     assert stored.promotion_status == "candidate"
     assert stored.quarantine_reason is None
+
+
+def test_explicit_update_supersedes_stale_memory(tmp_path):
+    cem = CEM(tmp_path)
+    trace_one = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=0, role="user", content="PREFERENCE: editor_theme=light")],
+    )
+    trace_two = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=1, role="user", content="UPDATE: editor_theme=dark")],
+    )
+
+    cem.ingest_trace(trace_one)
+    old_atom = cem.propose_memories(trace_one.trace_id)[0]
+    cem.validate(old_atom.atom_id)
+    cem.ingest_trace(trace_two)
+    current_atom = cem.propose_memories(trace_two.trace_id)[0]
+    current_decision = cem.validate(current_atom.atom_id)
+
+    old_stored = cem.store.get_atom(old_atom.atom_id)
+    current_stored = cem.store.get_atom(current_atom.atom_id)
+    assert old_stored.promotion_status == "deprecated"
+    assert old_stored.superseded_by == [current_atom.atom_id]
+    assert current_stored.promotion_status == "candidate"
+    assert current_decision.decision == "candidate"
+    assert current_decision.reason_codes == []
