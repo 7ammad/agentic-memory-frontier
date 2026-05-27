@@ -130,6 +130,11 @@ class CEM:
                 for atom_id in card.evidence_atom_ids
                 for result in self.store.list_validations(atom_id)
             ]
+            decisions = [
+                decision
+                for atom_id in card.evidence_atom_ids
+                if (decision := self.store.get_latest_validation_decision(atom_id)) is not None
+            ]
             atoms = [self.store.get_atom(atom_id) for atom_id in card.evidence_atom_ids]
             return MemoryAudit(
                 memory_id=card.card_id,
@@ -137,7 +142,7 @@ class CEM:
                 source_trace_ids=sorted({trace_id for atom in atoms for trace_id in atom.source_trace_ids}),
                 source_turn_ids=sorted({turn_id for atom in atoms for turn_id in atom.source_turn_ids}),
                 validation_results=validations,
-                validation_decision=None,
+                validation_decision=decisions[0] if len(decisions) == 1 else None,
                 promotion_status="verified",
                 quarantine_reason=None,
             )

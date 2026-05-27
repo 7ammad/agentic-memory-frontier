@@ -33,6 +33,9 @@ def test_trace_ingest_extract_validate_promote_and_retrieve(tmp_path):
 
     card = cem.promote(atoms[0].atom_id)
     assert card is not None
+    card_audit = cem.audit(card.card_id)
+    assert card_audit.validation_decision is not None
+    assert card_audit.validation_decision.decision == "candidate"
 
     brief = cem.retrieve_action_brief(
         TaskContext(
