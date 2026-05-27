@@ -43,6 +43,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert round(result.raw_trace_retrieval.metrics.action_brief_pollution_rate, 3) == 0.611
     assert result.raw_trace_retrieval.metrics.scoped_memory_suppression == 0.0
     assert result.raw_trace_retrieval.metrics.expired_memory_suppression == 0.0
+    assert result.raw_trace_retrieval.metrics.audit_completeness_rate == 0.0
     assert result.raw_trace_retrieval.expected_action_delta == 0.0
     assert result.summary_reflection.trusted_false_memory_count == 5
     assert result.summary_reflection.metrics.action_brief_card_count == 13
@@ -50,6 +51,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert round(result.summary_reflection.metrics.action_brief_pollution_rate, 3) == 0.615
     assert result.summary_reflection.metrics.scoped_memory_suppression == 0.25
     assert result.summary_reflection.metrics.expired_memory_suppression == 0.0
+    assert result.summary_reflection.metrics.audit_completeness_rate == 0.0
     assert round(result.summary_reflection.expected_action_delta, 3) == -0.061
     assert result.unvalidated_memory.proposed_count == 18
     assert result.unvalidated_memory.metrics.promoted_count == 18
@@ -60,6 +62,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.unvalidated_memory.metrics.expired_memory_suppression == 1.0
     assert result.unvalidated_memory.metrics.evidence_consolidation_count == 0
     assert result.unvalidated_memory.metrics.max_evidence_support_count == 1
+    assert result.unvalidated_memory.metrics.audit_completeness_rate == 0.0
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
     assert round(result.unvalidated_memory.expected_action_delta, 3) == 0.364
@@ -71,6 +74,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.cem0_validation.metrics.expired_memory_suppression == 1.0
     assert result.cem0_validation.metrics.evidence_consolidation_count == 1
     assert result.cem0_validation.metrics.max_evidence_support_count == 2
+    assert result.cem0_validation.metrics.audit_completeness_rate == 1.0
     assert result.cem0_validation.trusted_false_memory_count == 0
     assert result.cem0_validation.expected_action_delta == 1.0
     assert result.cem0_validation.decision_reason_codes["database=mysql"] == ["contradiction"]
@@ -138,14 +142,18 @@ def test_synthetic_eval_markdown_report(tmp_path):
     markdown = render_synthetic_eval_markdown(result)
 
     assert "# synthetic_corruption Report" in markdown
-    assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
-    assert "| raw_trace_retrieval | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 |" in markdown
-    assert "| summary_reflection | 0 | 0 | 5 | 13 | -0.061 | 0 | 0.667 | 0.615 | 0.25 | 0 | 0 | 0 |" in markdown
-    assert "| unvalidated_memory | 18 | 0 | 7 | 14 | 0.364 | 0 | 1 | 0.5 | 1 | 1 | 0 | 1 |" in markdown
-    assert "| cem0_validation | 18 | 6 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 2 |" in markdown
+    assert "Audit completeness" in markdown
+    assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
+    assert "| raw_trace_retrieval | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |" in markdown
+    assert "| summary_reflection | 0 | 0 | 5 | 13 | -0.061 | 0 | 0.667 | 0.615 | 0.25 | 0 | 0 | 0 | 0 |" in markdown
+    assert "| unvalidated_memory | 18 | 0 | 7 | 14 | 0.364 | 0 | 1 | 0.5 | 1 | 1 | 0 | 1 | 0 |" in markdown
+    assert "| cem0_validation | 18 | 6 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 2 | 1 |" in markdown
     assert "## CEM-0 Comparison" in markdown
     assert "| summary_reflection | 1 | 1.061 | 5 | 7 |" in markdown
     assert "| unvalidated_memory | 1 | 0.636 | 7 | 8 |" in markdown
+    assert "## Audit Coverage" in markdown
+    assert "| unvalidated_memory | 0 | 0 | 1 |" in markdown
+    assert "| cem0_validation | 1 | 1 | 2 |" in markdown
     assert "`database=mysql`: contradiction" in markdown
 
 

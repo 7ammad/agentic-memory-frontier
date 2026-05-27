@@ -54,6 +54,7 @@ class WritePathMetrics(BaseModel):
     expired_memory_suppression: float = 0.0
     evidence_consolidation_count: int = 0
     max_evidence_support_count: int = 0
+    audit_completeness_rate: float = 0.0
     stale_memory_suppression: float = 0.0
     false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
     valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
@@ -84,6 +85,7 @@ class EvalReportRow(BaseModel):
     expired_memory_suppression: float
     evidence_consolidation_count: int
     max_evidence_support_count: int
+    audit_completeness_rate: float
 
 
 class EvalReportComparisonRow(BaseModel):
@@ -493,6 +495,7 @@ def _run_unvalidated_memory(
             ),
             evidence_consolidation_count=_evidence_consolidation_count(cards),
             max_evidence_support_count=_max_evidence_support_count(cards),
+            audit_completeness_rate=_audit_completeness_rate(cem),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -525,6 +528,7 @@ def _run_no_memory() -> MemoryRunResult:
             expired_memory_suppression=0.0,
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
+            audit_completeness_rate=0.0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={},
             valid_memory_retention_by_risk={},
@@ -571,6 +575,7 @@ def _run_raw_trace_retrieval(
             ),
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
+            audit_completeness_rate=0.0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -631,6 +636,7 @@ def _run_summary_reflection(
             ),
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
+            audit_completeness_rate=0.0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -681,6 +687,7 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         expired_memory_suppression=run.metrics.expired_memory_suppression,
         evidence_consolidation_count=run.metrics.evidence_consolidation_count,
         max_evidence_support_count=run.metrics.max_evidence_support_count,
+        audit_completeness_rate=run.metrics.audit_completeness_rate,
     )
 
 
@@ -796,6 +803,7 @@ def _cem0_metrics(
         ),
         evidence_consolidation_count=_evidence_consolidation_count(cem.store.list_cards()),
         max_evidence_support_count=_max_evidence_support_count(cem.store.list_cards()),
+        audit_completeness_rate=_audit_completeness_rate(cem),
         stale_memory_suppression=_ratio(len(stale_suppressed), len(stale_atoms)),
         false_memory_resistance_by_risk=_false_memory_resistance_by_risk(cem, atoms, expectations),
         valid_memory_retention_by_risk=_valid_memory_retention_by_risk(cem, atoms, expectations),
@@ -853,6 +861,36 @@ def _valid_memory_retention_by_risk(
         retained = [atom for atom in valid_atoms if _decision(cem, atom).decision == "candidate"]
         results[risk_type] = _ratio(len(retained), len(valid_atoms))
     return results
+
+
+def _audit_completeness_rate(cem: CEM) -> float:
+    cards = cem.store.list_cards()
+    complete_count = len([card for card in cards if _card_has_complete_audit(cem, card)])
+    return _ratio(complete_count, len(cards))
+
+
+def _card_has_complete_audit(cem: CEM, card: ExperienceCard) -> bool:
+    audit = cem.audit(card.card_id)
+    if not (
+        audit.source_trace_ids
+        and audit.source_turn_ids
+        and audit.source_agent_ids
+        and audit.source_session_ids
+    ):
+        return False
+    if audit.confidence_score < 0:
+        return False
+    if audit.valid_from is None:
+        return False
+    if audit.evidence_atom_count != len(card.evidence_atom_ids) or audit.evidence_atom_count == 0:
+        return False
+    if not audit.validation_results or not audit.validation_check_names:
+        return False
+
+    atoms = [cem.store.get_atom(atom_id) for atom_id in card.evidence_atom_ids]
+    if any(not atom.source_spans for atom in atoms):
+        return False
+    return all(cem.store.get_latest_validation_decision(atom.atom_id) is not None for atom in atoms)
 
 
 def _risk_types(

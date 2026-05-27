@@ -54,7 +54,8 @@ Current expected signal:
   "false_quarantine_rate": 0.0,
   "no_memory": {
     "metrics": {
-      "action_brief_card_count": 0
+      "action_brief_card_count": 0,
+      "audit_completeness_rate": 0.0
     }
   },
   "raw_trace_retrieval": {
@@ -64,7 +65,8 @@ Current expected signal:
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.6111111111111112,
       "scoped_memory_suppression": 0.0,
-      "expired_memory_suppression": 0.0
+      "expired_memory_suppression": 0.0,
+      "audit_completeness_rate": 0.0
     }
   },
   "summary_reflection": {
@@ -74,7 +76,8 @@ Current expected signal:
       "action_brief_relevance_recall": 0.6666666666666666,
       "action_brief_pollution_rate": 0.6153846153846154,
       "scoped_memory_suppression": 0.25,
-      "expired_memory_suppression": 0.0
+      "expired_memory_suppression": 0.0,
+      "audit_completeness_rate": 0.0
     }
   },
   "unvalidated_memory": {
@@ -88,7 +91,8 @@ Current expected signal:
       "scoped_memory_suppression": 1.0,
       "expired_memory_suppression": 1.0,
       "evidence_consolidation_count": 0,
-      "max_evidence_support_count": 1
+      "max_evidence_support_count": 1,
+      "audit_completeness_rate": 0.0
     }
   },
   "cem0_validation": {
@@ -111,6 +115,7 @@ Current expected signal:
       "expired_memory_suppression": 1.0,
       "evidence_consolidation_count": 1,
       "max_evidence_support_count": 2,
+      "audit_completeness_rate": 1.0,
       "stale_memory_suppression": 1.0,
       "false_memory_resistance_by_risk": {
         "assistant_hypothesis": 1.0,
@@ -141,7 +146,7 @@ Current expected signal:
 }
 ```
 
-The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, and max support.
+The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
 
 Run tests:
 

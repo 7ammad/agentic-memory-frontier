@@ -21,6 +21,105 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - Do not claim state-of-the-art.
 - Never read or write `C:\Dev\Builds\Waki`.
 
+## Full Agreed Program Checklist
+
+This is the full plan as captured in `AGENTS.md` and `research/2026-05-27-plan-1-causal-experience-memory-foundation.md`, not a new plan.
+
+### Historical Design Work
+
+- [x] A: Deep technical review of SuperClaude memory MCP.
+- [x] B: SuperClaude memory v0.3 upgrade spec.
+- [x] C: Codex memory system design.
+- [x] D: ACS protocol design.
+
+### Current Dependency Order
+
+- [x] Plan 1 foundation: Causal Experience Memory thesis locked.
+- [ ] CEM-0 proof: prove write-path integrity and action advantage.
+- [ ] Backend adapters.
+- [ ] MCP integration.
+- [ ] Multi-agent protocol.
+
+Current rule: backend adapters, MCP integration, and multi-agent protocol stay unchecked until the CEM-0 proof is stronger.
+
+## Original CEM-0 Plan Checklist
+
+This is the source-of-truth checklist from the CEM-0 spec and foundation plan. Keep this section honest: checked means implemented and covered by current repo evidence, unchecked means still to build.
+
+### Kernel Build Order
+
+- [x] Models: Pydantic schemas for traces, atoms, cards, validation, action briefs, and audits.
+- [x] Trace ledger: JSONL plus SQLite persistence for traces, atoms, cards, validations, and decisions.
+- [x] Extractor: deterministic V0 extractor for reproducible fixtures.
+- [x] Validator: source spans, grounding, epistemic role, confidence, causal support, source trust, and contradiction checks.
+- [x] Quarantine: invalid candidates become quarantined before promotion.
+- [x] Audit: `audit(memory_id)` returns provenance, validation, confidence, validity, status, and evidence counts.
+- [x] Baselines: no-memory, raw-trace retrieval, summary/reflection, and unvalidated-memory baselines.
+- [x] Synthetic eval: corruption suite with contradictions, stale/update, unsupported, poisoned, misleading-success, scope, expiry, and repeated-evidence cases.
+- [x] Experience Card promotion: candidate atoms promote into cards and repeated evidence consolidates.
+- [x] Action Brief retrieval: verified cards become task-scoped action briefs instead of raw memory dumps.
+- [x] Workflow demo: local workflow-gotcha demo compares baseline attempts against CEM-0.
+- [ ] Public benchmark report: polished, reproducible report suitable for external readers.
+
+### Evaluation Targets
+
+- [x] HaluMem-compatible local facsimile.
+- [x] Synthetic corruption suite.
+- [x] Workflow gotchas environment.
+- [ ] Real HaluMem runner or dataset adapter.
+- [ ] MemoryArena-style adapter.
+- [ ] LongMemEval-V2-style adapter.
+
+### Required Metrics
+
+- [ ] Extraction precision/recall/F1.
+- [x] Update recall via local HaluMem facsimile.
+- [x] False memory resistance.
+- [ ] Contradiction detection precision.
+- [x] Contradiction detection recall.
+- [x] Stale-memory suppression.
+- [x] Quarantine false-positive rate.
+- [ ] Memory harm rate as a named report metric.
+- [ ] Action influence rate.
+- [x] Evidence support/consolidation metrics.
+- [ ] p95 write latency.
+- [ ] p95 retrieval latency.
+- [ ] Tokens per write.
+- [ ] Tokens per retrieval.
+- [x] Action-brief relevance recall.
+- [x] Action-brief pollution rate.
+- [x] Scoped-memory suppression.
+- [x] Expired-memory suppression.
+- [x] Audit completeness rate.
+
+### Required Baselines
+
+- [x] No memory.
+- [ ] Full-context baseline.
+- [x] Rolling summary / reflection baseline.
+- [ ] Vanilla vector memory baseline.
+- [ ] Time-aware vector memory baseline.
+- [x] Unverified reflection / unvalidated memory baseline.
+- [ ] Human-curated runbook upper bound.
+
+### First Demo Acceptance Criteria
+
+- [x] CEM-0 quarantines at least one unsupported or contradictory memory.
+- [x] CEM-0 promotes at least one Experience Card with source evidence.
+- [x] Held-out workflow task succeeds with CEM-0 where no-memory fails.
+- [ ] Raw vector retrieval returns related traces but misses or fails the decisive precondition.
+- [x] `audit(memory_id)` explains why the memory exists, where it came from, why it was promoted/quarantined, and when it is valid.
+- [ ] Eval report includes all required baselines, including a dumb baseline expected to lose.
+
+### 30-Day Sprint Status
+
+- [x] Week 1: scaffold packages, models, trace ledger, synthetic trace generator.
+- [x] Week 2: extractor, source grounding, contradiction detector, quarantine, audit logs.
+- [x] Week 3: local HaluMem facsimile, partial baselines, first integrity table.
+- [ ] Week 3 remaining: real/external benchmark adapter decision and missing baseline coverage.
+- [x] Week 4: workflow demo, Experience Card promotion, Action Brief retrieval, held-out task comparison.
+- [ ] Week 4 remaining: public-ready benchmark report.
+
 ## Current State
 
 - [x] Scaffold CEM-0 kernel: trace ingest, deterministic extraction, validation, quarantine, promotion, action brief, audit.
@@ -146,3 +245,31 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 
 - [x] Update README with temporal-validity expected signal.
   - Needed outcome: current smoke output documents the time-validity behavior.
+
+## Next Lane: Audit Explainability V1
+
+- [x] Add audit provenance, confidence, validity, and evidence-count fields.
+  - Needed outcome: `audit(memory_id)` can explain where a memory came from, how trusted it is, and when it is valid.
+
+- [x] Add synthetic audit completeness metric.
+  - Needed outcome: eval reports whether promoted cards have source spans, validation decisions, confidence, and validity metadata.
+
+- [x] Add markdown audit section for CEM-0 report.
+  - Needed outcome: humans can inspect audit coverage without decoding raw atom/card payloads.
+
+- [x] Update README with audit explainability expected signal.
+  - Needed outcome: current smoke output documents auditability alongside write-path and action-brief behavior.
+
+## Next From Original Plan: CEM-0 Proof Completion
+
+- [ ] Complete held-out workflow comparison reporting.
+  - Original source: Week 4 says "Run held-out task comparison."
+  - Needed outcome: report shows no-memory, raw-trace, summary/reflection, unvalidated-memory, and CEM-0 workflow success side by side.
+
+- [ ] Add Marginal Memory Advantage / workflow success delta.
+  - Original source: benchmark strategy says `MMA = TaskSuccess(memory_agent) - TaskSuccess(no_memory_agent)`.
+  - Needed outcome: eval reports CEM-0's held-out workflow advantage against each baseline, not just write-path integrity.
+
+- [ ] Write public-ready benchmark report.
+  - Original source: Week 4 says "Write public-ready benchmark report."
+  - Needed outcome: current smoke output connects audit/write-path quality to held-out task behavior and is readable outside the codebase.

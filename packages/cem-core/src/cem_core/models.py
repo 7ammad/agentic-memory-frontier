@@ -177,6 +177,13 @@ class MemoryAudit(StrictModel):
     memory_kind: Literal["atom", "card"]
     source_trace_ids: list[str]
     source_turn_ids: list[str]
+    source_agent_ids: list[str]
+    source_session_ids: list[str]
+    confidence_score: float
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    evidence_atom_count: int
+    validation_check_names: list[str]
     validation_results: list[ValidationResult]
     validation_decision: ValidationDecision | None = None
     promotion_status: str

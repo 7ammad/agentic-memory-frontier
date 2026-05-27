@@ -9,6 +9,7 @@ build/
 .coverage
 htmlcov/
 data/
+tmp/
 *.sqlite
 *.sqlite3
 *.db

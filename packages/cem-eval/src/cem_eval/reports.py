@@ -10,8 +10,8 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
         "",
         f"Generated at: {report.generated_at.isoformat()}",
         "",
-        "| Run | Proposed | Quarantined | Trusted false memories | Action brief cards | Expected action delta | False memory resistance | Relevance recall | Pollution rate | Scoped suppression | Expired suppression | Evidence consolidation | Max support |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Run | Proposed | Quarantined | Trusted false memories | Action brief cards | Expected action delta | False memory resistance | Relevance recall | Pollution rate | Scoped suppression | Expired suppression | Evidence consolidation | Max support | Audit completeness |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in [*report.baseline_rows, report.cem0_row]:
         lines.append(
@@ -31,6 +31,7 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
                     _format_float(row.expired_memory_suppression),
                     str(row.evidence_consolidation_count),
                     str(row.max_evidence_support_count),
+                    _format_float(row.audit_completeness_rate),
                 ]
             )
             + " |"
@@ -54,6 +55,28 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
                     _format_float(row.expected_action_delta_delta),
                     str(row.trusted_false_memory_reduction),
                     str(row.action_brief_card_reduction),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Audit Coverage",
+            "",
+            "| Run | Audit completeness | Evidence consolidation | Max support |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+    for row in [*report.baseline_rows, report.cem0_row]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    row.name,
+                    _format_float(row.audit_completeness_rate),
+                    str(row.evidence_consolidation_count),
+                    str(row.max_evidence_support_count),
                 ]
             )
             + " |"

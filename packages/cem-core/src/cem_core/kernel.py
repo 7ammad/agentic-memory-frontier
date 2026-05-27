@@ -145,12 +145,20 @@ class CEM:
     def audit(self, memory_id: str) -> MemoryAudit:
         try:
             atom = self.store.get_atom(memory_id)
+            validations = self.store.list_validations(atom.atom_id)
             return MemoryAudit(
                 memory_id=atom.atom_id,
                 memory_kind="atom",
                 source_trace_ids=atom.source_trace_ids,
                 source_turn_ids=atom.source_turn_ids,
-                validation_results=self.store.list_validations(atom.atom_id),
+                source_agent_ids=[atom.source_agent_id],
+                source_session_ids=[atom.source_session_id],
+                confidence_score=atom.confidence_score,
+                valid_from=atom.valid_from,
+                valid_until=atom.valid_until,
+                evidence_atom_count=1,
+                validation_check_names=[result.check_name for result in validations],
+                validation_results=validations,
                 validation_decision=self.store.get_latest_validation_decision(atom.atom_id),
                 promotion_status=atom.promotion_status,
                 quarantine_reason=atom.quarantine_reason,
@@ -173,6 +181,13 @@ class CEM:
                 memory_kind="card",
                 source_trace_ids=sorted({trace_id for atom in atoms for trace_id in atom.source_trace_ids}),
                 source_turn_ids=sorted({turn_id for atom in atoms for turn_id in atom.source_turn_ids}),
+                source_agent_ids=sorted({atom.source_agent_id for atom in atoms}),
+                source_session_ids=sorted({atom.source_session_id for atom in atoms}),
+                confidence_score=card.confidence_score,
+                valid_from=card.valid_from,
+                valid_until=card.valid_until,
+                evidence_atom_count=len(card.evidence_atom_ids),
+                validation_check_names=sorted({result.check_name for result in validations}),
                 validation_results=validations,
                 validation_decision=decisions[0] if len(decisions) == 1 else None,
                 promotion_status="verified",

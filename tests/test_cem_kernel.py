@@ -1,5 +1,5 @@
-from datetime import timedelta
 from collections.abc import Sequence
+from datetime import timedelta
 
 from cem_core import AgentTrace, CEM, ContradictionMatch, ExperienceAtom, TaskContext, TraceTurn
 from cem_core.models import utc_now
@@ -38,6 +38,21 @@ def test_trace_ingest_extract_validate_promote_and_retrieve(tmp_path):
     card_audit = cem.audit(card.card_id)
     assert card_audit.validation_decision is not None
     assert card_audit.validation_decision.decision == "candidate"
+    assert card_audit.source_agent_ids == ["codex"]
+    assert card_audit.source_session_ids == ["s1"]
+    assert card_audit.confidence_score == card.confidence_score
+    assert card_audit.valid_from == card.valid_from
+    assert card_audit.valid_until == card.valid_until
+    assert card_audit.evidence_atom_count == 1
+    assert set(card_audit.validation_check_names) == {
+        "causal_support",
+        "confidence_floor",
+        "contradiction",
+        "epistemic_role",
+        "source_agent_trust",
+        "source_grounding",
+        "source_span_presence",
+    }
 
     brief = cem.retrieve_action_brief(
         TaskContext(
@@ -78,6 +93,13 @@ def test_contradiction_is_quarantined_with_audit_trail(tmp_path):
     assert audit.quarantine_reason is not None
     assert audit.validation_decision is not None
     assert audit.validation_decision.reason_codes == ["contradiction"]
+    assert audit.source_agent_ids == ["codex"]
+    assert audit.source_session_ids == ["s1"]
+    assert audit.confidence_score == second_after.confidence_score
+    assert audit.valid_from is None
+    assert audit.valid_until is None
+    assert audit.evidence_atom_count == 1
+    assert "contradiction" in audit.validation_check_names
     assert any(result.check_name == "contradiction" and not result.passed for result in audit.validation_results)
 
 
@@ -259,6 +281,12 @@ def test_repeated_evidence_reuses_experience_card(tmp_path):
     assert second_card.evidence_atom_ids == [first.atom_id, second.atom_id]
     assert cem.store.get_atom(second.atom_id).support_count == 2
     assert len(cem.store.list_cards()) == 1
+    audit = cem.audit(second_card.card_id)
+    assert audit.evidence_atom_count == 2
+    assert audit.validation_decision is None
+    assert audit.source_agent_ids == ["codex"]
+    assert audit.source_session_ids == ["s1"]
+    assert audit.confidence_score == second_card.confidence_score
 
 
 def test_action_brief_filters_cross_session_memory_without_matching_scope(tmp_path):
