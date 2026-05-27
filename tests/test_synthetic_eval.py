@@ -31,6 +31,18 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     ]
     assert result.report.cem0_row.name == "cem0_validation"
     assert result.report.cem0_row.expected_action_delta == 1.0
+    workflow_rows = {row.name: row for row in result.report.workflow_rows}
+    assert workflow_rows["no_memory"].success is False
+    assert workflow_rows["raw_trace_retrieval"].success is False
+    assert workflow_rows["summary_reflection"].success is False
+    assert workflow_rows["unvalidated_memory"].success is False
+    assert workflow_rows["cem0_validation"].success is True
+    assert "missing assignment_group-before-assignee precondition" in workflow_rows["no_memory"].failure_reasons
+    assert (
+        "polluted action present: click refresh before submitting workflow-gotchas form"
+        in workflow_rows["unvalidated_memory"].failure_reasons
+    )
+    assert workflow_rows["cem0_validation"].failure_reasons == []
     comparisons = {row.baseline_name: row for row in result.report.comparison_rows}
     assert comparisons["unvalidated_memory"].false_memory_resistance_delta == 1.0
     assert round(comparisons["unvalidated_memory"].expected_action_delta_delta, 3) == 0.636
@@ -154,6 +166,9 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "## Audit Coverage" in markdown
     assert "| unvalidated_memory | 0 | 0 | 1 |" in markdown
     assert "| cem0_validation | 1 | 1 | 2 |" in markdown
+    assert "## Held-Out Workflow" in markdown
+    assert "| no_memory | no | missing assignment_group-before-assignee precondition; missing approval_code failure lesson; missing test-before-claiming-done instruction |" in markdown
+    assert "| cem0_validation | yes | none |" in markdown
     assert "`database=mysql`: contradiction" in markdown
 
 

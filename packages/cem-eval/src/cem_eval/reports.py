@@ -84,6 +84,27 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
     lines.extend(
         [
             "",
+            "## Held-Out Workflow",
+            "",
+            "| Run | Success | Failure reasons |",
+            "| --- | ---: | --- |",
+        ]
+    )
+    for row in report.workflow_rows:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    row.name,
+                    "yes" if row.success else "no",
+                    "; ".join(row.failure_reasons) if row.failure_reasons else "none",
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## CEM-0 Decision Codes",
             "",
         ]

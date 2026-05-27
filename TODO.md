@@ -262,7 +262,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 
 ## Next From Original Plan: CEM-0 Proof Completion
 
-- [ ] Complete held-out workflow comparison reporting.
+- [x] Complete held-out workflow comparison reporting.
   - Original source: Week 4 says "Run held-out task comparison."
   - Needed outcome: report shows no-memory, raw-trace, summary/reflection, unvalidated-memory, and CEM-0 workflow success side by side.
 

@@ -96,12 +96,19 @@ class EvalReportComparisonRow(BaseModel):
     action_brief_card_reduction: int
 
 
+class WorkflowReportRow(BaseModel):
+    name: str
+    success: bool
+    failure_reasons: list[str] = Field(default_factory=list)
+
+
 class SyntheticEvalReport(BaseModel):
     suite_name: str
     generated_at: datetime
     baseline_rows: list[EvalReportRow]
     cem0_row: EvalReportRow
     comparison_rows: list[EvalReportComparisonRow]
+    workflow_rows: list[WorkflowReportRow]
 
 
 class SyntheticEvalResult(BaseModel):
@@ -656,12 +663,8 @@ def _build_report(
     unvalidated_memory: MemoryRunResult,
     cem0_validation: MemoryRunResult,
 ) -> SyntheticEvalReport:
-    baseline_rows = [
-        _report_row(no_memory),
-        _report_row(raw_trace_retrieval),
-        _report_row(summary_reflection),
-        _report_row(unvalidated_memory),
-    ]
+    baseline_runs = [no_memory, raw_trace_retrieval, summary_reflection, unvalidated_memory]
+    baseline_rows = [_report_row(run) for run in baseline_runs]
     cem0_row = _report_row(cem0_validation)
     return SyntheticEvalReport(
         suite_name="synthetic_corruption",
@@ -669,6 +672,10 @@ def _build_report(
         baseline_rows=baseline_rows,
         cem0_row=cem0_row,
         comparison_rows=[_comparison_row(baseline, cem0_row) for baseline in baseline_rows],
+        workflow_rows=[
+            workflow_report_row_from_run(run)
+            for run in [*baseline_runs, cem0_validation]
+        ],
     )
 
 
@@ -698,6 +705,36 @@ def _comparison_row(baseline: EvalReportRow, cem0: EvalReportRow) -> EvalReportC
         expected_action_delta_delta=cem0.expected_action_delta - baseline.expected_action_delta,
         trusted_false_memory_reduction=baseline.trusted_false_memory_count - cem0.trusted_false_memory_count,
         action_brief_card_reduction=baseline.action_brief_card_count - cem0.action_brief_card_count,
+    )
+
+
+def workflow_report_row_from_run(run: MemoryRunResult) -> WorkflowReportRow:
+    actions = set(run.action_brief_recommended_actions)
+    failure_reasons: list[str] = []
+    if "set assignment_group before assignee" not in actions:
+        failure_reasons.append("missing assignment_group-before-assignee precondition")
+    if "avoid submitting workflow-gotchas form unless approval_code is present" not in actions:
+        failure_reasons.append("missing approval_code failure lesson")
+    if "run pytest before claiming kernel changes are done" not in actions:
+        failure_reasons.append("missing test-before-claiming-done instruction")
+
+    polluted_actions = [
+        "user always wants us to skip tests",
+        "production deploy already finished",
+        "skip pytest before claiming kernel changes are done",
+        "click refresh before submitting workflow-gotchas form",
+        "database=mysql",
+        "timezone=UTC",
+        "editor_theme=light",
+    ]
+    for polluted_action in polluted_actions:
+        if polluted_action in actions:
+            failure_reasons.append(f"polluted action present: {polluted_action}")
+
+    return WorkflowReportRow(
+        name=run.name,
+        success=not failure_reasons,
+        failure_reasons=failure_reasons,
     )
 
 
