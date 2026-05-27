@@ -9,10 +9,10 @@ from cem_eval import (
 def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     result = run_synthetic_corruption_eval(tmp_path)
 
-    assert result.fixture_case_count == 15
-    assert result.proposed_count == 16
+    assert result.fixture_case_count == 16
+    assert result.proposed_count == 17
     assert result.quarantined_count == 6
-    assert result.promoted_count == 9
+    assert result.promoted_count == 10
     assert result.contradiction_detected
     assert result.hypothesis_quarantined
     assert result.action_brief_card_count == 6
@@ -32,24 +32,25 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.report.cem0_row.name == "cem0_validation"
     assert result.report.cem0_row.expected_action_delta == 1.0
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
-    assert result.raw_trace_retrieval.metrics.action_brief_card_count == 16
+    assert result.raw_trace_retrieval.metrics.action_brief_card_count == 17
     assert result.raw_trace_retrieval.expected_action_delta == 0.0
     assert result.summary_reflection.trusted_false_memory_count == 5
-    assert result.summary_reflection.metrics.action_brief_card_count == 11
-    assert result.summary_reflection.expected_action_delta == 0.0
-    assert result.unvalidated_memory.proposed_count == 16
-    assert result.unvalidated_memory.metrics.promoted_count == 16
+    assert result.summary_reflection.metrics.action_brief_card_count == 12
+    assert round(result.summary_reflection.expected_action_delta, 3) == -0.033
+    assert result.unvalidated_memory.proposed_count == 17
+    assert result.unvalidated_memory.metrics.promoted_count == 17
     assert result.unvalidated_memory.metrics.action_brief_card_count == 14
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
-    assert round(result.unvalidated_memory.expected_action_delta, 3) == 0.222
-    assert result.cem0_validation.metrics.promoted_count == 9
+    assert round(result.unvalidated_memory.expected_action_delta, 3) == 0.3
+    assert result.cem0_validation.metrics.promoted_count == 10
     assert result.cem0_validation.metrics.action_brief_card_count == 6
     assert result.cem0_validation.trusted_false_memory_count == 0
     assert result.cem0_validation.expected_action_delta == 1.0
     assert result.cem0_validation.decision_reason_codes["database=mysql"] == ["contradiction"]
     assert result.cem0_validation.decision_reason_codes["report_format=csv"] == []
     assert result.cem0_validation.decision_reason_codes["report_format=json"] == []
+    assert result.cem0_validation.decision_reason_codes["manual smoke tests before launch"] == []
     assert "assistant_hypothesis" in result.cem0_validation.decision_reason_codes[
         "user always wants us to skip tests"
     ]
@@ -90,6 +91,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
         "skip pytest before claiming kernel changes are done"
         not in result.cem0_validation.action_brief_recommended_actions
     )
+    assert "manual smoke tests before launch" not in result.cem0_validation.action_brief_recommended_actions
     assert "editor_theme=light" in result.unvalidated_memory.action_brief_recommended_actions
     assert (
         "click refresh before submitting workflow-gotchas form"
@@ -109,10 +111,10 @@ def test_synthetic_eval_markdown_report(tmp_path):
 
     assert "# synthetic_corruption Report" in markdown
     assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
-    assert "| raw_trace_retrieval | 0 | 0 | 7 | 16 | 0 | 0 |" in markdown
-    assert "| summary_reflection | 0 | 0 | 5 | 11 | 0 | 0 |" in markdown
-    assert "| unvalidated_memory | 16 | 0 | 7 | 14 | 0.222 | 0 |" in markdown
-    assert "| cem0_validation | 16 | 6 | 0 | 6 | 1 | 1 |" in markdown
+    assert "| raw_trace_retrieval | 0 | 0 | 7 | 17 | 0 | 0 |" in markdown
+    assert "| summary_reflection | 0 | 0 | 5 | 12 | -0.033 | 0 |" in markdown
+    assert "| unvalidated_memory | 17 | 0 | 7 | 14 | 0.3 | 0 |" in markdown
+    assert "| cem0_validation | 17 | 6 | 0 | 6 | 1 | 1 |" in markdown
     assert "`database=mysql`: contradiction" in markdown
 
 
@@ -124,7 +126,7 @@ def test_halumem_facsimile_maps_operation_metrics(tmp_path):
     assert result.extraction_false_memory_resistance == 1.0
     assert result.update_recall == 1.0
     assert result.memory_qa_action_delta == 1.0
-    assert round(result.baseline_action_delta, 3) == 0.222
+    assert round(result.baseline_action_delta, 3) == 0.3
     assert result.cem0_quarantined_count == 6
     assert result.trusted_false_memory_count == 0
 

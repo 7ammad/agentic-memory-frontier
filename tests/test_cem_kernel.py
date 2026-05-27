@@ -259,6 +259,43 @@ def test_repeated_evidence_reuses_experience_card(tmp_path):
     assert len(cem.store.list_cards()) == 1
 
 
+def test_action_brief_filters_cross_session_memory_without_matching_scope(tmp_path):
+    cem = CEM(tmp_path)
+    trace = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        task_id="profile-settings",
+        turns=[TraceTurn(index=0, role="user", content="PREFERENCE: editor_theme=dark")],
+        environment={"domain": "project-alpha"},
+    )
+
+    cem.ingest_trace(trace)
+    atom = cem.propose_memories(trace.trace_id)[0]
+    cem.validate(atom.atom_id)
+    card = cem.promote(atom.atom_id)
+    assert card is not None
+
+    out_of_scope = cem.retrieve_action_brief(
+        TaskContext(
+            session_id="s2",
+            description="Configure project beta editor_theme dark preference",
+            domain_scope="project-beta",
+            task_family="beta-settings",
+        )
+    )
+    in_scope = cem.retrieve_action_brief(
+        TaskContext(
+            session_id="s2",
+            description="Configure project alpha editor_theme dark preference",
+            domain_scope="project-alpha",
+            task_family="profile-settings",
+        )
+    )
+
+    assert out_of_scope.applicable_card_ids == []
+    assert in_scope.applicable_card_ids == [card.card_id]
+
+
 def test_derived_claim_without_causal_support_is_quarantined(tmp_path):
     cem = CEM(tmp_path)
     trace = AgentTrace(

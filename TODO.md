@@ -112,7 +112,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
   - Example: two similar-looking memories have different scopes and should both survive.
   - Needed outcome: contradiction detection respects scope before quarantine.
 
-- [ ] Add multi-session scope fixture.
+- [x] Add multi-session scope fixture.
   - Example: preference in one session should not leak into a different project/session unless scope allows it.
   - Needed outcome: action brief excludes out-of-scope memory.
 

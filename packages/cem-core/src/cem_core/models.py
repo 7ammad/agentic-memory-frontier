@@ -126,6 +126,7 @@ class ExperienceCard(StrictModel):
 
 class TaskContext(StrictModel):
     task_id: str | None = None
+    session_id: str | None = None
     description: str
     domain_scope: str | None = None
     task_family: str | None = None

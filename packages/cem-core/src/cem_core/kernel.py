@@ -101,7 +101,7 @@ class CEM:
         return card
 
     def retrieve_action_brief(self, task: TaskContext, *, max_cards: int = 5) -> ActionBrief:
-        cards = self.store.list_cards()
+        cards = [card for card in self.store.list_cards() if self._card_in_scope(card, task)]
         scored = sorted(
             ((score_card(card, task), card) for card in cards),
             key=lambda item: item[0],
@@ -121,6 +121,21 @@ class CEM:
             confidence_score=confidence,
             expected_action_delta=None,
         )
+
+    def _card_in_scope(self, card: ExperienceCard, task: TaskContext) -> bool:
+        if task.session_id is None:
+            return True
+
+        atoms = [self.store.get_atom(atom_id) for atom_id in card.evidence_atom_ids]
+        if any(atom.source_session_id == task.session_id for atom in atoms):
+            return True
+
+        for atom in atoms:
+            if task.domain_scope and atom.domain_scope == task.domain_scope:
+                return True
+            if task.task_family and atom.task_family == task.task_family:
+                return True
+        return False
 
     def audit(self, memory_id: str) -> MemoryAudit:
         try:
