@@ -131,6 +131,22 @@ Contradiction precision is measured over validator decisions. The denominator is
 | human_curated_runbook | 0 | 0 |
 | cem0_validation | 1 | 1 |
 
+## Memory Harm
+
+Memory harm rate is the fraction of recommended actions that are false, stale, expired, or out of scope for the held-out task. It is action-facing: a memory only counts as harmful here if it reaches the brief.
+
+| Run | Harm rate |
+| --- | ---: |
+| no_memory | 0 |
+| full_context | 0.611 |
+| vanilla_vector_memory | 0.4 |
+| time_aware_vector_memory | 0.4 |
+| raw_trace_retrieval | 0.611 |
+| summary_reflection | 0.615 |
+| unvalidated_memory | 0.5 |
+| human_curated_runbook | 0 |
+| cem0_validation | 0 |
+
 ## Audit Coverage
 
 Audit completeness is strict. A promoted card counts only when it has:
@@ -183,7 +199,7 @@ Those remain unchecked in `TODO.md`.
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
-1. Add memory harm rate and action influence rate as named report metrics.
+1. Add action influence rate as a named report metric.
 2. Add latency and token/cost measurements.
 3. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
 4. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.

@@ -106,6 +106,26 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
     lines.extend(
         [
             "",
+            "## Memory Harm",
+            "",
+            "| Run | Harm rate |",
+            "| --- | ---: |",
+        ]
+    )
+    for row in [*report.baseline_rows, report.cem0_row]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    row.name,
+                    _format_float(row.memory_harm_rate),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Audit Coverage",
             "",
             "| Run | Audit completeness | Evidence consolidation | Max support |",

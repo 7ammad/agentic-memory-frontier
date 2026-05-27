@@ -79,7 +79,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Contradiction detection recall.
 - [x] Stale-memory suppression.
 - [x] Quarantine false-positive rate.
-- [ ] Memory harm rate as a named report metric.
+- [x] Memory harm rate as a named report metric.
 - [ ] Action influence rate.
 - [x] Evidence support/consolidation metrics.
 - [ ] p95 write latency.
@@ -300,6 +300,10 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: required metrics include contradiction detection precision.
   - Needed outcome: distinguish true contradictions from safe same-key/different-scope cases.
 
-- [ ] Add memory harm rate as a named report metric.
+- [x] Add memory harm rate as a named report metric.
   - Original source: required metrics include memory harm rate.
   - Needed outcome: expose the share of action guidance polluted by false, stale, unsupported, or out-of-scope memory.
+
+- [ ] Add action influence rate.
+  - Original source: required metrics include action influence rate.
+  - Needed outcome: report how often promoted CEM-0 recommendations are decisive for the held-out workflow outcome.

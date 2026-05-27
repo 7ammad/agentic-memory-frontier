@@ -57,6 +57,7 @@ class WritePathMetrics(BaseModel):
     action_brief_card_count: int
     action_brief_relevance_recall: float = 0.0
     action_brief_pollution_rate: float = 0.0
+    memory_harm_rate: float = 0.0
     scoped_memory_suppression: float = 0.0
     expired_memory_suppression: float = 0.0
     evidence_consolidation_count: int = 0
@@ -93,6 +94,7 @@ class EvalReportRow(BaseModel):
     contradiction_recall: float
     action_brief_relevance_recall: float
     action_brief_pollution_rate: float
+    memory_harm_rate: float
     scoped_memory_suppression: float
     expired_memory_suppression: float
     evidence_consolidation_count: int
@@ -527,6 +529,10 @@ def _run_unvalidated_memory(
                 brief.recommended_next_actions,
                 expectations,
             ),
+            memory_harm_rate=_memory_harm_rate(
+                brief.recommended_next_actions,
+                expectations,
+            ),
             scoped_memory_suppression=_scoped_memory_suppression(
                 brief.recommended_next_actions,
                 expectations,
@@ -566,6 +572,7 @@ def _run_no_memory() -> MemoryRunResult:
             action_brief_card_count=0,
             action_brief_relevance_recall=0.0,
             action_brief_pollution_rate=0.0,
+            memory_harm_rate=0.0,
             scoped_memory_suppression=0.0,
             expired_memory_suppression=0.0,
             evidence_consolidation_count=0,
@@ -604,6 +611,10 @@ def _run_full_context(
                 expectations,
             ),
             action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            memory_harm_rate=_memory_harm_rate(
                 recommended_actions,
                 expectations,
             ),
@@ -655,6 +666,10 @@ def _run_raw_trace_retrieval(
                 expectations,
             ),
             action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            memory_harm_rate=_memory_harm_rate(
                 recommended_actions,
                 expectations,
             ),
@@ -717,6 +732,10 @@ def _run_vanilla_vector_memory(
                 expectations,
             ),
             action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            memory_harm_rate=_memory_harm_rate(
                 recommended_actions,
                 expectations,
             ),
@@ -786,6 +805,10 @@ def _run_time_aware_vector_memory(
                 recommended_actions,
                 expectations,
             ),
+            memory_harm_rate=_memory_harm_rate(
+                recommended_actions,
+                expectations,
+            ),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -847,6 +870,10 @@ def _run_summary_reflection(
                 recommended_actions,
                 expectations,
             ),
+            memory_harm_rate=_memory_harm_rate(
+                recommended_actions,
+                expectations,
+            ),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -896,6 +923,10 @@ def _run_human_curated_runbook(
                 expectations,
             ),
             action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            memory_harm_rate=_memory_harm_rate(
                 recommended_actions,
                 expectations,
             ),
@@ -984,6 +1015,7 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         contradiction_recall=run.metrics.contradiction_recall,
         action_brief_relevance_recall=run.metrics.action_brief_relevance_recall,
         action_brief_pollution_rate=run.metrics.action_brief_pollution_rate,
+        memory_harm_rate=run.metrics.memory_harm_rate,
         scoped_memory_suppression=run.metrics.scoped_memory_suppression,
         expired_memory_suppression=run.metrics.expired_memory_suppression,
         evidence_consolidation_count=run.metrics.evidence_consolidation_count,
@@ -1144,6 +1176,10 @@ def _cem0_metrics(
             expectations,
         ),
         action_brief_pollution_rate=_action_brief_pollution_rate(
+            action_brief_recommended_actions,
+            expectations,
+        ),
+        memory_harm_rate=_memory_harm_rate(
             action_brief_recommended_actions,
             expectations,
         ),
@@ -1526,6 +1562,25 @@ def _action_brief_pollution_rate(
     }
     polluted = [content for content in recommended_actions if content not in relevant_expected]
     return len(polluted) / len(recommended_actions)
+
+
+def _memory_harm_rate(
+    recommended_actions: list[str],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> float:
+    if not recommended_actions:
+        return 0.0
+    harmful_actions = [
+        content
+        for content in recommended_actions
+        if (
+            content not in expectations
+            or expectations[content].expected_status != "promote"
+            or not expectations[content].applies_to_held_out
+            or expectations[content].expired_for_held_out
+        )
+    ]
+    return len(harmful_actions) / len(recommended_actions)
 
 
 def _scoped_memory_suppression(
