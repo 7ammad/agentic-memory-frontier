@@ -126,6 +126,26 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
     lines.extend(
         [
             "",
+            "## Action Influence",
+            "",
+            "| Run | Influence rate |",
+            "| --- | ---: |",
+        ]
+    )
+    for row in [*report.baseline_rows, report.cem0_row]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    row.name,
+                    _format_float(row.action_influence_rate),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Audit Coverage",
             "",
             "| Run | Audit completeness | Evidence consolidation | Max support |",

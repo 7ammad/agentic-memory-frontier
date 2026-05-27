@@ -147,6 +147,22 @@ Memory harm rate is the fraction of recommended actions that are false, stale, e
 | human_curated_runbook | 0 |
 | cem0_validation | 0 |
 
+## Action Influence
+
+Action influence rate is the fraction of held-out decisive actions present in the brief. It does not imply success by itself: baselines can include decisive actions and still fail if harmful memory pollutes the same brief.
+
+| Run | Influence rate |
+| --- | ---: |
+| no_memory | 0 |
+| full_context | 1 |
+| vanilla_vector_memory | 0.667 |
+| time_aware_vector_memory | 0.667 |
+| raw_trace_retrieval | 1 |
+| summary_reflection | 1 |
+| unvalidated_memory | 1 |
+| human_curated_runbook | 1 |
+| cem0_validation | 1 |
+
 ## Audit Coverage
 
 Audit completeness is strict. A promoted card counts only when it has:
@@ -190,7 +206,7 @@ The current report does not prove:
 - external HaluMem performance;
 - MemoryArena performance;
 - LongMemEval-V2 performance;
-- action influence rate from real agent traces;
+- action influence measurement from real agent traces;
 - latency or token-cost claims.
 
 Those remain unchecked in `TODO.md`.
@@ -199,7 +215,6 @@ Those remain unchecked in `TODO.md`.
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
-1. Add action influence rate as a named report metric.
-2. Add latency and token/cost measurements.
-3. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
-4. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
+1. Add latency and token/cost measurements.
+2. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
+3. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.

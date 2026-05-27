@@ -78,6 +78,7 @@ Current expected signal:
       "action_brief_relevance_recall": 0.8333333333333334,
       "action_brief_pollution_rate": 0.4,
       "memory_harm_rate": 0.4,
+      "action_influence_rate": 0.6666666666666666,
       "scoped_memory_suppression": 0.75,
       "audit_completeness_rate": 0.0
     }
@@ -90,6 +91,7 @@ Current expected signal:
       "action_brief_relevance_recall": 0.8333333333333334,
       "action_brief_pollution_rate": 0.4,
       "memory_harm_rate": 0.4,
+      "action_influence_rate": 0.6666666666666666,
       "scoped_memory_suppression": 0.75,
       "audit_completeness_rate": 0.0
     }
@@ -128,6 +130,7 @@ Current expected signal:
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.5,
       "memory_harm_rate": 0.5,
+      "action_influence_rate": 1.0,
       "scoped_memory_suppression": 1.0,
       "expired_memory_suppression": 1.0,
       "evidence_consolidation_count": 0,
@@ -144,6 +147,7 @@ Current expected signal:
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.0,
       "memory_harm_rate": 0.0,
+      "action_influence_rate": 1.0,
       "audit_completeness_rate": 0.0
     }
   },
@@ -169,6 +173,7 @@ Current expected signal:
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.0,
       "memory_harm_rate": 0.0,
+      "action_influence_rate": 1.0,
       "scoped_memory_suppression": 1.0,
       "expired_memory_suppression": 1.0,
       "evidence_consolidation_count": 1,
@@ -238,7 +243,7 @@ Current expected signal:
 }
 ```
 
-The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, extraction quality, contradiction detection, memory harm, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
+The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, extraction quality, contradiction detection, memory harm, action influence, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
 
 Run tests:
 

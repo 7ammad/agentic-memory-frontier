@@ -82,6 +82,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.full_context.metrics.action_brief_relevance_recall == 1.0
     assert round(result.full_context.metrics.action_brief_pollution_rate, 3) == 0.611
     assert round(result.full_context.metrics.memory_harm_rate, 3) == 0.611
+    assert result.full_context.metrics.action_influence_rate == 1.0
     assert result.full_context.metrics.scoped_memory_suppression == 0.0
     assert result.full_context.metrics.expired_memory_suppression == 0.0
     assert result.full_context.metrics.audit_completeness_rate == 0.0
@@ -91,6 +92,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert round(result.vanilla_vector_memory.metrics.action_brief_relevance_recall, 3) == 0.833
     assert result.vanilla_vector_memory.metrics.action_brief_pollution_rate == 0.4
     assert result.vanilla_vector_memory.metrics.memory_harm_rate == 0.4
+    assert round(result.vanilla_vector_memory.metrics.action_influence_rate, 3) == 0.667
     assert result.vanilla_vector_memory.metrics.scoped_memory_suppression == 0.75
     assert result.vanilla_vector_memory.metrics.expired_memory_suppression == 0.0
     assert result.vanilla_vector_memory.metrics.audit_completeness_rate == 0.0
@@ -107,6 +109,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert round(result.time_aware_vector_memory.metrics.action_brief_relevance_recall, 3) == 0.833
     assert result.time_aware_vector_memory.metrics.action_brief_pollution_rate == 0.4
     assert result.time_aware_vector_memory.metrics.memory_harm_rate == 0.4
+    assert round(result.time_aware_vector_memory.metrics.action_influence_rate, 3) == 0.667
     assert result.time_aware_vector_memory.metrics.scoped_memory_suppression == 0.75
     assert result.time_aware_vector_memory.metrics.expired_memory_suppression == 0.0
     assert result.time_aware_vector_memory.metrics.audit_completeness_rate == 0.0
@@ -120,6 +123,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.raw_trace_retrieval.metrics.action_brief_relevance_recall == 1.0
     assert round(result.raw_trace_retrieval.metrics.action_brief_pollution_rate, 3) == 0.611
     assert round(result.raw_trace_retrieval.metrics.memory_harm_rate, 3) == 0.611
+    assert result.raw_trace_retrieval.metrics.action_influence_rate == 1.0
     assert result.raw_trace_retrieval.metrics.scoped_memory_suppression == 0.0
     assert result.raw_trace_retrieval.metrics.expired_memory_suppression == 0.0
     assert result.raw_trace_retrieval.metrics.audit_completeness_rate == 0.0
@@ -129,6 +133,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert round(result.summary_reflection.metrics.action_brief_relevance_recall, 3) == 0.667
     assert round(result.summary_reflection.metrics.action_brief_pollution_rate, 3) == 0.615
     assert round(result.summary_reflection.metrics.memory_harm_rate, 3) == 0.615
+    assert result.summary_reflection.metrics.action_influence_rate == 1.0
     assert result.summary_reflection.metrics.scoped_memory_suppression == 0.25
     assert result.summary_reflection.metrics.expired_memory_suppression == 0.0
     assert result.summary_reflection.metrics.audit_completeness_rate == 0.0
@@ -139,6 +144,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.unvalidated_memory.metrics.action_brief_relevance_recall == 1.0
     assert result.unvalidated_memory.metrics.action_brief_pollution_rate == 0.5
     assert result.unvalidated_memory.metrics.memory_harm_rate == 0.5
+    assert result.unvalidated_memory.metrics.action_influence_rate == 1.0
     assert result.unvalidated_memory.metrics.scoped_memory_suppression == 1.0
     assert result.unvalidated_memory.metrics.expired_memory_suppression == 1.0
     assert result.unvalidated_memory.metrics.evidence_consolidation_count == 0
@@ -156,6 +162,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.human_curated_runbook.metrics.action_brief_relevance_recall == 1.0
     assert result.human_curated_runbook.metrics.action_brief_pollution_rate == 0.0
     assert result.human_curated_runbook.metrics.memory_harm_rate == 0.0
+    assert result.human_curated_runbook.metrics.action_influence_rate == 1.0
     assert result.human_curated_runbook.metrics.scoped_memory_suppression == 1.0
     assert result.human_curated_runbook.metrics.expired_memory_suppression == 1.0
     assert result.human_curated_runbook.metrics.audit_completeness_rate == 0.0
@@ -165,6 +172,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.cem0_validation.metrics.action_brief_relevance_recall == 1.0
     assert result.cem0_validation.metrics.action_brief_pollution_rate == 0.0
     assert result.cem0_validation.metrics.memory_harm_rate == 0.0
+    assert result.cem0_validation.metrics.action_influence_rate == 1.0
     assert result.cem0_validation.metrics.scoped_memory_suppression == 1.0
     assert result.cem0_validation.metrics.expired_memory_suppression == 1.0
     assert result.cem0_validation.metrics.evidence_consolidation_count == 1
@@ -269,6 +277,10 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "| full_context | 0.611 |" in markdown
     assert "| unvalidated_memory | 0.5 |" in markdown
     assert "| cem0_validation | 0 |" in markdown
+    assert "## Action Influence" in markdown
+    assert "| no_memory | 0 |" in markdown
+    assert "| vanilla_vector_memory | 0.667 |" in markdown
+    assert "| cem0_validation | 1 |" in markdown
     assert "## Audit Coverage" in markdown
     assert "| unvalidated_memory | 0 | 0 | 1 |" in markdown
     assert "| cem0_validation | 1 | 1 | 2 |" in markdown

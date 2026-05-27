@@ -36,6 +36,12 @@ RiskType = Literal[
     "misleading_success",
 ]
 
+HELD_OUT_DECISIVE_ACTIONS = (
+    "set assignment_group before assignee",
+    "avoid submitting workflow-gotchas form unless approval_code is present",
+    "run pytest before claiming kernel changes are done",
+)
+
 
 class SyntheticMemoryExpectation(BaseModel):
     content: str
@@ -58,6 +64,7 @@ class WritePathMetrics(BaseModel):
     action_brief_relevance_recall: float = 0.0
     action_brief_pollution_rate: float = 0.0
     memory_harm_rate: float = 0.0
+    action_influence_rate: float = 0.0
     scoped_memory_suppression: float = 0.0
     expired_memory_suppression: float = 0.0
     evidence_consolidation_count: int = 0
@@ -95,6 +102,7 @@ class EvalReportRow(BaseModel):
     action_brief_relevance_recall: float
     action_brief_pollution_rate: float
     memory_harm_rate: float
+    action_influence_rate: float
     scoped_memory_suppression: float
     expired_memory_suppression: float
     evidence_consolidation_count: int
@@ -533,6 +541,7 @@ def _run_unvalidated_memory(
                 brief.recommended_next_actions,
                 expectations,
             ),
+            action_influence_rate=_action_influence_rate(brief.recommended_next_actions),
             scoped_memory_suppression=_scoped_memory_suppression(
                 brief.recommended_next_actions,
                 expectations,
@@ -573,6 +582,7 @@ def _run_no_memory() -> MemoryRunResult:
             action_brief_relevance_recall=0.0,
             action_brief_pollution_rate=0.0,
             memory_harm_rate=0.0,
+            action_influence_rate=0.0,
             scoped_memory_suppression=0.0,
             expired_memory_suppression=0.0,
             evidence_consolidation_count=0,
@@ -618,6 +628,7 @@ def _run_full_context(
                 recommended_actions,
                 expectations,
             ),
+            action_influence_rate=_action_influence_rate(recommended_actions),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -673,6 +684,7 @@ def _run_raw_trace_retrieval(
                 recommended_actions,
                 expectations,
             ),
+            action_influence_rate=_action_influence_rate(recommended_actions),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -739,6 +751,7 @@ def _run_vanilla_vector_memory(
                 recommended_actions,
                 expectations,
             ),
+            action_influence_rate=_action_influence_rate(recommended_actions),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -809,6 +822,7 @@ def _run_time_aware_vector_memory(
                 recommended_actions,
                 expectations,
             ),
+            action_influence_rate=_action_influence_rate(recommended_actions),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -874,6 +888,7 @@ def _run_summary_reflection(
                 recommended_actions,
                 expectations,
             ),
+            action_influence_rate=_action_influence_rate(recommended_actions),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -930,6 +945,7 @@ def _run_human_curated_runbook(
                 recommended_actions,
                 expectations,
             ),
+            action_influence_rate=_action_influence_rate(recommended_actions),
             scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
@@ -1016,6 +1032,7 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         action_brief_relevance_recall=run.metrics.action_brief_relevance_recall,
         action_brief_pollution_rate=run.metrics.action_brief_pollution_rate,
         memory_harm_rate=run.metrics.memory_harm_rate,
+        action_influence_rate=run.metrics.action_influence_rate,
         scoped_memory_suppression=run.metrics.scoped_memory_suppression,
         expired_memory_suppression=run.metrics.expired_memory_suppression,
         evidence_consolidation_count=run.metrics.evidence_consolidation_count,
@@ -1044,11 +1061,11 @@ def _comparison_row(
 def workflow_report_row_from_run(run: MemoryRunResult) -> WorkflowReportRow:
     actions = set(run.action_brief_recommended_actions)
     failure_reasons: list[str] = []
-    if "set assignment_group before assignee" not in actions:
+    if HELD_OUT_DECISIVE_ACTIONS[0] not in actions:
         failure_reasons.append("missing assignment_group-before-assignee precondition")
-    if "avoid submitting workflow-gotchas form unless approval_code is present" not in actions:
+    if HELD_OUT_DECISIVE_ACTIONS[1] not in actions:
         failure_reasons.append("missing approval_code failure lesson")
-    if "run pytest before claiming kernel changes are done" not in actions:
+    if HELD_OUT_DECISIVE_ACTIONS[2] not in actions:
         failure_reasons.append("missing test-before-claiming-done instruction")
 
     polluted_actions = [
@@ -1183,6 +1200,7 @@ def _cem0_metrics(
             action_brief_recommended_actions,
             expectations,
         ),
+        action_influence_rate=_action_influence_rate(action_brief_recommended_actions),
         scoped_memory_suppression=_scoped_memory_suppression(
             action_brief_recommended_actions,
             expectations,
@@ -1581,6 +1599,14 @@ def _memory_harm_rate(
         )
     ]
     return len(harmful_actions) / len(recommended_actions)
+
+
+def _action_influence_rate(recommended_actions: list[str]) -> float:
+    action_set = set(recommended_actions)
+    decisive_present = [
+        action for action in HELD_OUT_DECISIVE_ACTIONS if action in action_set
+    ]
+    return _ratio(len(decisive_present), len(HELD_OUT_DECISIVE_ACTIONS))
 
 
 def _scoped_memory_suppression(
