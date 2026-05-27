@@ -57,6 +57,7 @@ Current expected signal:
   },
   "cem0_validation": {
     "trusted_false_memory_count": 0,
+    "expected_action_delta": 1.0,
     "decision_reason_codes": {
       "database=mysql": ["contradiction"],
       "timezone=UTC": ["contradiction"],

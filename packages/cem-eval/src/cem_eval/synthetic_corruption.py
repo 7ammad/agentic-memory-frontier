@@ -56,6 +56,7 @@ class MemoryRunResult(BaseModel):
     quarantined_count: int
     trusted_false_memory_count: int
     action_brief_recommended_actions: list[str] = Field(default_factory=list)
+    expected_action_delta: float
     decision_reason_codes: dict[str, list[str]] = Field(default_factory=dict)
     metrics: WritePathMetrics
 
@@ -302,6 +303,7 @@ def _run_unvalidated_memory(
         quarantined_count=0,
         trusted_false_memory_count=len(false_atoms),
         action_brief_recommended_actions=brief.recommended_next_actions,
+        expected_action_delta=_expected_action_delta(brief.recommended_next_actions, expectations),
         decision_reason_codes={},
         metrics=WritePathMetrics(
             false_memory_resistance=0.0,
@@ -327,6 +329,7 @@ def _run_no_memory() -> MemoryRunResult:
         quarantined_count=0,
         trusted_false_memory_count=0,
         action_brief_recommended_actions=[],
+        expected_action_delta=0.0,
         decision_reason_codes={},
         metrics=WritePathMetrics(
             false_memory_resistance=0.0,
@@ -379,6 +382,7 @@ def _run_cem0_validation(
             quarantined_count=len(quarantined),
             trusted_false_memory_count=len(trusted_false),
             action_brief_recommended_actions=brief.recommended_next_actions,
+            expected_action_delta=_expected_action_delta(brief.recommended_next_actions, expectations),
             decision_reason_codes=_decision_reason_codes(cem, atoms),
             metrics=metrics,
         ),
@@ -615,6 +619,32 @@ def _held_out_task() -> TaskContext:
         domain_scope="workflow-gotchas",
         task_family="workflow-gotcha",
     )
+
+
+def _expected_action_delta(
+    recommended_actions: list[str],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> float:
+    action_set = set(recommended_actions)
+    valid_expected = [
+        expectation.content
+        for expectation in expectations.values()
+        if expectation.expected_status == "promote"
+    ]
+    unsafe_expected = [
+        expectation.content
+        for expectation in expectations.values()
+        if expectation.expected_status != "promote"
+    ]
+    valid_coverage = _ratio(
+        len([content for content in valid_expected if content in action_set]),
+        len(valid_expected),
+    )
+    unsafe_pollution = _ratio(
+        len([content for content in unsafe_expected if content in action_set]),
+        len(unsafe_expected),
+    )
+    return valid_coverage - unsafe_pollution
 
 
 def _expected_status(

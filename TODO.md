@@ -35,6 +35,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add failed-trace lesson fixture cases with valid failure-mode promotion.
 - [x] Add action-brief recommended-action assertions and unvalidated-memory harm checks.
 - [x] Add no-memory baseline row to the synthetic eval.
+- [x] Add `expected_action_delta` placeholder computation from fixture labels.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -75,7 +76,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add held-out task assertions that check decisive recommended action text, not just card count.
 - [x] Add a no-memory baseline for held-out task success.
 - [x] Add an unvalidated-memory harm check where a false card pollutes the action brief.
-- [ ] Add `expected_action_delta` placeholder computation from fixture labels.
+- [x] Add `expected_action_delta` placeholder computation from fixture labels.
 
 ## Next Lane: Audit And Reporting
 

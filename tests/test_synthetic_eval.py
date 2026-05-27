@@ -16,9 +16,12 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.false_quarantine_rate == 0.0
     assert result.no_memory.metrics.action_brief_card_count == 0
     assert result.no_memory.action_brief_recommended_actions == []
+    assert result.no_memory.expected_action_delta == 0.0
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
+    assert result.unvalidated_memory.expected_action_delta == 0.0
     assert result.cem0_validation.trusted_false_memory_count == 0
+    assert result.cem0_validation.expected_action_delta == 1.0
     assert result.cem0_validation.decision_reason_codes["database=mysql"] == ["contradiction"]
     assert "assistant_hypothesis" in result.cem0_validation.decision_reason_codes[
         "user always wants us to skip tests"
