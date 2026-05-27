@@ -71,6 +71,7 @@ class SyntheticEvalResult(BaseModel):
     false_memory_resistance: float
     contradiction_recall: float
     false_quarantine_rate: float
+    no_memory: MemoryRunResult
     unvalidated_memory: MemoryRunResult
     cem0_validation: MemoryRunResult
 
@@ -79,6 +80,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     root = Path(root)
     fixture = build_synthetic_corruption_fixture()
     expectations = fixture.expectations_by_content
+    no_memory = _run_no_memory()
     unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", fixture.traces, expectations)
     cem0_validation, atoms = _run_cem0_validation(root / "cem0-validation", fixture.traces, expectations)
 
@@ -98,6 +100,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         false_memory_resistance=cem0_validation.metrics.false_memory_resistance,
         contradiction_recall=cem0_validation.metrics.contradiction_recall,
         false_quarantine_rate=cem0_validation.metrics.false_quarantine_rate,
+        no_memory=no_memory,
         unvalidated_memory=unvalidated_memory,
         cem0_validation=cem0_validation,
     )
@@ -313,6 +316,27 @@ def _run_unvalidated_memory(
             valid_memory_retention_by_risk={
                 risk_type: 1.0 for risk_type in _risk_types(expectations, expected_status="promote")
             },
+        ),
+    )
+
+
+def _run_no_memory() -> MemoryRunResult:
+    return MemoryRunResult(
+        name="no_memory",
+        proposed_count=0,
+        quarantined_count=0,
+        trusted_false_memory_count=0,
+        action_brief_recommended_actions=[],
+        decision_reason_codes={},
+        metrics=WritePathMetrics(
+            false_memory_resistance=0.0,
+            contradiction_recall=0.0,
+            false_quarantine_rate=0.0,
+            promoted_count=0,
+            action_brief_card_count=0,
+            stale_memory_suppression=0.0,
+            false_memory_resistance_by_risk={},
+            valid_memory_retention_by_risk={},
         ),
     )
 

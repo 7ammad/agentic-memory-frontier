@@ -43,6 +43,11 @@ Current expected signal:
   "false_memory_resistance": 1.0,
   "contradiction_recall": 1.0,
   "false_quarantine_rate": 0.0,
+  "no_memory": {
+    "metrics": {
+      "action_brief_card_count": 0
+    }
+  },
   "unvalidated_memory": {
     "trusted_false_memory_count": 7,
     "metrics": {
