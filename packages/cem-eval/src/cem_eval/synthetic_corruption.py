@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -61,6 +62,23 @@ class MemoryRunResult(BaseModel):
     metrics: WritePathMetrics
 
 
+class EvalReportRow(BaseModel):
+    name: str
+    proposed_count: int
+    quarantined_count: int
+    trusted_false_memory_count: int
+    action_brief_card_count: int
+    expected_action_delta: float
+    false_memory_resistance: float
+
+
+class SyntheticEvalReport(BaseModel):
+    suite_name: str
+    generated_at: datetime
+    baseline_rows: list[EvalReportRow]
+    cem0_row: EvalReportRow
+
+
 class SyntheticEvalResult(BaseModel):
     fixture_case_count: int
     proposed_count: int
@@ -75,6 +93,7 @@ class SyntheticEvalResult(BaseModel):
     no_memory: MemoryRunResult
     unvalidated_memory: MemoryRunResult
     cem0_validation: MemoryRunResult
+    report: SyntheticEvalReport
 
 
 def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
@@ -90,6 +109,11 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     hypothesis_quarantined = any(
         "assistant_hypothesis" in codes for codes in cem0_validation.decision_reason_codes.values()
     )
+    report = _build_report(
+        no_memory=no_memory,
+        unvalidated_memory=unvalidated_memory,
+        cem0_validation=cem0_validation,
+    )
     return SyntheticEvalResult(
         fixture_case_count=len(expectations),
         proposed_count=cem0_validation.proposed_count,
@@ -104,6 +128,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         no_memory=no_memory,
         unvalidated_memory=unvalidated_memory,
         cem0_validation=cem0_validation,
+        report=report,
     )
 
 
@@ -341,6 +366,32 @@ def _run_no_memory() -> MemoryRunResult:
             false_memory_resistance_by_risk={},
             valid_memory_retention_by_risk={},
         ),
+    )
+
+
+def _build_report(
+    *,
+    no_memory: MemoryRunResult,
+    unvalidated_memory: MemoryRunResult,
+    cem0_validation: MemoryRunResult,
+) -> SyntheticEvalReport:
+    return SyntheticEvalReport(
+        suite_name="synthetic_corruption",
+        generated_at=datetime.now(timezone.utc),
+        baseline_rows=[_report_row(no_memory), _report_row(unvalidated_memory)],
+        cem0_row=_report_row(cem0_validation),
+    )
+
+
+def _report_row(run: MemoryRunResult) -> EvalReportRow:
+    return EvalReportRow(
+        name=run.name,
+        proposed_count=run.proposed_count,
+        quarantined_count=run.quarantined_count,
+        trusted_false_memory_count=run.trusted_false_memory_count,
+        action_brief_card_count=run.metrics.action_brief_card_count,
+        expected_action_delta=run.expected_action_delta,
+        false_memory_resistance=run.metrics.false_memory_resistance,
     )
 
 
