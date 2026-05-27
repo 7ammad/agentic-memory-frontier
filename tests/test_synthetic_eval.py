@@ -1,4 +1,8 @@
-from cem_eval import render_synthetic_eval_markdown, run_synthetic_corruption_eval
+from cem_eval import (
+    render_synthetic_eval_markdown,
+    run_halumem_facsimile_eval,
+    run_synthetic_corruption_eval,
+)
 
 
 def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
@@ -100,3 +104,16 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "| unvalidated_memory | 13 | 0 | 7 | 13 | 0 | 0 |" in markdown
     assert "| cem0_validation | 13 | 6 | 0 | 6 | 1 | 1 |" in markdown
     assert "`database=mysql`: contradiction" in markdown
+
+
+def test_halumem_facsimile_maps_operation_metrics(tmp_path):
+    result = run_halumem_facsimile_eval(tmp_path)
+
+    assert result.suite_name == "halumem_local_facsimile"
+    assert result.source_suite_name == "synthetic_corruption"
+    assert result.extraction_false_memory_resistance == 1.0
+    assert result.update_recall == 1.0
+    assert result.memory_qa_action_delta == 1.0
+    assert result.baseline_action_delta == 0.0
+    assert result.cem0_quarantined_count == 6
+    assert result.trusted_false_memory_count == 0
