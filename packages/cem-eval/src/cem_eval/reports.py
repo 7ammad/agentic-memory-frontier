@@ -85,6 +85,27 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
     lines.extend(
         [
             "",
+            "## Contradiction Detection",
+            "",
+            "| Run | Precision | Recall |",
+            "| --- | ---: | ---: |",
+        ]
+    )
+    for row in [*report.baseline_rows, report.cem0_row]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    row.name,
+                    _format_float(row.contradiction_precision),
+                    _format_float(row.contradiction_recall),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Audit Coverage",
             "",
             "| Run | Audit completeness | Evidence consolidation | Max support |",

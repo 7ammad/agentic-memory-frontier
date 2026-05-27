@@ -50,6 +50,7 @@ class WritePathMetrics(BaseModel):
     extraction_recall: float = 0.0
     extraction_f1: float = 0.0
     false_memory_resistance: float
+    contradiction_precision: float = 0.0
     contradiction_recall: float
     false_quarantine_rate: float
     promoted_count: int
@@ -88,6 +89,8 @@ class EvalReportRow(BaseModel):
     extraction_recall: float
     extraction_f1: float
     false_memory_resistance: float
+    contradiction_precision: float
+    contradiction_recall: float
     action_brief_relevance_recall: float
     action_brief_pollution_rate: float
     scoped_memory_suppression: float
@@ -130,6 +133,7 @@ class SyntheticEvalResult(BaseModel):
     hypothesis_quarantined: bool
     action_brief_card_count: int
     false_memory_resistance: float
+    contradiction_precision: float
     contradiction_recall: float
     false_quarantine_rate: float
     no_memory: MemoryRunResult
@@ -183,6 +187,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         hypothesis_quarantined=hypothesis_quarantined,
         action_brief_card_count=cem0_validation.metrics.action_brief_card_count,
         false_memory_resistance=cem0_validation.metrics.false_memory_resistance,
+        contradiction_precision=cem0_validation.metrics.contradiction_precision,
         contradiction_recall=cem0_validation.metrics.contradiction_recall,
         false_quarantine_rate=cem0_validation.metrics.false_quarantine_rate,
         no_memory=no_memory,
@@ -975,6 +980,8 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         extraction_recall=run.metrics.extraction_recall,
         extraction_f1=run.metrics.extraction_f1,
         false_memory_resistance=run.metrics.false_memory_resistance,
+        contradiction_precision=run.metrics.contradiction_precision,
+        contradiction_recall=run.metrics.contradiction_recall,
         action_brief_relevance_recall=run.metrics.action_brief_relevance_recall,
         action_brief_pollution_rate=run.metrics.action_brief_pollution_rate,
         scoped_memory_suppression=run.metrics.scoped_memory_suppression,
@@ -1116,14 +1123,7 @@ def _cem0_metrics(
 ) -> WritePathMetrics:
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     blocked_false_atoms = [atom for atom in false_atoms if _is_suppressed(cem, atom)]
-    contradiction_atoms = [
-        atom for atom in atoms if _expectation(atom, expectations).risk_type == "contradiction"
-    ]
-    detected_contradictions = [
-        atom
-        for atom in contradiction_atoms
-        if "contradiction" in _decision(cem, atom).reason_codes
-    ]
+    contradiction_precision, contradiction_recall = _contradiction_scores(cem, atoms, expectations)
     valid_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "promote"]
     valid_quarantined = [atom for atom in valid_atoms if _decision(cem, atom).decision == "quarantined"]
     stale_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "deprecated"]
@@ -1134,7 +1134,8 @@ def _cem0_metrics(
         extraction_recall=extraction_recall,
         extraction_f1=extraction_f1,
         false_memory_resistance=_ratio(len(blocked_false_atoms), len(false_atoms)),
-        contradiction_recall=_ratio(len(detected_contradictions), len(contradiction_atoms)),
+        contradiction_precision=contradiction_precision,
+        contradiction_recall=contradiction_recall,
         false_quarantine_rate=_ratio(len(valid_quarantined), len(valid_atoms)),
         promoted_count=promoted_count,
         action_brief_card_count=action_brief_card_count,
@@ -1214,6 +1215,27 @@ def _valid_memory_retention_by_risk(
         retained = [atom for atom in valid_atoms if _decision(cem, atom).decision == "candidate"]
         results[risk_type] = _ratio(len(retained), len(valid_atoms))
     return results
+
+
+def _contradiction_scores(
+    cem: CEM,
+    atoms: list[ExperienceAtom],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> tuple[float, float]:
+    expected_contradictions = [
+        atom for atom in atoms if _expectation(atom, expectations).risk_type == "contradiction"
+    ]
+    detected_as_contradictions = [
+        atom for atom in atoms if "contradiction" in _decision(cem, atom).reason_codes
+    ]
+    true_positive_detections = [
+        atom
+        for atom in detected_as_contradictions
+        if _expectation(atom, expectations).risk_type == "contradiction"
+    ]
+    precision = _ratio(len(true_positive_detections), len(detected_as_contradictions))
+    recall = _ratio(len(true_positive_detections), len(expected_contradictions))
+    return precision, recall
 
 
 def _extraction_scores(

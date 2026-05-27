@@ -75,7 +75,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Extraction precision/recall/F1.
 - [x] Update recall via local HaluMem facsimile.
 - [x] False memory resistance.
-- [ ] Contradiction detection precision.
+- [x] Contradiction detection precision.
 - [x] Contradiction detection recall.
 - [x] Stale-memory suppression.
 - [x] Quarantine false-positive rate.
@@ -296,6 +296,10 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: required metrics include extraction precision, recall, and F1.
   - Needed outcome: evaluate proposed atoms against fixture labels before validation.
 
-- [ ] Add contradiction detection precision.
+- [x] Add contradiction detection precision.
   - Original source: required metrics include contradiction detection precision.
   - Needed outcome: distinguish true contradictions from safe same-key/different-scope cases.
+
+- [ ] Add memory harm rate as a named report metric.
+  - Original source: required metrics include memory harm rate.
+  - Needed outcome: expose the share of action guidance polluted by false, stale, unsupported, or out-of-scope memory.

@@ -115,6 +115,22 @@ Extraction quality is measured against the synthetic fixture labels before valid
 | human_curated_runbook | 0 | 0 | 0 |
 | cem0_validation | 1 | 1 | 1 |
 
+## Contradiction Detection
+
+Contradiction precision is measured over validator decisions. The denominator is every atom labeled with the `contradiction` reason code; the numerator is only fixture-labeled true contradictions. The scoped `report_format=csv` and `report_format=json` memories are the current negative-control pair: same key, different domains, no contradiction label.
+
+| Run | Precision | Recall |
+| --- | ---: | ---: |
+| no_memory | 0 | 0 |
+| full_context | 0 | 0 |
+| vanilla_vector_memory | 0 | 0 |
+| time_aware_vector_memory | 0 | 0 |
+| raw_trace_retrieval | 0 | 0 |
+| summary_reflection | 0 | 0 |
+| unvalidated_memory | 0 | 0 |
+| human_curated_runbook | 0 | 0 |
+| cem0_validation | 1 | 1 |
+
 ## Audit Coverage
 
 Audit completeness is strict. A promoted card counts only when it has:
@@ -158,7 +174,6 @@ The current report does not prove:
 - external HaluMem performance;
 - MemoryArena performance;
 - LongMemEval-V2 performance;
-- contradiction precision;
 - action influence rate from real agent traces;
 - latency or token-cost claims.
 
@@ -168,8 +183,7 @@ Those remain unchecked in `TODO.md`.
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
-1. Add the missing required baselines: full context, vector memory, time-aware vector memory, and human-curated runbook upper bound.
-2. Add extraction precision/recall/F1 and contradiction precision metrics.
-3. Add latency and token/cost measurements.
-4. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
-5. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
+1. Add memory harm rate and action influence rate as named report metrics.
+2. Add latency and token/cost measurements.
+3. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
+4. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
