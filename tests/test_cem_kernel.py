@@ -199,6 +199,36 @@ def test_untrusted_source_is_quarantined(tmp_path):
     assert decision.metric_labels == ["poisoned"]
 
 
+def test_repeated_evidence_reuses_experience_card(tmp_path):
+    cem = CEM(tmp_path)
+    trace_one = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=0, role="environment", content="SKILL: set assignment_group before assignee")],
+    )
+    trace_two = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=1, role="environment", content="SKILL: set assignment_group before assignee")],
+    )
+
+    cem.ingest_trace(trace_one)
+    first = cem.propose_memories(trace_one.trace_id)[0]
+    cem.validate(first.atom_id)
+    first_card = cem.promote(first.atom_id)
+    cem.ingest_trace(trace_two)
+    second = cem.propose_memories(trace_two.trace_id)[0]
+    cem.validate(second.atom_id)
+    second_card = cem.promote(second.atom_id)
+
+    assert first_card is not None
+    assert second_card is not None
+    assert second_card.card_id == first_card.card_id
+    assert second_card.evidence_atom_ids == [first.atom_id, second.atom_id]
+    assert cem.store.get_atom(second.atom_id).support_count == 2
+    assert len(cem.store.list_cards()) == 1
+
+
 def test_derived_claim_without_causal_support_is_quarantined(tmp_path):
     cem = CEM(tmp_path)
     trace = AgentTrace(

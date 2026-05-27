@@ -68,6 +68,18 @@ class CEM:
         if atom.promotion_status not in {"candidate", "verified"}:
             return None
 
+        existing = self._matching_card(atom)
+        if existing is not None:
+            if atom.atom_id not in existing.evidence_atom_ids:
+                existing.evidence_atom_ids.append(atom.atom_id)
+            existing.confidence_score = max(existing.confidence_score, atom.confidence_score)
+            existing.last_validated_at = utc_now()
+            atom.promotion_status = "verified"
+            atom.support_count = len(existing.evidence_atom_ids)
+            self.store.save_atom(atom)
+            self.store.save_card(existing)
+            return existing
+
         card = ExperienceCard(
             title=_title(atom.content),
             use_when=atom.domain_scope or atom.task_family or "similar task context",
@@ -159,6 +171,14 @@ class CEM:
         atom.promotion_status = "quarantined"
         atom.quarantine_reason = reason
         self.store.save_atom(atom)
+
+    def _matching_card(self, atom: ExperienceAtom) -> ExperienceCard | None:
+        title = _title(atom.content)
+        use_when = atom.domain_scope or atom.task_family or "similar task context"
+        for card in self.store.list_cards():
+            if card.title == title and card.use_when == use_when:
+                return card
+        return None
 
 
 def _title(content: str) -> str:

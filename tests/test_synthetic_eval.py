@@ -10,9 +10,9 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     result = run_synthetic_corruption_eval(tmp_path)
 
     assert result.fixture_case_count == 13
-    assert result.proposed_count == 13
+    assert result.proposed_count == 14
     assert result.quarantined_count == 6
-    assert result.promoted_count == 6
+    assert result.promoted_count == 7
     assert result.contradiction_detected
     assert result.hypothesis_quarantined
     assert result.action_brief_card_count == 6
@@ -32,12 +32,19 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.report.cem0_row.name == "cem0_validation"
     assert result.report.cem0_row.expected_action_delta == 1.0
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
+    assert result.raw_trace_retrieval.metrics.action_brief_card_count == 14
     assert result.raw_trace_retrieval.expected_action_delta == 0.0
     assert result.summary_reflection.trusted_false_memory_count == 5
+    assert result.summary_reflection.metrics.action_brief_card_count == 10
     assert result.summary_reflection.expected_action_delta < 0.0
+    assert result.unvalidated_memory.proposed_count == 14
+    assert result.unvalidated_memory.metrics.promoted_count == 14
+    assert result.unvalidated_memory.metrics.action_brief_card_count == 14
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
     assert result.unvalidated_memory.expected_action_delta == 0.0
+    assert result.cem0_validation.metrics.promoted_count == 7
+    assert result.cem0_validation.metrics.action_brief_card_count == 6
     assert result.cem0_validation.trusted_false_memory_count == 0
     assert result.cem0_validation.expected_action_delta == 1.0
     assert result.cem0_validation.decision_reason_codes["database=mysql"] == ["contradiction"]
@@ -100,10 +107,10 @@ def test_synthetic_eval_markdown_report(tmp_path):
 
     assert "# synthetic_corruption Report" in markdown
     assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
-    assert "| raw_trace_retrieval | 0 | 0 | 7 | 13 | 0 | 0 |" in markdown
-    assert "| summary_reflection | 0 | 0 | 5 | 9 | -0.048 | 0 |" in markdown
-    assert "| unvalidated_memory | 13 | 0 | 7 | 13 | 0 | 0 |" in markdown
-    assert "| cem0_validation | 13 | 6 | 0 | 6 | 1 | 1 |" in markdown
+    assert "| raw_trace_retrieval | 0 | 0 | 7 | 14 | 0 | 0 |" in markdown
+    assert "| summary_reflection | 0 | 0 | 5 | 10 | -0.048 | 0 |" in markdown
+    assert "| unvalidated_memory | 14 | 0 | 7 | 14 | 0 | 0 |" in markdown
+    assert "| cem0_validation | 14 | 6 | 0 | 6 | 1 | 1 |" in markdown
     assert "`database=mysql`: contradiction" in markdown
 
 

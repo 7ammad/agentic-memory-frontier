@@ -44,6 +44,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add summary/reflection baseline.
 - [x] Add HaluMem-style local facsimile runner.
 - [x] Add workflow gotchas environment.
+- [x] Add repeated-evidence consolidation fixture.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -100,3 +101,20 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add HaluMem-style adapter or local facsimile.
 - [x] Add workflow gotchas environment.
 - [ ] Add storage adapters only after the write-path and action-brief evals are stronger.
+
+## Next Lane: Eval Hardening V2
+
+- [x] Add repeated-evidence consolidation fixture.
+  - Example: the same valid skill appears in multiple successful traces.
+  - Needed outcome: support count increases without duplicating action-brief cards.
+
+- [ ] Add false-quarantine negative-control fixture.
+  - Example: two similar-looking memories have different scopes and should both survive.
+  - Needed outcome: contradiction detection respects scope before quarantine.
+
+- [ ] Add multi-session scope fixture.
+  - Example: preference in one session should not leak into a different project/session unless scope allows it.
+  - Needed outcome: action brief excludes out-of-scope memory.
+
+- [ ] Add report comparison against the new hardening cases.
+  - Needed outcome: synthetic report distinguishes write-path integrity from action-brief utility.
