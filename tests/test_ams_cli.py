@@ -187,6 +187,81 @@ def test_ams_cli_eval_smoke(tmp_path):
     assert result["result"]["contradiction_recall"] == 1.0
 
 
+def test_ams_cli_migration_dry_run_writes_ledger_without_mutating_memory(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = _legacy_memory_base(tmp_path)
+
+    result = _ams(root, "--json", "migrate", "dry-run", "--memory-base", str(memory_base))
+    directives = _ams(root, "--json", "list", "--kind", "directives")
+    cards = _ams(root, "--json", "list")
+
+    assert result["applied"] is False
+    assert result["pin_count"] == 4
+    assert result["remember_count"] == 1
+    assert result["skip_count"] == 1
+    assert directives["directives"] == []
+    assert cards["cards"] == []
+    assert (root / "migration-runs.jsonl").exists()
+    assert (root / "migration-latest.json").exists()
+    assert (root / "migration-latest.md").exists()
+
+
+def test_ams_cli_migration_apply_is_idempotent(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = _legacy_memory_base(tmp_path)
+
+    first = _ams(root, "--json", "migrate", "apply", "--memory-base", str(memory_base))
+    second = _ams(root, "--json", "migrate", "apply", "--memory-base", str(memory_base))
+    directives = _ams(root, "--json", "list", "--kind", "directives")
+    cards = _ams(root, "--json", "list")
+
+    assert first["applied"] is True
+    assert first["applied_pin_count"] == 4
+    assert first["applied_remember_count"] == 1
+    assert second["applied_pin_count"] == 0
+    assert second["applied_remember_count"] == 0
+    assert second["existing_count"] == 5
+    assert len(directives["directives"]) == 4
+    assert len(cards["cards"]) == 1
+
+
+def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
+    root = tmp_path / "ams"
+
+    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
+    _ams(
+        root,
+        "--json",
+        "remember",
+        "run python scripts/ams.py brief before continuing Agentic Memory System work",
+        "--kind",
+        "skill",
+        "--outcome",
+        "success",
+        "--domain",
+        "agentic-memory-system",
+    )
+    monitor = _ams(root, "--json", "monitor")
+    dashboard = _ams(root, "--json", "dashboard")
+
+    assert monitor["status"] == "pass"
+    assert (root / "monitor-runs.jsonl").exists()
+    assert (root / "monitor-latest.json").exists()
+    assert (root / "monitor-latest.md").exists()
+    assert dashboard["latest_monitor"]["run_id"] == monitor["run_id"]
+    assert dashboard["card_count"] == 1
+    assert dashboard["directive_count"] == 6
+
+
+def test_ams_cli_monitor_fails_visibly_when_memory_is_not_seeded(tmp_path):
+    root = tmp_path / "ams"
+
+    result = _ams(root, "--json", "monitor")
+
+    assert result["status"] == "fail"
+    assert any(check["status"] == "fail" for check in result["checks"])
+
+
 def _ams(root: Path, *args: str) -> dict:
     process = subprocess.run(
         [sys.executable, str(AMS), "--root", str(root), *args],
@@ -198,3 +273,30 @@ def _ams(root: Path, *args: str) -> dict:
     )
     assert process.returncode == 0, process.stderr
     return json.loads(process.stdout)
+
+
+def _legacy_memory_base(tmp_path: Path) -> Path:
+    memory_base = tmp_path / "legacy-memory"
+    memory_base.mkdir()
+    (memory_base / "MEMORY.md").write_text(
+        "\n".join(
+            [
+                "# Task Group: C:\\Dev\\Builds\\Agentic Memory System / CEM-0 foundation pivot",
+                "scope: Agentic Memory System after the pivot away from universal onboarding.",
+                "",
+                "## Reusable knowledge",
+                "- The project pivot is explicit: Causal Experience Memory.",
+                "- The first implementation wedge is CEM-0 / MemGuard Kernel.",
+                "- The immediate next-work queue is verification.",
+                "",
+                "## Failures and how to do differently",
+                "- Symptom: drift back into platform-first framing.",
+                "- Symptom: overstate current extractor.",
+                "",
+                "# Task Group: Other Project",
+                "scope: unrelated",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return memory_base

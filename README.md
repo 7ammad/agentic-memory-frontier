@@ -60,6 +60,15 @@ python scripts/ams.py list --kind directives
 python scripts/ams.py audit <memory_id>
 ```
 
+Curate legacy Codex memory and run Monitor-0:
+
+```powershell
+python scripts/ams.py migrate dry-run
+python scripts/ams.py migrate apply
+python scripts/ams.py monitor
+python scripts/ams.py dashboard
+```
+
 Default root:
 
 ```text
@@ -67,6 +76,17 @@ Default root:
 ```
 
 Set `AMS_ROOT` or pass `--root` to use a different local store.
+
+Operator records live in the AMS root:
+
+```text
+migration-runs.jsonl
+migration-latest.json
+migration-latest.md
+monitor-runs.jsonl
+monitor-latest.json
+monitor-latest.md
+```
 
 The current V0 benchmark report is in [docs/cem-0-benchmark-report.md](docs/cem-0-benchmark-report.md).
 

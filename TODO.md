@@ -152,6 +152,17 @@ Do not start these until CEM-0 proof items above and the external benchmark runn
 - [x] `list` and `audit` expose cards, atoms, and directives.
 - [x] Subprocess tests cover persistence, quarantine, directives, bootstrap idempotency, root isolation, and JSON output.
 
+### 10. Migration And Monitor Operations
+
+- [x] AMS v1.1 migration and monitor plan written.
+- [x] Migration dry-run builds a reviewable ledger without mutating memory.
+- [x] Migration apply pins curated directives and remembers verified operational experience idempotently.
+- [x] Migration records write JSONL, latest JSON, and latest Markdown.
+- [x] Monitor-0 checks root, SQLite, directives, learned cards, and action-brief guardrails.
+- [x] Monitor records write JSONL, latest JSON, and latest Markdown.
+- [x] Dashboard command summarizes counts and latest migration/monitor state.
+- [x] Subprocess tests cover migration, monitor, dashboard, and failure visibility.
+
 ## Historical Schedule Note
 
 The original spec used Week 1 through Week 4 as a human-readable grouping of work. That is not the active schedule. For this AI build, the active schedule is the ordered queue above: take the next unchecked item, implement it, verify it, commit it, push it, and continue.

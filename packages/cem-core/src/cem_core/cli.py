@@ -18,6 +18,12 @@ from .local_memory import (
     retrieve_brief,
     run_eval,
 )
+from .operations import (
+    apply_codex_memory_migration,
+    build_codex_memory_migration_run,
+    dashboard_status,
+    run_monitor,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -117,6 +123,30 @@ def build_parser() -> argparse.ArgumentParser:
     eval_parser = subparsers.add_parser("eval", parents=[json_parent], help="Run the synthetic corruption eval.")
     eval_parser.set_defaults(handler=_cmd_eval)
 
+    migrate_parser = subparsers.add_parser("migrate", parents=[json_parent], help="Curate legacy Codex memory into AMS.")
+    migrate_subparsers = migrate_parser.add_subparsers(dest="migrate_command", required=True)
+    migrate_dry_run = migrate_subparsers.add_parser(
+        "dry-run",
+        parents=[json_parent],
+        help="Build and log a migration plan without applying it.",
+    )
+    migrate_dry_run.add_argument("--memory-base", type=Path, help="Legacy Codex memory base. Defaults to ~/.codex/memories.")
+    migrate_dry_run.set_defaults(handler=_cmd_migrate_dry_run)
+    migrate_apply = migrate_subparsers.add_parser(
+        "apply",
+        parents=[json_parent],
+        help="Apply the curated migration plan.",
+    )
+    migrate_apply.add_argument("--memory-base", type=Path, help="Legacy Codex memory base. Defaults to ~/.codex/memories.")
+    migrate_apply.set_defaults(handler=_cmd_migrate_apply)
+
+    monitor_parser = subparsers.add_parser("monitor", parents=[json_parent], help="Run AMS Monitor-0 checks.")
+    monitor_parser.add_argument("--deep", action="store_true", help="Also run the synthetic corruption eval.")
+    monitor_parser.set_defaults(handler=_cmd_monitor)
+
+    dashboard_parser = subparsers.add_parser("dashboard", parents=[json_parent], help="Show latest AMS operator status.")
+    dashboard_parser.set_defaults(handler=_cmd_dashboard)
+
     return parser
 
 
@@ -184,6 +214,22 @@ def _cmd_eval(args: argparse.Namespace) -> dict[str, Any]:
     return run_eval(args.root)
 
 
+def _cmd_migrate_dry_run(args: argparse.Namespace) -> dict[str, Any]:
+    return build_codex_memory_migration_run(args.root, memory_base=args.memory_base).model_dump(mode="json")
+
+
+def _cmd_migrate_apply(args: argparse.Namespace) -> dict[str, Any]:
+    return apply_codex_memory_migration(args.root, memory_base=args.memory_base).model_dump(mode="json")
+
+
+def _cmd_monitor(args: argparse.Namespace) -> dict[str, Any]:
+    return run_monitor(args.root, deep=args.deep).model_dump(mode="json")
+
+
+def _cmd_dashboard(args: argparse.Namespace) -> dict[str, Any]:
+    return dashboard_status(args.root)
+
+
 def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
     if as_json:
         print(json.dumps(payload, indent=2))
@@ -200,6 +246,12 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
         print(f"bootstrap: {payload['created_count']} created, {payload['existing_count']} existing")
         for directive in payload["directives"]:
             print(f"{directive['directive_id']} :: {directive['content']}")
+    elif "pin_count" in payload and "remember_count" in payload:
+        _emit_migration(payload)
+    elif "checks" in payload and "status" in payload:
+        _emit_monitor(payload)
+    elif "latest_monitor" in payload:
+        _emit_dashboard(payload)
     elif "cards" in payload:
         _emit_cards(payload)
     elif "atoms" in payload:
@@ -260,3 +312,50 @@ def _emit_atoms(payload: dict[str, Any]) -> None:
         return
     for atom in payload["atoms"]:
         print(f"{atom['atom_id']} :: {atom['status']} :: {atom['content']}")
+
+
+def _emit_migration(payload: dict[str, Any]) -> None:
+    mode = "applied" if payload["applied"] else "dry-run"
+    print(f"migration: {mode} {payload['run_id']}")
+    print(
+        "items: "
+        f"{payload['pin_count']} pin, "
+        f"{payload['remember_count']} remember, "
+        f"{payload['skip_count']} skip"
+    )
+    if payload["applied"]:
+        print(
+            "applied: "
+            f"{payload['applied_pin_count']} pins, "
+            f"{payload['applied_remember_count']} memories, "
+            f"{payload['existing_count']} existing"
+        )
+    for item in payload["items"]:
+        print(f"- {item['action']}: {item['content']}")
+
+
+def _emit_monitor(payload: dict[str, Any]) -> None:
+    print(f"monitor: {payload['status']} {payload['run_id']}")
+    for check in payload["checks"]:
+        print(f"- {check['status']}: {check['name']} :: {check['detail']}")
+
+
+def _emit_dashboard(payload: dict[str, Any]) -> None:
+    print(f"root: {payload['root']}")
+    print(
+        "counts: "
+        f"{payload['card_count']} cards, "
+        f"{payload['atom_count']} atoms, "
+        f"{payload['directive_count']} directives"
+    )
+    latest_monitor = payload.get("latest_monitor")
+    latest_migration = payload.get("latest_migration")
+    if latest_monitor:
+        print(f"latest_monitor: {latest_monitor['status']} {latest_monitor['run_id']}")
+    else:
+        print("latest_monitor: none")
+    if latest_migration:
+        mode = "applied" if latest_migration["applied"] else "dry-run"
+        print(f"latest_migration: {mode} {latest_migration['run_id']}")
+    else:
+        print("latest_migration: none")
