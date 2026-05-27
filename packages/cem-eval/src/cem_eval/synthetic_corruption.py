@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import math
+import re
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -125,6 +128,7 @@ class SyntheticEvalResult(BaseModel):
     false_quarantine_rate: float
     no_memory: MemoryRunResult
     full_context: MemoryRunResult
+    vanilla_vector_memory: MemoryRunResult
     raw_trace_retrieval: MemoryRunResult
     summary_reflection: MemoryRunResult
     unvalidated_memory: MemoryRunResult
@@ -138,6 +142,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     expectations = fixture.expectations_by_content
     no_memory = _run_no_memory()
     full_context = _run_full_context(fixture.traces, expectations)
+    vanilla_vector_memory = _run_vanilla_vector_memory(fixture.traces, expectations)
     raw_trace_retrieval = _run_raw_trace_retrieval(fixture.traces, expectations)
     summary_reflection = _run_summary_reflection(fixture.traces, expectations)
     unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", fixture.traces, expectations)
@@ -151,6 +156,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     report = _build_report(
         no_memory=no_memory,
         full_context=full_context,
+        vanilla_vector_memory=vanilla_vector_memory,
         raw_trace_retrieval=raw_trace_retrieval,
         summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
@@ -169,6 +175,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         false_quarantine_rate=cem0_validation.metrics.false_quarantine_rate,
         no_memory=no_memory,
         full_context=full_context,
+        vanilla_vector_memory=vanilla_vector_memory,
         raw_trace_retrieval=raw_trace_retrieval,
         summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
@@ -650,6 +657,68 @@ def _run_raw_trace_retrieval(
     )
 
 
+def _run_vanilla_vector_memory(
+    traces: list[AgentTrace],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> MemoryRunResult:
+    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    task = _held_out_task()
+    query = " ".join([task.description, task.domain_scope or "", task.task_family or ""])
+    scored = sorted(
+        ((lexical_vector_score(query, atom.content), atom) for atom in atoms),
+        key=lambda item: (item[0], item[1].content),
+        reverse=True,
+    )
+    recommended_actions = [atom.content for score, atom in scored if score > 0][:10]
+    false_atoms = [
+        atom
+        for atom in atoms
+        if atom.content in recommended_actions and _is_unsafe_expected(atom, expectations)
+    ]
+    return MemoryRunResult(
+        name="vanilla_vector_memory",
+        proposed_count=0,
+        quarantined_count=0,
+        trusted_false_memory_count=len(false_atoms),
+        action_brief_recommended_actions=recommended_actions,
+        expected_action_delta=_expected_action_delta(recommended_actions, expectations),
+        decision_reason_codes={},
+        metrics=WritePathMetrics(
+            false_memory_resistance=0.0,
+            contradiction_recall=0.0,
+            false_quarantine_rate=0.0,
+            promoted_count=0,
+            action_brief_card_count=len(recommended_actions),
+            action_brief_relevance_recall=_action_brief_relevance_recall(
+                recommended_actions,
+                expectations,
+            ),
+            action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            scoped_memory_suppression=_scoped_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
+            expired_memory_suppression=_expired_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
+            evidence_consolidation_count=0,
+            max_evidence_support_count=0,
+            audit_completeness_rate=0.0,
+            stale_memory_suppression=0.0,
+            false_memory_resistance_by_risk={
+                risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
+            },
+            valid_memory_retention_by_risk={
+                risk_type: 1.0 for risk_type in _risk_types(expectations, expected_status="promote")
+            },
+        ),
+    )
+
+
 def _run_summary_reflection(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
@@ -715,12 +784,20 @@ def _build_report(
     *,
     no_memory: MemoryRunResult,
     full_context: MemoryRunResult,
+    vanilla_vector_memory: MemoryRunResult,
     raw_trace_retrieval: MemoryRunResult,
     summary_reflection: MemoryRunResult,
     unvalidated_memory: MemoryRunResult,
     cem0_validation: MemoryRunResult,
 ) -> SyntheticEvalReport:
-    baseline_runs = [no_memory, full_context, raw_trace_retrieval, summary_reflection, unvalidated_memory]
+    baseline_runs = [
+        no_memory,
+        full_context,
+        vanilla_vector_memory,
+        raw_trace_retrieval,
+        summary_reflection,
+        unvalidated_memory,
+    ]
     baseline_rows = [_report_row(run) for run in baseline_runs]
     cem0_row = _report_row(cem0_validation)
     workflow_rows = [
@@ -810,6 +887,24 @@ def workflow_report_row_from_run(run: MemoryRunResult) -> WorkflowReportRow:
         success=not failure_reasons,
         failure_reasons=failure_reasons,
     )
+
+
+def lexical_vector_score(query: str, document: str) -> float:
+    query_counts = _term_counts(query)
+    document_counts = _term_counts(document)
+    if not query_counts or not document_counts:
+        return 0.0
+    dot_product = sum(query_counts[term] * document_counts[term] for term in document_counts)
+    query_norm = math.sqrt(sum(count * count for count in query_counts.values()))
+    document_norm = math.sqrt(sum(count * count for count in document_counts.values()))
+    if query_norm == 0 or document_norm == 0:
+        return 0.0
+    return dot_product / (query_norm * document_norm)
+
+
+def _term_counts(text: str) -> Counter[str]:
+    terms = re.findall(r"[a-z0-9_]+", text.lower())
+    return Counter(term for term in terms if len(term) > 2)
 
 
 def _run_cem0_validation(

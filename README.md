@@ -69,6 +69,17 @@ Current expected signal:
       "audit_completeness_rate": 0.0
     }
   },
+  "vanilla_vector_memory": {
+    "trusted_false_memory_count": 3,
+    "expected_action_delta": 0.4696969696969697,
+    "metrics": {
+      "action_brief_card_count": 10,
+      "action_brief_relevance_recall": 0.8333333333333334,
+      "action_brief_pollution_rate": 0.4,
+      "scoped_memory_suppression": 0.75,
+      "audit_completeness_rate": 0.0
+    }
+  },
   "raw_trace_retrieval": {
     "trusted_false_memory_count": 7,
     "expected_action_delta": 0.0,
@@ -147,6 +158,13 @@ Current expected signal:
         "trusted_false_memory_reduction": 5,
         "action_brief_card_reduction": 7
       },
+      "vanilla_vector_memory": {
+        "false_memory_resistance_delta": 1.0,
+        "expected_action_delta_delta": 0.5303030303030303,
+        "workflow_success_delta": 1.0,
+        "trusted_false_memory_reduction": 3,
+        "action_brief_card_reduction": 4
+      },
       "unvalidated_memory": {
         "false_memory_resistance_delta": 1.0,
         "expected_action_delta_delta": 0.6363636363636364,
@@ -158,6 +176,7 @@ Current expected signal:
     "workflow_rows": {
       "no_memory": false,
       "full_context": false,
+      "vanilla_vector_memory": false,
       "raw_trace_retrieval": false,
       "summary_reflection": false,
       "unvalidated_memory": false,

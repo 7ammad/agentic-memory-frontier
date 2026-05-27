@@ -26,6 +26,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert [row.name for row in result.report.baseline_rows] == [
         "no_memory",
         "full_context",
+        "vanilla_vector_memory",
         "raw_trace_retrieval",
         "summary_reflection",
         "unvalidated_memory",
@@ -35,6 +36,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     workflow_rows = {row.name: row for row in result.report.workflow_rows}
     assert workflow_rows["no_memory"].success is False
     assert workflow_rows["full_context"].success is False
+    assert workflow_rows["vanilla_vector_memory"].success is False
     assert workflow_rows["raw_trace_retrieval"].success is False
     assert workflow_rows["summary_reflection"].success is False
     assert workflow_rows["unvalidated_memory"].success is False
@@ -50,6 +52,10 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert comparisons["full_context"].expected_action_delta_delta == 1.0
     assert comparisons["full_context"].workflow_success_delta == 1.0
     assert comparisons["full_context"].trusted_false_memory_reduction == 7
+    assert comparisons["vanilla_vector_memory"].false_memory_resistance_delta == 1.0
+    assert round(comparisons["vanilla_vector_memory"].expected_action_delta_delta, 3) == 0.53
+    assert comparisons["vanilla_vector_memory"].workflow_success_delta == 1.0
+    assert comparisons["vanilla_vector_memory"].trusted_false_memory_reduction == 3
     assert comparisons["unvalidated_memory"].false_memory_resistance_delta == 1.0
     assert round(comparisons["unvalidated_memory"].expected_action_delta_delta, 3) == 0.636
     assert comparisons["unvalidated_memory"].workflow_success_delta == 1.0
@@ -65,6 +71,21 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.full_context.metrics.expired_memory_suppression == 0.0
     assert result.full_context.metrics.audit_completeness_rate == 0.0
     assert result.full_context.expected_action_delta == 0.0
+    assert result.vanilla_vector_memory.trusted_false_memory_count == 3
+    assert result.vanilla_vector_memory.metrics.action_brief_card_count == 10
+    assert round(result.vanilla_vector_memory.metrics.action_brief_relevance_recall, 3) == 0.833
+    assert result.vanilla_vector_memory.metrics.action_brief_pollution_rate == 0.4
+    assert result.vanilla_vector_memory.metrics.scoped_memory_suppression == 0.75
+    assert result.vanilla_vector_memory.metrics.expired_memory_suppression == 0.0
+    assert result.vanilla_vector_memory.metrics.audit_completeness_rate == 0.0
+    assert round(result.vanilla_vector_memory.expected_action_delta, 3) == 0.47
+    assert "run pytest before claiming kernel changes are done" not in (
+        result.vanilla_vector_memory.action_brief_recommended_actions
+    )
+    assert (
+        "click refresh before submitting workflow-gotchas form"
+        in result.vanilla_vector_memory.action_brief_recommended_actions
+    )
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
     assert result.raw_trace_retrieval.metrics.action_brief_card_count == 18
     assert result.raw_trace_retrieval.metrics.action_brief_relevance_recall == 1.0
@@ -173,12 +194,14 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "Audit completeness" in markdown
     assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
     assert "| full_context | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |" in markdown
+    assert "| vanilla_vector_memory | 0 | 0 | 3 | 10 | 0.47 | 0 | 0.833 | 0.4 | 0.75 | 0 | 0 | 0 | 0 |" in markdown
     assert "| raw_trace_retrieval | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |" in markdown
     assert "| summary_reflection | 0 | 0 | 5 | 13 | -0.061 | 0 | 0.667 | 0.615 | 0.25 | 0 | 0 | 0 | 0 |" in markdown
     assert "| unvalidated_memory | 18 | 0 | 7 | 14 | 0.364 | 0 | 1 | 0.5 | 1 | 1 | 0 | 1 | 0 |" in markdown
     assert "| cem0_validation | 18 | 6 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 2 | 1 |" in markdown
     assert "## CEM-0 Comparison" in markdown
     assert "| full_context | 1 | 1 | 1 | 7 | 12 |" in markdown
+    assert "| vanilla_vector_memory | 1 | 0.53 | 1 | 3 | 4 |" in markdown
     assert "| summary_reflection | 1 | 1.061 | 1 | 5 | 7 |" in markdown
     assert "| unvalidated_memory | 1 | 0.636 | 1 | 7 | 8 |" in markdown
     assert "## Audit Coverage" in markdown
@@ -209,6 +232,7 @@ def test_workflow_gotcha_demo_scores_action_briefs(tmp_path):
 
     assert attempts["no_memory"].success is False
     assert attempts["full_context"].success is False
+    assert attempts["vanilla_vector_memory"].success is False
     assert attempts["raw_trace_retrieval"].success is False
     assert attempts["summary_reflection"].success is False
     assert attempts["unvalidated_memory"].success is False

@@ -97,7 +97,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] No memory.
 - [x] Full-context baseline.
 - [x] Rolling summary / reflection baseline.
-- [ ] Vanilla vector memory baseline.
+- [x] Vanilla vector memory baseline.
 - [ ] Time-aware vector memory baseline.
 - [x] Unverified reflection / unvalidated memory baseline.
 - [ ] Human-curated runbook upper bound.
@@ -107,7 +107,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] CEM-0 quarantines at least one unsupported or contradictory memory.
 - [x] CEM-0 promotes at least one Experience Card with source evidence.
 - [x] Held-out workflow task succeeds with CEM-0 where no-memory fails.
-- [ ] Raw vector retrieval returns related traces but misses or fails the decisive precondition.
+- [x] Raw vector retrieval returns related traces but misses or fails the decisive precondition.
 - [x] `audit(memory_id)` explains why the memory exists, where it came from, why it was promoted/quarantined, and when it is valid.
 - [ ] Eval report includes all required baselines, including a dumb baseline expected to lose.
 
@@ -280,7 +280,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: required baselines include "full context."
   - Needed outcome: compare CEM-0 against an agent given all fixture trace text.
 
-- [ ] Add vanilla vector memory baseline.
+- [x] Add vanilla vector memory baseline.
   - Original source: required baselines include "vanilla vector memory."
   - Needed outcome: compare CEM-0 against semantic retrieval over raw memories/traces.
 
