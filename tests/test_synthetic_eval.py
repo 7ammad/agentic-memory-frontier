@@ -1,4 +1,4 @@
-from cem_eval import run_synthetic_corruption_eval
+from cem_eval import render_synthetic_eval_markdown, run_synthetic_corruption_eval
 
 
 def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
@@ -77,3 +77,15 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
         in result.unvalidated_memory.action_brief_recommended_actions
     )
     assert result.unvalidated_memory.metrics.action_brief_card_count > result.action_brief_card_count
+
+
+def test_synthetic_eval_markdown_report(tmp_path):
+    result = run_synthetic_corruption_eval(tmp_path)
+
+    markdown = render_synthetic_eval_markdown(result)
+
+    assert "# synthetic_corruption Report" in markdown
+    assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
+    assert "| unvalidated_memory | 13 | 0 | 7 | 13 | 0 | 0 |" in markdown
+    assert "| cem0_validation | 13 | 6 | 0 | 6 | 1 | 1 |" in markdown
+    assert "`database=mysql`: contradiction" in markdown

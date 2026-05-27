@@ -38,6 +38,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add `expected_action_delta` placeholder computation from fixture labels.
 - [x] Make atom and card audits include validation decision summaries.
 - [x] Add a machine-readable eval report object with baseline rows and CEM-0 row.
+- [x] Add a markdown report writer for the synthetic corruption suite.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -84,7 +85,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 
 - [x] Make `audit(memory_id)` include the validation decision summary.
 - [x] Add a machine-readable eval report object with timestamp, suite name, baseline rows, and CEM-0 row.
-- [ ] Add a small markdown report writer for the synthetic corruption suite.
+- [x] Add a small markdown report writer for the synthetic corruption suite.
 - [ ] Link the latest eval report shape from `README.md`.
 
 ## Later, Not Yet

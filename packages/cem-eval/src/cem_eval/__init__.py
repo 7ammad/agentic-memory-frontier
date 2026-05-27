@@ -1,3 +1,4 @@
+from .reports import render_synthetic_eval_markdown
 from .synthetic_corruption import (
     EvalReportRow,
     MemoryRunResult,
@@ -13,5 +14,6 @@ __all__ = [
     "SyntheticEvalReport",
     "SyntheticEvalResult",
     "WritePathMetrics",
+    "render_synthetic_eval_markdown",
     "run_synthetic_corruption_eval",
 ]
