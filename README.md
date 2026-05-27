@@ -57,6 +57,10 @@ Current expected signal:
       "action_brief_card_count": 0
     }
   },
+  "raw_trace_retrieval": {
+    "trusted_false_memory_count": 7,
+    "expected_action_delta": 0.0
+  },
   "unvalidated_memory": {
     "trusted_false_memory_count": 7,
     "metrics": {
