@@ -76,6 +76,11 @@ class EvalReportRow(BaseModel):
     action_brief_card_count: int
     expected_action_delta: float
     false_memory_resistance: float
+    action_brief_relevance_recall: float
+    action_brief_pollution_rate: float
+    scoped_memory_suppression: float
+    evidence_consolidation_count: int
+    max_evidence_support_count: int
 
 
 class EvalReportComparisonRow(BaseModel):
@@ -631,6 +636,11 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         action_brief_card_count=run.metrics.action_brief_card_count,
         expected_action_delta=run.expected_action_delta,
         false_memory_resistance=run.metrics.false_memory_resistance,
+        action_brief_relevance_recall=run.metrics.action_brief_relevance_recall,
+        action_brief_pollution_rate=run.metrics.action_brief_pollution_rate,
+        scoped_memory_suppression=run.metrics.scoped_memory_suppression,
+        evidence_consolidation_count=run.metrics.evidence_consolidation_count,
+        max_evidence_support_count=run.metrics.max_evidence_support_count,
     )
 
 

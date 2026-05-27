@@ -137,6 +137,8 @@ Current expected signal:
 }
 ```
 
+The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, evidence consolidation, and max support.
+
 Run tests:
 
 ```powershell

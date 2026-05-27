@@ -132,11 +132,11 @@ def test_synthetic_eval_markdown_report(tmp_path):
     markdown = render_synthetic_eval_markdown(result)
 
     assert "# synthetic_corruption Report" in markdown
-    assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
-    assert "| raw_trace_retrieval | 0 | 0 | 7 | 17 | 0 | 0 |" in markdown
-    assert "| summary_reflection | 0 | 0 | 5 | 12 | -0.033 | 0 |" in markdown
-    assert "| unvalidated_memory | 17 | 0 | 7 | 14 | 0.3 | 0 |" in markdown
-    assert "| cem0_validation | 17 | 6 | 0 | 6 | 1 | 1 |" in markdown
+    assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
+    assert "| raw_trace_retrieval | 0 | 0 | 7 | 17 | 0 | 0 | 1 | 0.588 | 0 | 0 | 0 |" in markdown
+    assert "| summary_reflection | 0 | 0 | 5 | 12 | -0.033 | 0 | 0.667 | 0.583 | 0.333 | 0 | 0 |" in markdown
+    assert "| unvalidated_memory | 17 | 0 | 7 | 14 | 0.3 | 0 | 1 | 0.5 | 1 | 0 | 1 |" in markdown
+    assert "| cem0_validation | 17 | 6 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 2 |" in markdown
     assert "## CEM-0 Comparison" in markdown
     assert "| summary_reflection | 1 | 1.033 | 5 | 6 |" in markdown
     assert "| unvalidated_memory | 1 | 0.7 | 7 | 8 |" in markdown

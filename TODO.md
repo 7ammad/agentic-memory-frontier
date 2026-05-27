@@ -130,5 +130,5 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add evidence consolidation metric.
   - Needed outcome: repeated evidence increases support without inflating action-brief card count.
 
-- [ ] Add markdown/report rows for the new action-brief utility metrics.
+- [x] Add markdown/report rows for the new action-brief utility metrics.
   - Needed outcome: humans can read utility, integrity, and scope behavior without decoding raw JSON.
