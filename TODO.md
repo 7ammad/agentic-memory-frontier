@@ -119,8 +119,8 @@ Backend adapters, MCP integration, and multi-agent protocol stay gated until the
 
 ### 6. External Benchmark Decision And Adapters
 
-- [ ] Decide whether to integrate real HaluMem now or keep strengthening the local facsimile first.
-- [ ] Real HaluMem runner or dataset adapter.
+- [x] Decide whether to integrate real HaluMem now or keep strengthening the local facsimile first.
+- [x] Real HaluMem runner or dataset adapter.
 - [ ] MemoryArena-style adapter.
 - [ ] LongMemEval-V2-style adapter.
 

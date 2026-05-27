@@ -26,6 +26,8 @@ The active build queue is in [TODO.md](TODO.md). Codex should update it and cont
 
 The current V0 benchmark report is in [docs/cem-0-benchmark-report.md](docs/cem-0-benchmark-report.md).
 
+The external benchmark decision is in [docs/cem-0-external-benchmark-decision.md](docs/cem-0-external-benchmark-decision.md). CEM-0 now has a local HaluMem dataset adapter for JSON/JSONL exports, but it does not claim a real HaluMem score yet.
+
 ## CEM-0 Quick Smoke
 
 Run the current synthetic corruption eval:
@@ -254,3 +256,13 @@ Run tests:
 ```powershell
 python -m pytest
 ```
+
+## HaluMem Adapter Smoke
+
+Inspect a local HaluMem JSON or JSONL export:
+
+```powershell
+python scripts/run_halumem_adapter.py path\to\halumem.json
+```
+
+The adapter normalizes users, sessions, dialogue, memory points, update links, and QA evidence into CEM-0 evaluation records. It also emits exact-match extraction scoring fields for candidate memories: precision, recall, F1, hallucinated count, omitted count, update recall, and QA evidence recall.

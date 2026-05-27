@@ -207,6 +207,18 @@ The current result supports a narrow CEM-0 claim:
 
 This is useful because the unvalidated-memory baseline sees the same candidate memories but trusts all of them. It has full relevant coverage, yet still fails because harmful memories pollute the action brief.
 
+## External Benchmark Adapter
+
+The HaluMem decision is locked in [cem-0-external-benchmark-decision.md](cem-0-external-benchmark-decision.md): HaluMem comes first because it directly tests extraction, update, and QA hallucination at the write-path layer.
+
+CEM-0 now includes a local HaluMem adapter that can load JSON, JSONL, or directories of JSON/JSONL files, normalize sessions and memory points, convert sessions into `AgentTrace` records, and score candidate extracted memories against HaluMem reference memory points.
+
+Smoke command:
+
+```powershell
+python scripts/run_halumem_adapter.py path\to\halumem.json
+```
+
 ## Not Proven Yet
 
 The current report does not prove:
@@ -223,5 +235,5 @@ Those remain unchecked in `TODO.md`.
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
-1. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
+1. Run the HaluMem adapter on the downloaded real dataset and wire CEM-0 candidate extraction into the scoring layer.
 2. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
