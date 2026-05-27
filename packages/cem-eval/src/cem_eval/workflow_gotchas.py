@@ -26,6 +26,7 @@ def run_workflow_gotcha_demo(root: str | Path) -> WorkflowGotchaDemoResult:
     return WorkflowGotchaDemoResult(
         attempts=[
             _attempt_from_run(synthetic.no_memory),
+            _attempt_from_run(synthetic.full_context),
             _attempt_from_run(synthetic.raw_trace_retrieval),
             _attempt_from_run(synthetic.summary_reflection),
             _attempt_from_run(synthetic.unvalidated_memory),

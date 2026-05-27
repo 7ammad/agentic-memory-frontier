@@ -95,7 +95,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 ### Required Baselines
 
 - [x] No memory.
-- [ ] Full-context baseline.
+- [x] Full-context baseline.
 - [x] Rolling summary / reflection baseline.
 - [ ] Vanilla vector memory baseline.
 - [ ] Time-aware vector memory baseline.
@@ -276,7 +276,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 
 ## Next From Original Plan: Missing Baselines And Metrics
 
-- [ ] Add full-context baseline.
+- [x] Add full-context baseline.
   - Original source: required baselines include "full context."
   - Needed outcome: compare CEM-0 against an agent given all fixture trace text.
 

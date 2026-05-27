@@ -25,6 +25,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.report.suite_name == "synthetic_corruption"
     assert [row.name for row in result.report.baseline_rows] == [
         "no_memory",
+        "full_context",
         "raw_trace_retrieval",
         "summary_reflection",
         "unvalidated_memory",
@@ -33,6 +34,7 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.report.cem0_row.expected_action_delta == 1.0
     workflow_rows = {row.name: row for row in result.report.workflow_rows}
     assert workflow_rows["no_memory"].success is False
+    assert workflow_rows["full_context"].success is False
     assert workflow_rows["raw_trace_retrieval"].success is False
     assert workflow_rows["summary_reflection"].success is False
     assert workflow_rows["unvalidated_memory"].success is False
@@ -44,6 +46,10 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     )
     assert workflow_rows["cem0_validation"].failure_reasons == []
     comparisons = {row.baseline_name: row for row in result.report.comparison_rows}
+    assert comparisons["full_context"].false_memory_resistance_delta == 1.0
+    assert comparisons["full_context"].expected_action_delta_delta == 1.0
+    assert comparisons["full_context"].workflow_success_delta == 1.0
+    assert comparisons["full_context"].trusted_false_memory_reduction == 7
     assert comparisons["unvalidated_memory"].false_memory_resistance_delta == 1.0
     assert round(comparisons["unvalidated_memory"].expected_action_delta_delta, 3) == 0.636
     assert comparisons["unvalidated_memory"].workflow_success_delta == 1.0
@@ -51,6 +57,14 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert comparisons["unvalidated_memory"].action_brief_card_reduction == 8
     assert round(comparisons["summary_reflection"].expected_action_delta_delta, 3) == 1.061
     assert comparisons["summary_reflection"].workflow_success_delta == 1.0
+    assert result.full_context.trusted_false_memory_count == 7
+    assert result.full_context.metrics.action_brief_card_count == 18
+    assert result.full_context.metrics.action_brief_relevance_recall == 1.0
+    assert round(result.full_context.metrics.action_brief_pollution_rate, 3) == 0.611
+    assert result.full_context.metrics.scoped_memory_suppression == 0.0
+    assert result.full_context.metrics.expired_memory_suppression == 0.0
+    assert result.full_context.metrics.audit_completeness_rate == 0.0
+    assert result.full_context.expected_action_delta == 0.0
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
     assert result.raw_trace_retrieval.metrics.action_brief_card_count == 18
     assert result.raw_trace_retrieval.metrics.action_brief_relevance_recall == 1.0
@@ -158,11 +172,13 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "# synthetic_corruption Report" in markdown
     assert "Audit completeness" in markdown
     assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
+    assert "| full_context | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |" in markdown
     assert "| raw_trace_retrieval | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |" in markdown
     assert "| summary_reflection | 0 | 0 | 5 | 13 | -0.061 | 0 | 0.667 | 0.615 | 0.25 | 0 | 0 | 0 | 0 |" in markdown
     assert "| unvalidated_memory | 18 | 0 | 7 | 14 | 0.364 | 0 | 1 | 0.5 | 1 | 1 | 0 | 1 | 0 |" in markdown
     assert "| cem0_validation | 18 | 6 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 2 | 1 |" in markdown
     assert "## CEM-0 Comparison" in markdown
+    assert "| full_context | 1 | 1 | 1 | 7 | 12 |" in markdown
     assert "| summary_reflection | 1 | 1.061 | 1 | 5 | 7 |" in markdown
     assert "| unvalidated_memory | 1 | 0.636 | 1 | 7 | 8 |" in markdown
     assert "## Audit Coverage" in markdown
@@ -192,6 +208,7 @@ def test_workflow_gotcha_demo_scores_action_briefs(tmp_path):
     attempts = {attempt.run_name: attempt for attempt in result.attempts}
 
     assert attempts["no_memory"].success is False
+    assert attempts["full_context"].success is False
     assert attempts["raw_trace_retrieval"].success is False
     assert attempts["summary_reflection"].success is False
     assert attempts["unvalidated_memory"].success is False

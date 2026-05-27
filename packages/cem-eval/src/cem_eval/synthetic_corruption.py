@@ -124,6 +124,7 @@ class SyntheticEvalResult(BaseModel):
     contradiction_recall: float
     false_quarantine_rate: float
     no_memory: MemoryRunResult
+    full_context: MemoryRunResult
     raw_trace_retrieval: MemoryRunResult
     summary_reflection: MemoryRunResult
     unvalidated_memory: MemoryRunResult
@@ -136,6 +137,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     fixture = build_synthetic_corruption_fixture()
     expectations = fixture.expectations_by_content
     no_memory = _run_no_memory()
+    full_context = _run_full_context(fixture.traces, expectations)
     raw_trace_retrieval = _run_raw_trace_retrieval(fixture.traces, expectations)
     summary_reflection = _run_summary_reflection(fixture.traces, expectations)
     unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", fixture.traces, expectations)
@@ -148,6 +150,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     )
     report = _build_report(
         no_memory=no_memory,
+        full_context=full_context,
         raw_trace_retrieval=raw_trace_retrieval,
         summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
@@ -165,6 +168,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         contradiction_recall=cem0_validation.metrics.contradiction_recall,
         false_quarantine_rate=cem0_validation.metrics.false_quarantine_rate,
         no_memory=no_memory,
+        full_context=full_context,
         raw_trace_retrieval=raw_trace_retrieval,
         summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
@@ -544,6 +548,57 @@ def _run_no_memory() -> MemoryRunResult:
     )
 
 
+def _run_full_context(
+    traces: list[AgentTrace],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> MemoryRunResult:
+    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    recommended_actions = [atom.content for atom in atoms]
+    false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
+    return MemoryRunResult(
+        name="full_context",
+        proposed_count=0,
+        quarantined_count=0,
+        trusted_false_memory_count=len(false_atoms),
+        action_brief_recommended_actions=recommended_actions,
+        expected_action_delta=_expected_action_delta(recommended_actions, expectations),
+        decision_reason_codes={},
+        metrics=WritePathMetrics(
+            false_memory_resistance=0.0,
+            contradiction_recall=0.0,
+            false_quarantine_rate=0.0,
+            promoted_count=0,
+            action_brief_card_count=len(recommended_actions),
+            action_brief_relevance_recall=_action_brief_relevance_recall(
+                recommended_actions,
+                expectations,
+            ),
+            action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            scoped_memory_suppression=_scoped_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
+            expired_memory_suppression=_expired_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
+            evidence_consolidation_count=0,
+            max_evidence_support_count=0,
+            audit_completeness_rate=0.0,
+            stale_memory_suppression=0.0,
+            false_memory_resistance_by_risk={
+                risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
+            },
+            valid_memory_retention_by_risk={
+                risk_type: 1.0 for risk_type in _risk_types(expectations, expected_status="promote")
+            },
+        ),
+    )
+
+
 def _run_raw_trace_retrieval(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
@@ -659,12 +714,13 @@ def _run_summary_reflection(
 def _build_report(
     *,
     no_memory: MemoryRunResult,
+    full_context: MemoryRunResult,
     raw_trace_retrieval: MemoryRunResult,
     summary_reflection: MemoryRunResult,
     unvalidated_memory: MemoryRunResult,
     cem0_validation: MemoryRunResult,
 ) -> SyntheticEvalReport:
-    baseline_runs = [no_memory, raw_trace_retrieval, summary_reflection, unvalidated_memory]
+    baseline_runs = [no_memory, full_context, raw_trace_retrieval, summary_reflection, unvalidated_memory]
     baseline_rows = [_report_row(run) for run in baseline_runs]
     cem0_row = _report_row(cem0_validation)
     workflow_rows = [

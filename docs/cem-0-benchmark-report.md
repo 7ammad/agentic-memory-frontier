@@ -56,6 +56,7 @@ Current fixture coverage:
 | Run | Proposed | Quarantined | Trusted false memories | Action brief cards | Expected action delta | False memory resistance | Relevance recall | Pollution rate | Scoped suppression | Expired suppression | Evidence consolidation | Max support | Audit completeness |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | no_memory | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| full_context | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |
 | raw_trace_retrieval | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |
 | summary_reflection | 0 | 0 | 5 | 13 | -0.061 | 0 | 0.667 | 0.615 | 0.25 | 0 | 0 | 0 | 0 |
 | unvalidated_memory | 18 | 0 | 7 | 14 | 0.364 | 0 | 1 | 0.5 | 1 | 1 | 0 | 1 | 0 |
@@ -66,6 +67,7 @@ Current fixture coverage:
 | Baseline | False memory resistance delta | Expected action delta delta | Workflow success delta | Trusted false memory reduction | Action brief card reduction |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | no_memory | 1 | 1 | 1 | 0 | -6 |
+| full_context | 1 | 1 | 1 | 7 | 12 |
 | raw_trace_retrieval | 1 | 1 | 1 | 7 | 12 |
 | summary_reflection | 1 | 1.061 | 1 | 5 | 7 |
 | unvalidated_memory | 1 | 0.636 | 1 | 7 | 8 |
@@ -82,6 +84,7 @@ The held-out workflow requires these decisive behaviors:
 | Run | Success | Main failure mode |
 | --- | ---: | --- |
 | no_memory | no | Missing all required operational memories. |
+| full_context | no | Sees all trace content but still includes polluted, stale, and contradictory actions. |
 | raw_trace_retrieval | no | Retrieves useful actions but also polluted, stale, and contradictory actions. |
 | summary_reflection | no | Drops one required action and keeps several polluted actions. |
 | unvalidated_memory | no | Promotes useful actions but also trusts false and stale actions. |
@@ -106,6 +109,7 @@ Audit completeness is strict. A promoted card counts only when it has:
 | Run | Audit completeness | Evidence consolidation | Max support |
 | --- | ---: | ---: | ---: |
 | no_memory | 0 | 0 | 0 |
+| full_context | 0 | 0 | 0 |
 | raw_trace_retrieval | 0 | 0 | 0 |
 | summary_reflection | 0 | 0 | 0 |
 | unvalidated_memory | 0 | 0 | 1 |
@@ -128,7 +132,6 @@ The current report does not prove:
 - LongMemEval-V2 performance;
 - vector-memory comparison with embeddings;
 - time-aware vector comparison;
-- full-context comparison;
 - human-curated runbook upper bound;
 - extraction precision/recall/F1;
 - contradiction precision;

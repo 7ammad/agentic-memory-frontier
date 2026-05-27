@@ -60,6 +60,15 @@ Current expected signal:
       "audit_completeness_rate": 0.0
     }
   },
+  "full_context": {
+    "trusted_false_memory_count": 7,
+    "expected_action_delta": 0.0,
+    "metrics": {
+      "action_brief_relevance_recall": 1.0,
+      "action_brief_pollution_rate": 0.6111111111111112,
+      "audit_completeness_rate": 0.0
+    }
+  },
   "raw_trace_retrieval": {
     "trusted_false_memory_count": 7,
     "expected_action_delta": 0.0,
@@ -148,6 +157,7 @@ Current expected signal:
     },
     "workflow_rows": {
       "no_memory": false,
+      "full_context": false,
       "raw_trace_retrieval": false,
       "summary_reflection": false,
       "unvalidated_memory": false,
