@@ -116,5 +116,5 @@ Do not stop at "task complete" when there is a clear next unchecked item.
   - Example: preference in one session should not leak into a different project/session unless scope allows it.
   - Needed outcome: action brief excludes out-of-scope memory.
 
-- [ ] Add report comparison against the new hardening cases.
+- [x] Add report comparison against the new hardening cases.
   - Needed outcome: synthetic report distinguishes write-path integrity from action-brief utility.

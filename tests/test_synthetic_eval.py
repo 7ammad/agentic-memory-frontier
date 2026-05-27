@@ -31,6 +31,12 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     ]
     assert result.report.cem0_row.name == "cem0_validation"
     assert result.report.cem0_row.expected_action_delta == 1.0
+    comparisons = {row.baseline_name: row for row in result.report.comparison_rows}
+    assert comparisons["unvalidated_memory"].false_memory_resistance_delta == 1.0
+    assert round(comparisons["unvalidated_memory"].expected_action_delta_delta, 3) == 0.7
+    assert comparisons["unvalidated_memory"].trusted_false_memory_reduction == 7
+    assert comparisons["unvalidated_memory"].action_brief_card_reduction == 8
+    assert round(comparisons["summary_reflection"].expected_action_delta_delta, 3) == 1.033
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
     assert result.raw_trace_retrieval.metrics.action_brief_card_count == 17
     assert result.raw_trace_retrieval.expected_action_delta == 0.0
@@ -115,6 +121,9 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "| summary_reflection | 0 | 0 | 5 | 12 | -0.033 | 0 |" in markdown
     assert "| unvalidated_memory | 17 | 0 | 7 | 14 | 0.3 | 0 |" in markdown
     assert "| cem0_validation | 17 | 6 | 0 | 6 | 1 | 1 |" in markdown
+    assert "## CEM-0 Comparison" in markdown
+    assert "| summary_reflection | 1 | 1.033 | 5 | 6 |" in markdown
+    assert "| unvalidated_memory | 1 | 0.7 | 7 | 8 |" in markdown
     assert "`database=mysql`: contradiction" in markdown
 
 

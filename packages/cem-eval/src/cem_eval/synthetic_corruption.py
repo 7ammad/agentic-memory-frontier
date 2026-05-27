@@ -73,11 +73,20 @@ class EvalReportRow(BaseModel):
     false_memory_resistance: float
 
 
+class EvalReportComparisonRow(BaseModel):
+    baseline_name: str
+    false_memory_resistance_delta: float
+    expected_action_delta_delta: float
+    trusted_false_memory_reduction: int
+    action_brief_card_reduction: int
+
+
 class SyntheticEvalReport(BaseModel):
     suite_name: str
     generated_at: datetime
     baseline_rows: list[EvalReportRow]
     cem0_row: EvalReportRow
+    comparison_rows: list[EvalReportComparisonRow]
 
 
 class SyntheticEvalResult(BaseModel):
@@ -544,16 +553,19 @@ def _build_report(
     unvalidated_memory: MemoryRunResult,
     cem0_validation: MemoryRunResult,
 ) -> SyntheticEvalReport:
+    baseline_rows = [
+        _report_row(no_memory),
+        _report_row(raw_trace_retrieval),
+        _report_row(summary_reflection),
+        _report_row(unvalidated_memory),
+    ]
+    cem0_row = _report_row(cem0_validation)
     return SyntheticEvalReport(
         suite_name="synthetic_corruption",
         generated_at=datetime.now(timezone.utc),
-        baseline_rows=[
-            _report_row(no_memory),
-            _report_row(raw_trace_retrieval),
-            _report_row(summary_reflection),
-            _report_row(unvalidated_memory),
-        ],
-        cem0_row=_report_row(cem0_validation),
+        baseline_rows=baseline_rows,
+        cem0_row=cem0_row,
+        comparison_rows=[_comparison_row(baseline, cem0_row) for baseline in baseline_rows],
     )
 
 
@@ -566,6 +578,16 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         action_brief_card_count=run.metrics.action_brief_card_count,
         expected_action_delta=run.expected_action_delta,
         false_memory_resistance=run.metrics.false_memory_resistance,
+    )
+
+
+def _comparison_row(baseline: EvalReportRow, cem0: EvalReportRow) -> EvalReportComparisonRow:
+    return EvalReportComparisonRow(
+        baseline_name=baseline.name,
+        false_memory_resistance_delta=cem0.false_memory_resistance - baseline.false_memory_resistance,
+        expected_action_delta_delta=cem0.expected_action_delta - baseline.expected_action_delta,
+        trusted_false_memory_reduction=baseline.trusted_false_memory_count - cem0.trusted_false_memory_count,
+        action_brief_card_reduction=baseline.action_brief_card_count - cem0.action_brief_card_count,
     )
 
 

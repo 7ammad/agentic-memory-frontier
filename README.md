@@ -97,6 +97,22 @@ Current expected signal:
         "unsupported": 1.0
       }
     }
+  },
+  "report": {
+    "comparison_rows": {
+      "summary_reflection": {
+        "false_memory_resistance_delta": 1.0,
+        "expected_action_delta_delta": 1.0333333333333332,
+        "trusted_false_memory_reduction": 5,
+        "action_brief_card_reduction": 6
+      },
+      "unvalidated_memory": {
+        "false_memory_resistance_delta": 1.0,
+        "expected_action_delta_delta": 0.7,
+        "trusted_false_memory_reduction": 7,
+        "action_brief_card_reduction": 8
+      }
+    }
   }
 }
 ```
