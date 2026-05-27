@@ -138,7 +138,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add expired-card retrieval suppression.
   - Needed outcome: cards outside `valid_from` / `valid_until` do not appear in action briefs.
 
-- [ ] Add temporal-validity synthetic fixture.
+- [x] Add temporal-validity synthetic fixture.
   - Needed outcome: stale-but-on-topic true memories are stored or deprecated correctly but not recommended after expiry.
 
 - [ ] Add temporal validity metrics to the synthetic report.

@@ -45,10 +45,10 @@ Current expected signal:
 
 ```json
 {
-  "fixture_case_count": 16,
-  "proposed_count": 17,
+  "fixture_case_count": 17,
+  "proposed_count": 18,
   "quarantined_count": 6,
-  "promoted_count": 10,
+  "promoted_count": 11,
   "false_memory_resistance": 1.0,
   "contradiction_recall": 1.0,
   "false_quarantine_rate": 0.0,
@@ -62,24 +62,24 @@ Current expected signal:
     "expected_action_delta": 0.0,
     "metrics": {
       "action_brief_relevance_recall": 1.0,
-      "action_brief_pollution_rate": 0.5882352941176471,
+      "action_brief_pollution_rate": 0.6111111111111112,
       "scoped_memory_suppression": 0.0
     }
   },
   "summary_reflection": {
     "trusted_false_memory_count": 5,
-    "expected_action_delta": -0.033333333333333326,
+    "expected_action_delta": -0.06060606060606066,
     "metrics": {
       "action_brief_relevance_recall": 0.6666666666666666,
-      "action_brief_pollution_rate": 0.5833333333333334,
-      "scoped_memory_suppression": 0.3333333333333333
+      "action_brief_pollution_rate": 0.6153846153846154,
+      "scoped_memory_suppression": 0.25
     }
   },
   "unvalidated_memory": {
     "trusted_false_memory_count": 7,
-    "expected_action_delta": 0.30000000000000004,
+    "expected_action_delta": 0.36363636363636365,
     "metrics": {
-      "promoted_count": 17,
+      "promoted_count": 18,
       "action_brief_card_count": 14,
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.5,
@@ -100,7 +100,7 @@ Current expected signal:
       "click refresh before submitting workflow-gotchas form": ["non_causal"]
     },
     "metrics": {
-      "promoted_count": 10,
+      "promoted_count": 11,
       "action_brief_card_count": 6,
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.0,
@@ -122,13 +122,13 @@ Current expected signal:
     "comparison_rows": {
       "summary_reflection": {
         "false_memory_resistance_delta": 1.0,
-        "expected_action_delta_delta": 1.0333333333333332,
+        "expected_action_delta_delta": 1.0606060606060606,
         "trusted_false_memory_reduction": 5,
-        "action_brief_card_reduction": 6
+        "action_brief_card_reduction": 7
       },
       "unvalidated_memory": {
         "false_memory_resistance_delta": 1.0,
-        "expected_action_delta_delta": 0.7,
+        "expected_action_delta_delta": 0.6363636363636364,
         "trusted_false_memory_reduction": 7,
         "action_brief_card_reduction": 8
       }
