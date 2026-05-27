@@ -33,6 +33,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add poisoned-memory fixture cases with untrusted-source quarantine.
 - [x] Add misleading-success fixture cases with non-causal derived-claim quarantine.
 - [x] Add failed-trace lesson fixture cases with valid failure-mode promotion.
+- [x] Add action-brief recommended-action assertions and unvalidated-memory harm checks.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -70,9 +71,9 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 
 ## Next Lane: Action-Brief Utility
 
-- [ ] Add held-out task assertions that check decisive recommended action text, not just card count.
+- [x] Add held-out task assertions that check decisive recommended action text, not just card count.
 - [ ] Add a no-memory baseline for held-out task success.
-- [ ] Add an unvalidated-memory harm check where a false card pollutes the action brief.
+- [x] Add an unvalidated-memory harm check where a false card pollutes the action brief.
 - [ ] Add `expected_action_delta` placeholder computation from fixture labels.
 
 ## Next Lane: Audit And Reporting

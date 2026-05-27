@@ -55,6 +55,7 @@ class MemoryRunResult(BaseModel):
     proposed_count: int
     quarantined_count: int
     trusted_false_memory_count: int
+    action_brief_recommended_actions: list[str] = Field(default_factory=list)
     decision_reason_codes: dict[str, list[str]] = Field(default_factory=dict)
     metrics: WritePathMetrics
 
@@ -297,6 +298,7 @@ def _run_unvalidated_memory(
         proposed_count=len(atoms),
         quarantined_count=0,
         trusted_false_memory_count=len(false_atoms),
+        action_brief_recommended_actions=brief.recommended_next_actions,
         decision_reason_codes={},
         metrics=WritePathMetrics(
             false_memory_resistance=0.0,
@@ -352,6 +354,7 @@ def _run_cem0_validation(
             proposed_count=len(atoms),
             quarantined_count=len(quarantined),
             trusted_false_memory_count=len(trusted_false),
+            action_brief_recommended_actions=brief.recommended_next_actions,
             decision_reason_codes=_decision_reason_codes(cem, atoms),
             metrics=metrics,
         ),

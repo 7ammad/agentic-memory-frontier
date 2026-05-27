@@ -43,4 +43,28 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
         "valid_preference": 1.0,
         "valid_skill": 1.0,
     }
+    assert "set assignment_group before assignee" in result.cem0_validation.action_brief_recommended_actions
+    assert (
+        "avoid submitting workflow-gotchas form unless approval_code is present"
+        in result.cem0_validation.action_brief_recommended_actions
+    )
+    assert "editor_theme=dark" in result.cem0_validation.action_brief_recommended_actions
+    assert "editor_theme=light" not in result.cem0_validation.action_brief_recommended_actions
+    assert (
+        "click refresh before submitting workflow-gotchas form"
+        not in result.cem0_validation.action_brief_recommended_actions
+    )
+    assert (
+        "skip pytest before claiming kernel changes are done"
+        not in result.cem0_validation.action_brief_recommended_actions
+    )
+    assert "editor_theme=light" in result.unvalidated_memory.action_brief_recommended_actions
+    assert (
+        "click refresh before submitting workflow-gotchas form"
+        in result.unvalidated_memory.action_brief_recommended_actions
+    )
+    assert (
+        "skip pytest before claiming kernel changes are done"
+        in result.unvalidated_memory.action_brief_recommended_actions
+    )
     assert result.unvalidated_memory.metrics.action_brief_card_count > result.action_brief_card_count
