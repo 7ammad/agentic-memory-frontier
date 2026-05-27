@@ -68,7 +68,15 @@ CEM-0 also has a local MemoryArena-style adapter that:
 python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
-This is not a full MemoryArena result yet. It is the local adapter layer needed before wiring real agent execution and CEM-0 action-brief ablations over MemoryArena tasks.
+The MemoryArena slice now also includes a CEM-backed runner:
+
+```powershell
+python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
+```
+
+That runner ingests MemoryArena tasks as traces, runs CEM-0's current write path, retrieves Action Brief recommendations for each task, and scores those recommendations against expected subtask answers.
+
+This is not a full MemoryArena result yet. It is the local adapter and runner layer needed before wiring real agent execution and broader CEM-0 action-brief ablations over MemoryArena tasks.
 
 ## LongMemEval-V2 Adapter Slice
 

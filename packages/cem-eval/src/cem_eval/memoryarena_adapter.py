@@ -84,7 +84,7 @@ def memoryarena_tasks_to_agent_traces(dataset: MemoryArenaDataset) -> list[Agent
                 TraceTurn(
                     index=len(turns),
                     role="system",
-                    content=f"BACKGROUND: {background}",
+                    content=background,
                 )
             )
         for subtask in task.subtasks:

@@ -127,7 +127,7 @@ Backend adapters, MCP integration, and multi-agent protocol stay gated until the
 ### 7. External Benchmark Runner Layer
 
 - [x] CEM-backed HaluMem write-path runner.
-- [ ] CEM-backed MemoryArena action-coupling runner.
+- [x] CEM-backed MemoryArena action-coupling runner.
 - [ ] CEM-backed LongMemEval-V2 trajectory/retrieval runner.
 - [ ] Unified external benchmark report object.
 

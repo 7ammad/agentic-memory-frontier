@@ -235,6 +235,14 @@ Smoke command:
 python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
+CEM-backed action-brief command:
+
+```powershell
+python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
+```
+
+CEM-0's MemoryArena runner ingests tasks as traces, runs the write path, retrieves Action Brief recommendations, and scores those recommendations against expected subtask answers.
+
 CEM-0 also includes a local LongMemEval-V2 adapter that loads a dataset root with `questions.jsonl`, `trajectories.jsonl`, and optional `haystacks/*.json`, converts trajectories into `AgentTrace` records, and scores exact answers plus haystack-member retrieval.
 
 Smoke command:

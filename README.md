@@ -285,6 +285,14 @@ python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bund
 
 The adapter normalizes ordered `questions`, `answers`, and optional `backgrounds` into multi-subtask task records. It emits progress score and task success rate, matching MemoryArena's action-coupled evaluation shape without claiming a full benchmark result yet.
 
+Run CEM-0 Action Brief scoring against a local MemoryArena export:
+
+```powershell
+python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
+```
+
+The CEM-backed runner ingests MemoryArena tasks as traces, validates promoted experience, retrieves action briefs for each task, and scores the recommended actions against expected subtask answers.
+
 ## LongMemEval-V2 Adapter Smoke
 
 Inspect a local LongMemEval-V2 dataset root:

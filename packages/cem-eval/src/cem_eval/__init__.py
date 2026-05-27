@@ -46,6 +46,11 @@ from .memoryarena_adapter import (
     score_memoryarena_reference_upper_bound,
     summarize_memoryarena_dataset,
 )
+from .memoryarena_runner import (
+    MemoryArenaCEM0EvalResult,
+    run_memoryarena_cem0_eval,
+    run_memoryarena_cem0_eval_from_dataset,
+)
 from .reports import render_synthetic_eval_markdown
 from .synthetic_corruption import (
     EvalReportRow,
@@ -81,6 +86,7 @@ __all__ = [
     "LongMemEvalV2State",
     "LongMemEvalV2Trajectory",
     "MemoryRunResult",
+    "MemoryArenaCEM0EvalResult",
     "MemoryArenaDataset",
     "MemoryArenaDatasetSummary",
     "MemoryArenaScore",
@@ -103,6 +109,8 @@ __all__ = [
     "run_halumem_cem0_eval",
     "run_halumem_cem0_eval_from_dataset",
     "run_halumem_facsimile_eval",
+    "run_memoryarena_cem0_eval",
+    "run_memoryarena_cem0_eval_from_dataset",
     "run_synthetic_corruption_eval",
     "run_workflow_gotcha_demo",
     "score_halumem_extraction",
