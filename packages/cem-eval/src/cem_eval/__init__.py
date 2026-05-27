@@ -16,6 +16,18 @@ from .halumem_runner import (
     halumem_facsimile_from_synthetic,
     run_halumem_facsimile_eval,
 )
+from .memoryarena_adapter import (
+    MemoryArenaDataset,
+    MemoryArenaDatasetSummary,
+    MemoryArenaScore,
+    MemoryArenaSubtask,
+    MemoryArenaTask,
+    load_memoryarena_dataset,
+    memoryarena_tasks_to_agent_traces,
+    score_memoryarena_predictions,
+    score_memoryarena_reference_upper_bound,
+    summarize_memoryarena_dataset,
+)
 from .reports import render_synthetic_eval_markdown
 from .synthetic_corruption import (
     EvalReportRow,
@@ -43,6 +55,11 @@ __all__ = [
     "HaluMemQuestion",
     "HaluMemSession",
     "MemoryRunResult",
+    "MemoryArenaDataset",
+    "MemoryArenaDatasetSummary",
+    "MemoryArenaScore",
+    "MemoryArenaSubtask",
+    "MemoryArenaTask",
     "SyntheticEvalReport",
     "SyntheticEvalResult",
     "WorkflowGotchaAttempt",
@@ -52,12 +69,17 @@ __all__ = [
     "halumem_facsimile_from_synthetic",
     "halumem_sessions_to_agent_traces",
     "load_halumem_dataset",
+    "load_memoryarena_dataset",
+    "memoryarena_tasks_to_agent_traces",
     "render_synthetic_eval_markdown",
     "run_halumem_facsimile_eval",
     "run_synthetic_corruption_eval",
     "run_workflow_gotcha_demo",
     "score_halumem_extraction",
     "score_halumem_reference_upper_bound",
+    "score_memoryarena_predictions",
+    "score_memoryarena_reference_upper_bound",
     "summarize_halumem_dataset",
+    "summarize_memoryarena_dataset",
     "workflow_report_row_from_run",
 ]

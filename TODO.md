@@ -121,7 +121,7 @@ Backend adapters, MCP integration, and multi-agent protocol stay gated until the
 
 - [x] Decide whether to integrate real HaluMem now or keep strengthening the local facsimile first.
 - [x] Real HaluMem runner or dataset adapter.
-- [ ] MemoryArena-style adapter.
+- [x] MemoryArena-style adapter.
 - [ ] LongMemEval-V2-style adapter.
 
 ### 7. Gated Later Work

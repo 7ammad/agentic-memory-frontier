@@ -219,6 +219,14 @@ Smoke command:
 python scripts/run_halumem_adapter.py path\to\halumem.json
 ```
 
+CEM-0 also includes a local MemoryArena-style adapter that can load JSON, JSONL, or directories of JSON/JSONL files, normalize ordered subtasks from `questions`, `answers`, and `backgrounds`, convert tasks into `AgentTrace` records, and score predictions with progress score and task success rate.
+
+Smoke command:
+
+```powershell
+python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bundled_shopping
+```
+
 ## Not Proven Yet
 
 The current report does not prove:

@@ -44,3 +44,20 @@ python scripts/run_halumem_adapter.py path\to\halumem.json
 This is not a published HaluMem benchmark score yet.
 
 The current adapter proves local ingestion and scoring against the official-style schema. A real benchmark result still requires running CEM-0 or a wrapped memory system over the downloaded HaluMem dataset and comparing against baselines.
+
+## MemoryArena Adapter Slice
+
+CEM-0 also has a local MemoryArena-style adapter that:
+
+- loads MemoryArena JSON, JSONL, or directories of JSON/JSONL files;
+- normalizes task `id`, ordered `questions`, expected `answers`, and optional `backgrounds`;
+- converts each task into an `AgentTrace` with task questions and answer feedback;
+- scores predictions with progress score and task success rate;
+- provides a reference upper-bound score for adapter sanity checks;
+- includes a CLI smoke command:
+
+```powershell
+python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bundled_shopping
+```
+
+This is not a full MemoryArena result yet. It is the local adapter layer needed before wiring real agent execution and CEM-0 action-brief ablations over MemoryArena tasks.

@@ -266,3 +266,13 @@ python scripts/run_halumem_adapter.py path\to\halumem.json
 ```
 
 The adapter normalizes users, sessions, dialogue, memory points, update links, and QA evidence into CEM-0 evaluation records. It also emits exact-match extraction scoring fields for candidate memories: precision, recall, F1, hallucinated count, omitted count, update recall, and QA evidence recall.
+
+## MemoryArena Adapter Smoke
+
+Inspect a local MemoryArena JSON or JSONL export:
+
+```powershell
+python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bundled_shopping
+```
+
+The adapter normalizes ordered `questions`, `answers`, and optional `backgrounds` into multi-subtask task records. It emits progress score and task success rate, matching MemoryArena's action-coupled evaluation shape without claiming a full benchmark result yet.
