@@ -320,3 +320,9 @@ python scripts/run_external_benchmark_report.py --halumem-result halumem.json --
 ```
 
 The report object normalizes runner outputs into one table with proposed/trusted/quarantined counts, the primary metric for each suite, secondary metric maps, and validation reason-code counts.
+
+## Storage Backends
+
+CEM-0 storage is now behind a small backend protocol. The default remains persistent SQLite + JSONL via `CEM("tmp/cem-run")`; tests and eval fixtures can use `CEM(store=InMemoryStore())`.
+
+The storage slice is documented in [docs/cem-0-storage-backends.md](docs/cem-0-storage-backends.md). It is backend-agnostic kernel wiring, not MCP integration or a hosted memory platform.

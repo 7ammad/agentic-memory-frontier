@@ -2,8 +2,25 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import Protocol
 
 from .models import AgentTrace, ExperienceAtom, ExperienceCard, ValidationDecision, ValidationResult
+
+
+class CEMStore(Protocol):
+    def save_trace(self, trace: AgentTrace) -> None: ...
+    def get_trace(self, trace_id: str) -> AgentTrace: ...
+    def save_atom(self, atom: ExperienceAtom) -> None: ...
+    def get_atom(self, atom_id: str) -> ExperienceAtom: ...
+    def list_atoms(self) -> list[ExperienceAtom]: ...
+    def save_card(self, card: ExperienceCard) -> None: ...
+    def get_card(self, card_id: str) -> ExperienceCard: ...
+    def list_cards(self) -> list[ExperienceCard]: ...
+    def save_validation(self, result: ValidationResult) -> None: ...
+    def list_validations(self, atom_id: str) -> list[ValidationResult]: ...
+    def save_validation_decision(self, decision: ValidationDecision) -> None: ...
+    def list_validation_decisions(self, atom_id: str) -> list[ValidationDecision]: ...
+    def get_latest_validation_decision(self, atom_id: str) -> ValidationDecision | None: ...
 
 
 class SQLiteStore:
@@ -151,3 +168,73 @@ class SQLiteStore:
         if row is None:
             return None
         return ValidationDecision.model_validate_json(row[0])
+
+
+class InMemoryStore:
+    """Local test/eval backend that exercises the same storage contract without files."""
+
+    def __init__(self) -> None:
+        self._traces: dict[str, str] = {}
+        self._atoms: dict[str, str] = {}
+        self._cards: dict[str, str] = {}
+        self._validations: list[tuple[str, str]] = []
+        self._validation_decisions: list[tuple[str, str]] = []
+
+    def save_trace(self, trace: AgentTrace) -> None:
+        self._traces[trace.trace_id] = trace.model_dump_json()
+
+    def get_trace(self, trace_id: str) -> AgentTrace:
+        payload = self._traces.get(trace_id)
+        if payload is None:
+            raise KeyError(f"Trace not found: {trace_id}")
+        return AgentTrace.model_validate_json(payload)
+
+    def save_atom(self, atom: ExperienceAtom) -> None:
+        self._atoms[atom.atom_id] = atom.model_dump_json()
+
+    def get_atom(self, atom_id: str) -> ExperienceAtom:
+        payload = self._atoms.get(atom_id)
+        if payload is None:
+            raise KeyError(f"Atom not found: {atom_id}")
+        return ExperienceAtom.model_validate_json(payload)
+
+    def list_atoms(self) -> list[ExperienceAtom]:
+        return [ExperienceAtom.model_validate_json(payload) for payload in self._atoms.values()]
+
+    def save_card(self, card: ExperienceCard) -> None:
+        self._cards[card.card_id] = card.model_dump_json()
+
+    def get_card(self, card_id: str) -> ExperienceCard:
+        payload = self._cards.get(card_id)
+        if payload is None:
+            raise KeyError(f"Card not found: {card_id}")
+        return ExperienceCard.model_validate_json(payload)
+
+    def list_cards(self) -> list[ExperienceCard]:
+        return [ExperienceCard.model_validate_json(payload) for payload in self._cards.values()]
+
+    def save_validation(self, result: ValidationResult) -> None:
+        self._validations.append((result.atom_id, result.model_dump_json()))
+
+    def list_validations(self, atom_id: str) -> list[ValidationResult]:
+        return [
+            ValidationResult.model_validate_json(payload)
+            for stored_atom_id, payload in self._validations
+            if stored_atom_id == atom_id
+        ]
+
+    def save_validation_decision(self, decision: ValidationDecision) -> None:
+        self._validation_decisions.append((decision.atom_id, decision.model_dump_json()))
+
+    def list_validation_decisions(self, atom_id: str) -> list[ValidationDecision]:
+        return [
+            ValidationDecision.model_validate_json(payload)
+            for stored_atom_id, payload in self._validation_decisions
+            if stored_atom_id == atom_id
+        ]
+
+    def get_latest_validation_decision(self, atom_id: str) -> ValidationDecision | None:
+        for stored_atom_id, payload in reversed(self._validation_decisions):
+            if stored_atom_id == atom_id:
+                return ValidationDecision.model_validate_json(payload)
+        return None

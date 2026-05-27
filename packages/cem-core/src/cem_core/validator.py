@@ -4,13 +4,13 @@ from datetime import timedelta
 
 from .contradiction import ContradictionDetector, KeyValueContradictionDetector
 from .models import ExperienceAtom, ValidationDecision, ValidationResult, utc_now
-from .storage import SQLiteStore
+from .storage import CEMStore
 
 
 class MemoryValidator:
     def __init__(
         self,
-        store: SQLiteStore,
+        store: CEMStore,
         *,
         contradiction_detector: ContradictionDetector | None = None,
     ) -> None:

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import timedelta
 
-from cem_core import AgentTrace, CEM, ContradictionMatch, ExperienceAtom, TaskContext, TraceTurn
+from cem_core import AgentTrace, CEM, ContradictionMatch, ExperienceAtom, InMemoryStore, TaskContext, TraceTurn
 from cem_core.models import utc_now
 
 
@@ -179,6 +179,54 @@ def test_extractor_strategy_can_be_swapped(tmp_path):
     cem.ingest_trace(trace)
 
     assert cem.propose_memories(trace.trace_id) == []
+
+
+def test_storage_backend_can_be_swapped_to_in_memory():
+    store = InMemoryStore()
+    cem = CEM(store=store)
+    trace = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        task_id="approval-flow",
+        turns=[TraceTurn(index=0, role="environment", content="SKILL: open approvals tab")],
+        final_outcome="success",
+        environment={"domain": "workflow-nav"},
+    )
+
+    cem.ingest_trace(trace)
+    atom = cem.propose_memories(trace.trace_id)[0]
+    decision = cem.validate(atom.atom_id)
+    card = cem.promote(atom.atom_id)
+    brief = cem.retrieve_action_brief(
+        TaskContext(
+            session_id="s1",
+            description="Which action should open approvals tab?",
+            domain_scope="workflow-nav",
+            task_family="approval-flow",
+        )
+    )
+
+    assert decision.decision == "candidate"
+    assert card is not None
+    assert store.get_trace(trace.trace_id).trace_id == trace.trace_id
+    assert store.get_latest_validation_decision(atom.atom_id) is not None
+    assert brief.recommended_next_actions == ["open approvals tab"]
+
+
+def test_cem_requires_exactly_one_storage_backend(tmp_path):
+    try:
+        CEM()
+    except ValueError as exc:
+        assert "requires a storage root or a store backend" in str(exc)
+    else:
+        raise AssertionError("CEM should require a storage root or store backend.")
+
+    try:
+        CEM(tmp_path, store=InMemoryStore())
+    except ValueError as exc:
+        assert "either root or store" in str(exc)
+    else:
+        raise AssertionError("CEM should reject ambiguous storage configuration.")
 
 
 def test_contradiction_strategy_can_be_swapped(tmp_path):

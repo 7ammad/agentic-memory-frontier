@@ -14,19 +14,26 @@ from .models import (
     TraceReceipt,
     utc_now,
 )
-from .storage import SQLiteStore
+from .storage import CEMStore, SQLiteStore
 from .validator import MemoryValidator
 
 
 class CEM:
     def __init__(
         self,
-        root: str | Path,
+        root: str | Path | None = None,
         *,
+        store: CEMStore | None = None,
         extractor: MemoryExtractor | None = None,
         contradiction_detector: ContradictionDetector | None = None,
     ) -> None:
-        self.store = SQLiteStore(Path(root))
+        if store is not None and root is not None:
+            raise ValueError("Pass either root or store, not both.")
+        if store is None:
+            if root is None:
+                raise ValueError("CEM requires a storage root or a store backend.")
+            store = SQLiteStore(Path(root))
+        self.store = store
         self.extractor = extractor or DeterministicExtractor()
         self.validator = MemoryValidator(
             self.store,

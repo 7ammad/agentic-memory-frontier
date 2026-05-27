@@ -18,6 +18,7 @@ from .models import (
     ValidationDecision,
     ValidationResult,
 )
+from .storage import CEMStore, InMemoryStore, SQLiteStore
 
 __all__ = [
     "ActionBrief",
@@ -25,13 +26,16 @@ __all__ = [
     "CEM",
     "ContradictionDetector",
     "ContradictionMatch",
+    "CEMStore",
     "DeterministicExtractor",
     "ExperienceAtom",
     "ExperienceCard",
     "KeyValueContradictionDetector",
     "MemoryAudit",
     "MemoryExtractor",
+    "InMemoryStore",
     "SourceSpan",
+    "SQLiteStore",
     "TaskContext",
     "TraceReceipt",
     "TraceTurn",
