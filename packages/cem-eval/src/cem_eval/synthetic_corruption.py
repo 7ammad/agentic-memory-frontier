@@ -92,6 +92,7 @@ class EvalReportComparisonRow(BaseModel):
     baseline_name: str
     false_memory_resistance_delta: float
     expected_action_delta_delta: float
+    workflow_success_delta: float
     trusted_false_memory_reduction: int
     action_brief_card_reduction: int
 
@@ -666,16 +667,26 @@ def _build_report(
     baseline_runs = [no_memory, raw_trace_retrieval, summary_reflection, unvalidated_memory]
     baseline_rows = [_report_row(run) for run in baseline_runs]
     cem0_row = _report_row(cem0_validation)
+    workflow_rows = [
+        workflow_report_row_from_run(run)
+        for run in [*baseline_runs, cem0_validation]
+    ]
+    workflow_success_by_name = {row.name: row.success for row in workflow_rows}
     return SyntheticEvalReport(
         suite_name="synthetic_corruption",
         generated_at=datetime.now(timezone.utc),
         baseline_rows=baseline_rows,
         cem0_row=cem0_row,
-        comparison_rows=[_comparison_row(baseline, cem0_row) for baseline in baseline_rows],
-        workflow_rows=[
-            workflow_report_row_from_run(run)
-            for run in [*baseline_runs, cem0_validation]
+        comparison_rows=[
+            _comparison_row(
+                baseline,
+                cem0_row,
+                baseline_workflow_success=workflow_success_by_name[baseline.name],
+                cem0_workflow_success=workflow_success_by_name[cem0_row.name],
+            )
+            for baseline in baseline_rows
         ],
+        workflow_rows=workflow_rows,
     )
 
 
@@ -698,11 +709,18 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
     )
 
 
-def _comparison_row(baseline: EvalReportRow, cem0: EvalReportRow) -> EvalReportComparisonRow:
+def _comparison_row(
+    baseline: EvalReportRow,
+    cem0: EvalReportRow,
+    *,
+    baseline_workflow_success: bool,
+    cem0_workflow_success: bool,
+) -> EvalReportComparisonRow:
     return EvalReportComparisonRow(
         baseline_name=baseline.name,
         false_memory_resistance_delta=cem0.false_memory_resistance - baseline.false_memory_resistance,
         expected_action_delta_delta=cem0.expected_action_delta - baseline.expected_action_delta,
+        workflow_success_delta=float(cem0_workflow_success) - float(baseline_workflow_success),
         trusted_false_memory_reduction=baseline.trusted_false_memory_count - cem0.trusted_false_memory_count,
         action_brief_card_reduction=baseline.action_brief_card_count - cem0.action_brief_card_count,
     )

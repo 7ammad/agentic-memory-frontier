@@ -266,7 +266,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: Week 4 says "Run held-out task comparison."
   - Needed outcome: report shows no-memory, raw-trace, summary/reflection, unvalidated-memory, and CEM-0 workflow success side by side.
 
-- [ ] Add Marginal Memory Advantage / workflow success delta.
+- [x] Add Marginal Memory Advantage / workflow success delta.
   - Original source: benchmark strategy says `MMA = TaskSuccess(memory_agent) - TaskSuccess(no_memory_agent)`.
   - Needed outcome: eval reports CEM-0's held-out workflow advantage against each baseline, not just write-path integrity.
 

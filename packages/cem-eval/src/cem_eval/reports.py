@@ -41,8 +41,8 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
             "",
             "## CEM-0 Comparison",
             "",
-            "| Baseline | False memory resistance delta | Expected action delta delta | Trusted false memory reduction | Action brief card reduction |",
-            "| --- | ---: | ---: | ---: | ---: |",
+            "| Baseline | False memory resistance delta | Expected action delta delta | Workflow success delta | Trusted false memory reduction | Action brief card reduction |",
+            "| --- | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
     for row in report.comparison_rows:
@@ -53,6 +53,7 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
                     row.baseline_name,
                     _format_float(row.false_memory_resistance_delta),
                     _format_float(row.expected_action_delta_delta),
+                    _format_float(row.workflow_success_delta),
                     str(row.trusted_false_memory_reduction),
                     str(row.action_brief_card_reduction),
                 ]

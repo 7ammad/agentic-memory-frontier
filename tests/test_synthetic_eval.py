@@ -46,9 +46,11 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     comparisons = {row.baseline_name: row for row in result.report.comparison_rows}
     assert comparisons["unvalidated_memory"].false_memory_resistance_delta == 1.0
     assert round(comparisons["unvalidated_memory"].expected_action_delta_delta, 3) == 0.636
+    assert comparisons["unvalidated_memory"].workflow_success_delta == 1.0
     assert comparisons["unvalidated_memory"].trusted_false_memory_reduction == 7
     assert comparisons["unvalidated_memory"].action_brief_card_reduction == 8
     assert round(comparisons["summary_reflection"].expected_action_delta_delta, 3) == 1.061
+    assert comparisons["summary_reflection"].workflow_success_delta == 1.0
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
     assert result.raw_trace_retrieval.metrics.action_brief_card_count == 18
     assert result.raw_trace_retrieval.metrics.action_brief_relevance_recall == 1.0
@@ -161,8 +163,8 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "| unvalidated_memory | 18 | 0 | 7 | 14 | 0.364 | 0 | 1 | 0.5 | 1 | 1 | 0 | 1 | 0 |" in markdown
     assert "| cem0_validation | 18 | 6 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 2 | 1 |" in markdown
     assert "## CEM-0 Comparison" in markdown
-    assert "| summary_reflection | 1 | 1.061 | 5 | 7 |" in markdown
-    assert "| unvalidated_memory | 1 | 0.636 | 7 | 8 |" in markdown
+    assert "| summary_reflection | 1 | 1.061 | 1 | 5 | 7 |" in markdown
+    assert "| unvalidated_memory | 1 | 0.636 | 1 | 7 | 8 |" in markdown
     assert "## Audit Coverage" in markdown
     assert "| unvalidated_memory | 0 | 0 | 1 |" in markdown
     assert "| cem0_validation | 1 | 1 | 2 |" in markdown
