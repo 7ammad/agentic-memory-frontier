@@ -139,6 +139,19 @@ Do not start these until CEM-0 proof items above and the external benchmark runn
 - [x] MCP integration.
 - [x] Multi-agent protocol.
 
+### 9. Usable Local Memory System
+
+- [x] AMS v1 plan grounded with MIT-12 and Claude Opus 4.7 review.
+- [x] Local CLI entry point: `python scripts/ams.py`.
+- [x] Persistent root default: `~/.codex/memory/cem`.
+- [x] Session continuity with current-session rotation.
+- [x] `remember` command writes learned experience through CEM validation.
+- [x] `pin` command stores explicit directives separately from learned experience.
+- [x] `bootstrap-codex` seeds this workspace's first Codex directives without creating CEM cards.
+- [x] `brief` command returns directives plus verified CEM action recommendations.
+- [x] `list` and `audit` expose cards, atoms, and directives.
+- [x] Subprocess tests cover persistence, quarantine, directives, bootstrap idempotency, root isolation, and JSON output.
+
 ## Historical Schedule Note
 
 The original spec used Week 1 through Week 4 as a human-readable grouping of work. That is not the active schedule. For this AI build, the active schedule is the ordered queue above: take the next unchecked item, implement it, verify it, commit it, push it, and continue.

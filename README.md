@@ -24,6 +24,50 @@ The implementation kickoff spec is in [specs/2026-05-27-cem-0-memguard-kernel-sp
 
 The active build queue is in [TODO.md](TODO.md). Codex should update it and continue to the next unchecked item after each verified commit unless blocked or redirected.
 
+## Use It Now
+
+AMS v1 is the first usable local memory surface for Codex. It uses CEM-0 for learned experience and keeps explicit directives separate so project rules do not get laundered as learned memories.
+
+Initialize a local memory root:
+
+```powershell
+python scripts/ams.py init
+```
+
+Pin this workspace's Codex directives:
+
+```powershell
+python scripts/ams.py bootstrap-codex --workspace .
+```
+
+Remember learned operational experience. `--outcome` is required on purpose:
+
+```powershell
+python scripts/ams.py remember "run pytest before claiming memory changes are complete" --kind skill --outcome success --domain agentic-memory-system --task-family verification
+```
+
+Retrieve an action brief before working:
+
+```powershell
+python scripts/ams.py brief "continue building Agentic Memory System" --domain agentic-memory-system
+```
+
+Inspect and audit memory:
+
+```powershell
+python scripts/ams.py list
+python scripts/ams.py list --kind directives
+python scripts/ams.py audit <memory_id>
+```
+
+Default root:
+
+```text
+~/.codex/memory/cem
+```
+
+Set `AMS_ROOT` or pass `--root` to use a different local store.
+
 The current V0 benchmark report is in [docs/cem-0-benchmark-report.md](docs/cem-0-benchmark-report.md).
 
 The external benchmark decision is in [docs/cem-0-external-benchmark-decision.md](docs/cem-0-external-benchmark-decision.md). CEM-0 now has a local HaluMem dataset adapter for JSON/JSONL exports, but it does not claim a real HaluMem score yet.
