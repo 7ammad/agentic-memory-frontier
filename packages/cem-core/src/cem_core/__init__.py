@@ -1,3 +1,9 @@
+from .contradiction import (
+    ContradictionDetector,
+    ContradictionMatch,
+    KeyValueContradictionDetector,
+)
+from .extractor import DeterministicExtractor, MemoryExtractor
 from .kernel import CEM
 from .models import (
     ActionBrief,
@@ -16,9 +22,14 @@ __all__ = [
     "ActionBrief",
     "AgentTrace",
     "CEM",
+    "ContradictionDetector",
+    "ContradictionMatch",
+    "DeterministicExtractor",
     "ExperienceAtom",
     "ExperienceCard",
+    "KeyValueContradictionDetector",
     "MemoryAudit",
+    "MemoryExtractor",
     "SourceSpan",
     "TaskContext",
     "TraceReceipt",

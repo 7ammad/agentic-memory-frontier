@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Protocol
+
 from .models import AgentTrace, ExperienceAtom, SourceSpan, TraceTurn
 
 MARKERS = {
@@ -10,6 +12,10 @@ MARKERS = {
     "FAILURE:": "failure_mode",
     "HYPOTHESIS:": "assistant_hypothesis",
 }
+
+
+class MemoryExtractor(Protocol):
+    def extract(self, trace: AgentTrace) -> list[ExperienceAtom]: ...
 
 
 class DeterministicExtractor:

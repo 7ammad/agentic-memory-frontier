@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from .contradiction import ContradictionDetector, KeyValueContradictionDetector
 from .models import ExperienceAtom, ValidationResult, utc_now
 from .storage import SQLiteStore
 
 
 class MemoryValidator:
-    def __init__(self, store: SQLiteStore) -> None:
+    def __init__(
+        self,
+        store: SQLiteStore,
+        *,
+        contradiction_detector: ContradictionDetector | None = None,
+    ) -> None:
         self.store = store
+        self.contradiction_detector = contradiction_detector or KeyValueContradictionDetector()
 
     def validate(self, atom_id: str) -> list[ValidationResult]:
         atom = self.store.get_atom(atom_id)
@@ -77,52 +84,28 @@ class MemoryValidator:
         )
 
     def _contradiction_check(self, atom: ExperienceAtom) -> ValidationResult:
-        key, value = contradiction_pair(atom.content)
-        if key is None:
+        active_atoms = [
+            other
+            for other in self.store.list_atoms()
+            if other.atom_id != atom.atom_id and other.promotion_status in {"candidate", "verified"}
+        ]
+        match = self.contradiction_detector.find_conflicts(atom, active_atoms)
+        if match is None:
             return ValidationResult(
                 atom_id=atom.atom_id,
                 check_name="contradiction",
                 passed=True,
-                reason="no contradiction key detected",
+                reason="no active contradiction detected",
             )
 
-        conflicting_ids: list[str] = []
-        for other in self.store.list_atoms():
-            if other.atom_id == atom.atom_id or other.promotion_status == "quarantined":
-                continue
-            other_key, other_value = contradiction_pair(other.content)
-            if other_key == key and other_value != value:
-                conflicting_ids.append(other.atom_id)
-
-        if conflicting_ids:
-            atom.contradiction_links = sorted(set(atom.contradiction_links + conflicting_ids))
-            self.store.save_atom(atom)
-            return ValidationResult(
-                atom_id=atom.atom_id,
-                check_name="contradiction",
-                passed=False,
-                reason=f"contradicts active memory for key '{key}'",
-            )
-
+        atom.contradiction_links = sorted(set(atom.contradiction_links + match.conflicting_atom_ids))
+        self.store.save_atom(atom)
         return ValidationResult(
             atom_id=atom.atom_id,
             check_name="contradiction",
-            passed=True,
-            reason="no active contradiction detected",
+            passed=False,
+            reason=match.reason,
         )
-
-
-def contradiction_pair(content: str) -> tuple[str | None, str | None]:
-    normalized = content.strip().lower()
-    for separator in ("=", " is ", " -> "):
-        if separator in normalized:
-            left, right = normalized.split(separator, 1)
-            key = left.strip(" .,:;")
-            value = right.strip(" .,:;")
-            if key and value:
-                return key, value
-    return None, None
-
 
 def _default_valid_until(atom: ExperienceAtom):
     if atom.epistemic_type == "preference":

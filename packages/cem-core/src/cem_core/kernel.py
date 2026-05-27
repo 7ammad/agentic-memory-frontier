@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .extractor import DeterministicExtractor
+from .contradiction import ContradictionDetector
+from .extractor import DeterministicExtractor, MemoryExtractor
 from .models import (
     ActionBrief,
     AgentTrace,
@@ -18,10 +19,19 @@ from .validator import MemoryValidator
 
 
 class CEM:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        extractor: MemoryExtractor | None = None,
+        contradiction_detector: ContradictionDetector | None = None,
+    ) -> None:
         self.store = SQLiteStore(Path(root))
-        self.extractor = DeterministicExtractor()
-        self.validator = MemoryValidator(self.store)
+        self.extractor = extractor or DeterministicExtractor()
+        self.validator = MemoryValidator(
+            self.store,
+            contradiction_detector=contradiction_detector,
+        )
 
     def ingest_trace(self, trace: AgentTrace) -> TraceReceipt:
         self.store.save_trace(trace)

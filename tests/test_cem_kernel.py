@@ -1,4 +1,6 @@
-from cem_core import AgentTrace, CEM, TaskContext, TraceTurn
+from collections.abc import Sequence
+
+from cem_core import AgentTrace, CEM, ContradictionMatch, ExperienceAtom, TaskContext, TraceTurn
 
 
 def test_trace_ingest_extract_validate_promote_and_retrieve(tmp_path):
@@ -87,3 +89,55 @@ def test_assistant_hypothesis_cannot_promote_without_evidence(tmp_path):
     stored = cem.store.get_atom(atom.atom_id)
     assert stored.promotion_status == "quarantined"
     assert "assistant hypothesis" in (stored.quarantine_reason or "")
+
+
+class EmptyExtractor:
+    def extract(self, trace: AgentTrace) -> list[ExperienceAtom]:
+        return []
+
+
+class NoopContradictionDetector:
+    def find_conflicts(
+        self,
+        atom: ExperienceAtom,
+        active_atoms: Sequence[ExperienceAtom],
+    ) -> ContradictionMatch | None:
+        return None
+
+
+def test_extractor_strategy_can_be_swapped(tmp_path):
+    cem = CEM(tmp_path, extractor=EmptyExtractor())
+    trace = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=0, role="user", content="PREFERENCE: database=postgres")],
+    )
+
+    cem.ingest_trace(trace)
+
+    assert cem.propose_memories(trace.trace_id) == []
+
+
+def test_contradiction_strategy_can_be_swapped(tmp_path):
+    cem = CEM(tmp_path, contradiction_detector=NoopContradictionDetector())
+    trace_one = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=0, role="user", content="PREFERENCE: database=postgres")],
+    )
+    trace_two = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=1, role="user", content="PREFERENCE: database=mysql")],
+    )
+
+    cem.ingest_trace(trace_one)
+    first = cem.propose_memories(trace_one.trace_id)[0]
+    cem.validate(first.atom_id)
+    cem.ingest_trace(trace_two)
+    second = cem.propose_memories(trace_two.trace_id)[0]
+    cem.validate(second.atom_id)
+
+    stored = cem.store.get_atom(second.atom_id)
+    assert stored.promotion_status == "candidate"
+    assert stored.quarantine_reason is None
