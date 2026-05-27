@@ -28,20 +28,21 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add write-path metrics: false memory resistance, contradiction recall, false quarantine rate, promoted count, action brief card count.
 - [x] Refactor extractor and contradiction detector behind strategy interfaces.
 - [x] Expand synthetic corruption eval to 9 labeled fixture cases.
+- [x] Add validation decision aggregation, decision reason codes, and per-risk metric breakdown.
 
 ## Active Lane: Write-Path Decision Quality
 
-- [ ] Add a `ValidationDecision` model that aggregates check results into one decision.
+- [x] Add a `ValidationDecision` model that aggregates check results into one decision.
   - Inputs: atom id, validation results, contradiction links, confidence, expected status where available.
   - Outputs: `candidate` or `quarantined`, reason codes, metric labels, human-readable explanation.
   - First files: `packages/cem-core/src/cem_core/models.py`, `packages/cem-core/src/cem_core/validator.py`, `tests/test_cem_kernel.py`.
   - Verification: `python -m pytest`, `python scripts/run_synthetic_eval.py`.
 
-- [ ] Replace string-matched quarantine checks in the eval with decision reason codes.
+- [x] Replace string-matched quarantine checks in the eval with decision reason codes.
   - Goal: metrics should read validator decisions, not quarantine reason prose.
   - First files: `packages/cem-eval/src/cem_eval/synthetic_corruption.py`, `packages/cem-core/src/cem_core/validator.py`.
 
-- [ ] Add per-risk-type metric breakdown.
+- [x] Add per-risk-type metric breakdown.
   - Report false memory resistance by `contradiction`, `assistant_hypothesis`, and `unsupported`.
   - Report valid-memory retention by `valid_preference`, `valid_instruction`, `valid_skill`, and `valid_failure_mode`.
 

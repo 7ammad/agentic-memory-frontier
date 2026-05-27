@@ -159,11 +159,24 @@ class ValidationResult(StrictModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class ValidationDecision(StrictModel):
+    atom_id: str
+    decision: Literal["candidate", "quarantined"]
+    reason_codes: list[str] = Field(default_factory=list)
+    metric_labels: list[str] = Field(default_factory=list)
+    explanation: str
+    contradiction_links: list[str] = Field(default_factory=list)
+    confidence_score: float
+    validation_results: list[ValidationResult]
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class MemoryAudit(StrictModel):
     memory_id: str
     memory_kind: Literal["atom", "card"]
     source_trace_ids: list[str]
     source_turn_ids: list[str]
     validation_results: list[ValidationResult]
+    validation_decision: ValidationDecision | None = None
     promotion_status: str
     quarantine_reason: str | None = None

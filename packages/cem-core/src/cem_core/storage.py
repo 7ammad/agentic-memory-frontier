@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from .models import AgentTrace, ExperienceAtom, ExperienceCard, ValidationResult
+from .models import AgentTrace, ExperienceAtom, ExperienceCard, ValidationDecision, ValidationResult
 
 
 class SQLiteStore:
@@ -36,6 +36,11 @@ class SQLiteStore:
                     payload TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS validations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    atom_id TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS validation_decisions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     atom_id TEXT NOT NULL,
                     payload TEXT NOT NULL
@@ -121,3 +126,28 @@ class SQLiteStore:
                 (atom_id,),
             ).fetchall()
         return [ValidationResult.model_validate_json(row[0]) for row in rows]
+
+    def save_validation_decision(self, decision: ValidationDecision) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO validation_decisions(atom_id, payload) VALUES(?, ?)",
+                (decision.atom_id, decision.model_dump_json()),
+            )
+
+    def list_validation_decisions(self, atom_id: str) -> list[ValidationDecision]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT payload FROM validation_decisions WHERE atom_id = ? ORDER BY id",
+                (atom_id,),
+            ).fetchall()
+        return [ValidationDecision.model_validate_json(row[0]) for row in rows]
+
+    def get_latest_validation_decision(self, atom_id: str) -> ValidationDecision | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM validation_decisions WHERE atom_id = ? ORDER BY id DESC LIMIT 1",
+                (atom_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return ValidationDecision.model_validate_json(row[0])

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from .contradiction import ContradictionDetector, KeyValueContradictionDetector
-from .models import ExperienceAtom, ValidationResult, utc_now
+from .models import ExperienceAtom, ValidationDecision, ValidationResult, utc_now
 from .storage import SQLiteStore
 
 
@@ -17,7 +17,7 @@ class MemoryValidator:
         self.store = store
         self.contradiction_detector = contradiction_detector or KeyValueContradictionDetector()
 
-    def validate(self, atom_id: str) -> list[ValidationResult]:
+    def validate(self, atom_id: str) -> ValidationDecision:
         atom = self.store.get_atom(atom_id)
         results = [
             self._source_span_check(atom),
@@ -28,19 +28,21 @@ class MemoryValidator:
         contradiction_result = self._contradiction_check(atom)
         results.append(contradiction_result)
 
-        failed = [result for result in results if not result.passed]
-        if failed:
+        decision = build_validation_decision(atom, results)
+        if decision.decision == "quarantined":
             atom.promotion_status = "quarantined"
-            atom.quarantine_reason = "; ".join(result.reason for result in failed)
+            atom.quarantine_reason = decision.explanation
         else:
             atom.promotion_status = "candidate"
+            atom.quarantine_reason = None
             atom.valid_from = atom.valid_from or atom.observed_at
             atom.valid_until = atom.valid_until or _default_valid_until(atom)
 
         self.store.save_atom(atom)
         for result in results:
             self.store.save_validation(result)
-        return results
+        self.store.save_validation_decision(decision)
+        return decision
 
     def _source_span_check(self, atom: ExperienceAtom) -> ValidationResult:
         passed = bool(atom.source_spans and atom.source_turn_ids and atom.source_trace_ids)
@@ -106,6 +108,58 @@ class MemoryValidator:
             passed=False,
             reason=match.reason,
         )
+
+
+def build_validation_decision(
+    atom: ExperienceAtom,
+    results: list[ValidationResult],
+) -> ValidationDecision:
+    failed = [result for result in results if not result.passed]
+    reason_codes = [_reason_code(result) for result in failed]
+    metric_labels = sorted({_metric_label(code) for code in reason_codes})
+    if failed:
+        explanation = "quarantined: " + "; ".join(result.reason for result in failed)
+        decision = "quarantined"
+    else:
+        explanation = "candidate: all validation checks passed"
+        decision = "candidate"
+    return ValidationDecision(
+        atom_id=atom.atom_id,
+        decision=decision,
+        reason_codes=reason_codes,
+        metric_labels=metric_labels,
+        explanation=explanation,
+        contradiction_links=atom.contradiction_links,
+        confidence_score=atom.confidence_score,
+        validation_results=results,
+    )
+
+
+def _reason_code(result: ValidationResult) -> str:
+    if result.check_name == "source_span_presence":
+        return "missing_source_span"
+    if result.check_name == "source_grounding":
+        return "unsupported"
+    if result.check_name == "epistemic_role":
+        return "assistant_hypothesis"
+    if result.check_name == "confidence_floor":
+        return "low_confidence"
+    if result.check_name == "contradiction":
+        return "contradiction"
+    return f"failed_{result.check_name}"
+
+
+def _metric_label(reason_code: str) -> str:
+    if reason_code in {"missing_source_span", "unsupported"}:
+        return "unsupported"
+    if reason_code == "assistant_hypothesis":
+        return "assistant_hypothesis"
+    if reason_code == "contradiction":
+        return "contradiction"
+    if reason_code == "low_confidence":
+        return "low_confidence"
+    return "validation_failure"
+
 
 def _default_valid_until(atom: ExperienceAtom):
     if atom.epistemic_type == "preference":

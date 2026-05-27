@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from cem_core import (
     AgentTrace,
@@ -14,6 +14,7 @@ from cem_core import (
     SourceSpan,
     TaskContext,
     TraceTurn,
+    ValidationDecision,
 )
 from cem_core.models import utc_now
 
@@ -41,6 +42,8 @@ class WritePathMetrics(BaseModel):
     false_quarantine_rate: float
     promoted_count: int
     action_brief_card_count: int
+    false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
+    valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
 
 
 class MemoryRunResult(BaseModel):
@@ -48,6 +51,7 @@ class MemoryRunResult(BaseModel):
     proposed_count: int
     quarantined_count: int
     trusted_false_memory_count: int
+    decision_reason_codes: dict[str, list[str]] = Field(default_factory=dict)
     metrics: WritePathMetrics
 
 
@@ -73,9 +77,11 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", fixture.traces, expectations)
     cem0_validation, atoms = _run_cem0_validation(root / "cem0-validation", fixture.traces, expectations)
 
-    quarantined = [atom for atom in atoms if atom.promotion_status == "quarantined"]
-    contradiction_detected = any("contradicts active memory" in (atom.quarantine_reason or "") for atom in quarantined)
-    hypothesis_quarantined = any(atom.epistemic_type == "assistant_hypothesis" for atom in quarantined)
+    reason_codes = cem0_validation.decision_reason_codes.values()
+    contradiction_detected = any("contradiction" in codes for codes in reason_codes)
+    hypothesis_quarantined = any(
+        "assistant_hypothesis" in codes for codes in cem0_validation.decision_reason_codes.values()
+    )
     return SyntheticEvalResult(
         fixture_case_count=len(expectations),
         proposed_count=cem0_validation.proposed_count,
@@ -236,12 +242,19 @@ def _run_unvalidated_memory(
         proposed_count=len(atoms),
         quarantined_count=0,
         trusted_false_memory_count=len(false_atoms),
+        decision_reason_codes={},
         metrics=WritePathMetrics(
             false_memory_resistance=0.0,
             contradiction_recall=0.0,
             false_quarantine_rate=0.0,
             promoted_count=len(atoms),
             action_brief_card_count=len(brief.applicable_card_ids),
+            false_memory_resistance_by_risk={
+                risk_type: 0.0 for risk_type in _risk_types(expectations, expected_status="quarantine")
+            },
+            valid_memory_retention_by_risk={
+                risk_type: 1.0 for risk_type in _risk_types(expectations, expected_status="promote")
+            },
         ),
     )
 
@@ -266,6 +279,7 @@ def _run_cem0_validation(
     quarantined = [atom for atom in atoms if atom.promotion_status == "quarantined"]
     brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
     metrics = _cem0_metrics(
+        cem,
         atoms,
         expectations=expectations,
         promoted_count=promoted_count,
@@ -282,6 +296,7 @@ def _run_cem0_validation(
             proposed_count=len(atoms),
             quarantined_count=len(quarantined),
             trusted_false_memory_count=len(trusted_false),
+            decision_reason_codes=_decision_reason_codes(cem, atoms),
             metrics=metrics,
         ),
         atoms,
@@ -297,6 +312,7 @@ def _propose_atoms(cem: CEM, traces: list[AgentTrace]) -> list[ExperienceAtom]:
 
 
 def _cem0_metrics(
+    cem: CEM,
     atoms: list[ExperienceAtom],
     *,
     expectations: dict[str, SyntheticMemoryExpectation],
@@ -304,23 +320,86 @@ def _cem0_metrics(
     action_brief_card_count: int,
 ) -> WritePathMetrics:
     false_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "quarantine"]
-    blocked_false_atoms = [atom for atom in false_atoms if atom.promotion_status == "quarantined"]
+    blocked_false_atoms = [atom for atom in false_atoms if _decision(cem, atom).decision == "quarantined"]
     contradiction_atoms = [
         atom for atom in atoms if _expectation(atom, expectations).risk_type == "contradiction"
     ]
     detected_contradictions = [
         atom
         for atom in contradiction_atoms
-        if "contradicts active memory" in (atom.quarantine_reason or "")
+        if "contradiction" in _decision(cem, atom).reason_codes
     ]
     valid_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "promote"]
-    valid_quarantined = [atom for atom in valid_atoms if atom.promotion_status == "quarantined"]
+    valid_quarantined = [atom for atom in valid_atoms if _decision(cem, atom).decision == "quarantined"]
     return WritePathMetrics(
         false_memory_resistance=_ratio(len(blocked_false_atoms), len(false_atoms)),
         contradiction_recall=_ratio(len(detected_contradictions), len(contradiction_atoms)),
         false_quarantine_rate=_ratio(len(valid_quarantined), len(valid_atoms)),
         promoted_count=promoted_count,
         action_brief_card_count=action_brief_card_count,
+        false_memory_resistance_by_risk=_false_memory_resistance_by_risk(cem, atoms, expectations),
+        valid_memory_retention_by_risk=_valid_memory_retention_by_risk(cem, atoms, expectations),
+    )
+
+
+def _decision_reason_codes(cem: CEM, atoms: list[ExperienceAtom]) -> dict[str, list[str]]:
+    return {atom.content: _decision(cem, atom).reason_codes for atom in atoms}
+
+
+def _decision(cem: CEM, atom: ExperienceAtom) -> ValidationDecision:
+    decision = cem.store.get_latest_validation_decision(atom.atom_id)
+    if decision is None:
+        raise AssertionError(f"Missing validation decision for atom: {atom.atom_id}")
+    return decision
+
+
+def _false_memory_resistance_by_risk(
+    cem: CEM,
+    atoms: list[ExperienceAtom],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> dict[str, float]:
+    results: dict[str, float] = {}
+    for risk_type in _risk_types(expectations, expected_status="quarantine"):
+        risky_atoms = [
+            atom
+            for atom in atoms
+            if _expected_status(atom, expectations) == "quarantine"
+            and _expectation(atom, expectations).risk_type == risk_type
+        ]
+        blocked = [atom for atom in risky_atoms if _decision(cem, atom).decision == "quarantined"]
+        results[risk_type] = _ratio(len(blocked), len(risky_atoms))
+    return results
+
+
+def _valid_memory_retention_by_risk(
+    cem: CEM,
+    atoms: list[ExperienceAtom],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> dict[str, float]:
+    results: dict[str, float] = {}
+    for risk_type in _risk_types(expectations, expected_status="promote"):
+        valid_atoms = [
+            atom
+            for atom in atoms
+            if _expected_status(atom, expectations) == "promote"
+            and _expectation(atom, expectations).risk_type == risk_type
+        ]
+        retained = [atom for atom in valid_atoms if _decision(cem, atom).decision == "candidate"]
+        results[risk_type] = _ratio(len(retained), len(valid_atoms))
+    return results
+
+
+def _risk_types(
+    expectations: dict[str, SyntheticMemoryExpectation],
+    *,
+    expected_status: ExpectedStatus,
+) -> list[str]:
+    return sorted(
+        {
+            expectation.risk_type
+            for expectation in expectations.values()
+            if expectation.expected_status == expected_status
+        }
     )
 
 

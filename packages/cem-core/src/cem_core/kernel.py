@@ -119,6 +119,7 @@ class CEM:
                 source_trace_ids=atom.source_trace_ids,
                 source_turn_ids=atom.source_turn_ids,
                 validation_results=self.store.list_validations(atom.atom_id),
+                validation_decision=self.store.get_latest_validation_decision(atom.atom_id),
                 promotion_status=atom.promotion_status,
                 quarantine_reason=atom.quarantine_reason,
             )
@@ -136,6 +137,7 @@ class CEM:
                 source_trace_ids=sorted({trace_id for atom in atoms for trace_id in atom.source_trace_ids}),
                 source_turn_ids=sorted({turn_id for atom in atoms for turn_id in atom.source_turn_ids}),
                 validation_results=validations,
+                validation_decision=None,
                 promotion_status="verified",
                 quarantine_reason=None,
             )

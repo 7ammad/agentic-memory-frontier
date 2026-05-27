@@ -27,8 +27,9 @@ def test_trace_ingest_extract_validate_promote_and_retrieve(tmp_path):
     assert len(atoms) == 1
     assert atoms[0].source_spans[0].text.startswith("select assignment_group")
 
-    results = cem.validate(atoms[0].atom_id)
-    assert all(result.passed for result in results)
+    decision = cem.validate(atoms[0].atom_id)
+    assert decision.decision == "candidate"
+    assert all(result.passed for result in decision.validation_results)
 
     card = cem.promote(atoms[0].atom_id)
     assert card is not None
@@ -70,6 +71,8 @@ def test_contradiction_is_quarantined_with_audit_trail(tmp_path):
 
     audit = cem.audit(second.atom_id)
     assert audit.quarantine_reason is not None
+    assert audit.validation_decision is not None
+    assert audit.validation_decision.reason_codes == ["contradiction"]
     assert any(result.check_name == "contradiction" and not result.passed for result in audit.validation_results)
 
 
@@ -89,6 +92,9 @@ def test_assistant_hypothesis_cannot_promote_without_evidence(tmp_path):
     stored = cem.store.get_atom(atom.atom_id)
     assert stored.promotion_status == "quarantined"
     assert "assistant hypothesis" in (stored.quarantine_reason or "")
+    decision = cem.store.get_latest_validation_decision(atom.atom_id)
+    assert decision is not None
+    assert "assistant_hypothesis" in decision.reason_codes
 
 
 class EmptyExtractor:

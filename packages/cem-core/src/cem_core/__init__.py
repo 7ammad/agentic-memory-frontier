@@ -15,6 +15,7 @@ from .models import (
     TaskContext,
     TraceReceipt,
     TraceTurn,
+    ValidationDecision,
     ValidationResult,
 )
 
@@ -34,5 +35,6 @@ __all__ = [
     "TaskContext",
     "TraceReceipt",
     "TraceTurn",
+    "ValidationDecision",
     "ValidationResult",
 ]

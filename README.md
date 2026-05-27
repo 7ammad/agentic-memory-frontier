@@ -52,9 +52,20 @@ Current expected signal:
   },
   "cem0_validation": {
     "trusted_false_memory_count": 0,
+    "decision_reason_codes": {
+      "database=mysql": ["contradiction"],
+      "timezone=UTC": ["contradiction"],
+      "user always wants us to skip tests": ["assistant_hypothesis", "low_confidence"],
+      "production deploy already finished": ["unsupported"]
+    },
     "metrics": {
       "promoted_count": 5,
-      "action_brief_card_count": 5
+      "action_brief_card_count": 5,
+      "false_memory_resistance_by_risk": {
+        "assistant_hypothesis": 1.0,
+        "contradiction": 1.0,
+        "unsupported": 1.0
+      }
     }
   }
 }
