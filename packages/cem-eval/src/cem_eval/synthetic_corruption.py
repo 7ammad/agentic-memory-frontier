@@ -129,6 +129,7 @@ class SyntheticEvalResult(BaseModel):
     no_memory: MemoryRunResult
     full_context: MemoryRunResult
     vanilla_vector_memory: MemoryRunResult
+    time_aware_vector_memory: MemoryRunResult
     raw_trace_retrieval: MemoryRunResult
     summary_reflection: MemoryRunResult
     unvalidated_memory: MemoryRunResult
@@ -143,6 +144,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     no_memory = _run_no_memory()
     full_context = _run_full_context(fixture.traces, expectations)
     vanilla_vector_memory = _run_vanilla_vector_memory(fixture.traces, expectations)
+    time_aware_vector_memory = _run_time_aware_vector_memory(fixture.traces, expectations)
     raw_trace_retrieval = _run_raw_trace_retrieval(fixture.traces, expectations)
     summary_reflection = _run_summary_reflection(fixture.traces, expectations)
     unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", fixture.traces, expectations)
@@ -157,6 +159,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         no_memory=no_memory,
         full_context=full_context,
         vanilla_vector_memory=vanilla_vector_memory,
+        time_aware_vector_memory=time_aware_vector_memory,
         raw_trace_retrieval=raw_trace_retrieval,
         summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
@@ -176,6 +179,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         no_memory=no_memory,
         full_context=full_context,
         vanilla_vector_memory=vanilla_vector_memory,
+        time_aware_vector_memory=time_aware_vector_memory,
         raw_trace_retrieval=raw_trace_retrieval,
         summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
@@ -719,6 +723,72 @@ def _run_vanilla_vector_memory(
     )
 
 
+def _run_time_aware_vector_memory(
+    traces: list[AgentTrace],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> MemoryRunResult:
+    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    task = _held_out_task()
+    query = " ".join([task.description, task.domain_scope or "", task.task_family or ""])
+    total = max(1, len(atoms) - 1)
+    scored = sorted(
+        (
+            (lexical_vector_score(query, atom.content) + (index / total * 0.05), atom)
+            for index, atom in enumerate(atoms)
+        ),
+        key=lambda item: (item[0], item[1].content),
+        reverse=True,
+    )
+    recommended_actions = [atom.content for score, atom in scored if score > 0][:10]
+    false_atoms = [
+        atom
+        for atom in atoms
+        if atom.content in recommended_actions and _is_unsafe_expected(atom, expectations)
+    ]
+    return MemoryRunResult(
+        name="time_aware_vector_memory",
+        proposed_count=0,
+        quarantined_count=0,
+        trusted_false_memory_count=len(false_atoms),
+        action_brief_recommended_actions=recommended_actions,
+        expected_action_delta=_expected_action_delta(recommended_actions, expectations),
+        decision_reason_codes={},
+        metrics=WritePathMetrics(
+            false_memory_resistance=0.0,
+            contradiction_recall=0.0,
+            false_quarantine_rate=0.0,
+            promoted_count=0,
+            action_brief_card_count=len(recommended_actions),
+            action_brief_relevance_recall=_action_brief_relevance_recall(
+                recommended_actions,
+                expectations,
+            ),
+            action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            scoped_memory_suppression=_scoped_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
+            expired_memory_suppression=_expired_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
+            evidence_consolidation_count=0,
+            max_evidence_support_count=0,
+            audit_completeness_rate=0.0,
+            stale_memory_suppression=0.0,
+            false_memory_resistance_by_risk={
+                risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
+            },
+            valid_memory_retention_by_risk={
+                risk_type: 1.0 for risk_type in _risk_types(expectations, expected_status="promote")
+            },
+        ),
+    )
+
+
 def _run_summary_reflection(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
@@ -785,6 +855,7 @@ def _build_report(
     no_memory: MemoryRunResult,
     full_context: MemoryRunResult,
     vanilla_vector_memory: MemoryRunResult,
+    time_aware_vector_memory: MemoryRunResult,
     raw_trace_retrieval: MemoryRunResult,
     summary_reflection: MemoryRunResult,
     unvalidated_memory: MemoryRunResult,
@@ -794,6 +865,7 @@ def _build_report(
         no_memory,
         full_context,
         vanilla_vector_memory,
+        time_aware_vector_memory,
         raw_trace_retrieval,
         summary_reflection,
         unvalidated_memory,

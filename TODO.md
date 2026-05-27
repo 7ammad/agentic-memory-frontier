@@ -98,7 +98,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Full-context baseline.
 - [x] Rolling summary / reflection baseline.
 - [x] Vanilla vector memory baseline.
-- [ ] Time-aware vector memory baseline.
+- [x] Time-aware vector memory baseline.
 - [x] Unverified reflection / unvalidated memory baseline.
 - [ ] Human-curated runbook upper bound.
 
@@ -284,7 +284,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: required baselines include "vanilla vector memory."
   - Needed outcome: compare CEM-0 against semantic retrieval over raw memories/traces.
 
-- [ ] Add time-aware vector memory baseline.
+- [x] Add time-aware vector memory baseline.
   - Original source: required baselines include "time-aware vector memory."
   - Needed outcome: compare CEM-0 against recency-aware semantic retrieval.
 
