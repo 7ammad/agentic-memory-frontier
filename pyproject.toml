@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+pythonpath = [
+  "packages/cem-core/src",
+  "packages/cem-eval/src",
+]
+testpaths = ["tests"]
+addopts = "-q"
