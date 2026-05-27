@@ -141,8 +141,8 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add temporal-validity synthetic fixture.
   - Needed outcome: stale-but-on-topic true memories are stored or deprecated correctly but not recommended after expiry.
 
-- [ ] Add temporal validity metrics to the synthetic report.
+- [x] Add temporal validity metrics to the synthetic report.
   - Needed outcome: report exposes expired memory suppression separately from contradiction and false-memory resistance.
 
-- [ ] Update README with temporal-validity expected signal.
+- [x] Update README with temporal-validity expected signal.
   - Needed outcome: current smoke output documents the time-validity behavior.

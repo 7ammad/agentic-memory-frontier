@@ -10,8 +10,8 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
         "",
         f"Generated at: {report.generated_at.isoformat()}",
         "",
-        "| Run | Proposed | Quarantined | Trusted false memories | Action brief cards | Expected action delta | False memory resistance | Relevance recall | Pollution rate | Scoped suppression | Evidence consolidation | Max support |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Run | Proposed | Quarantined | Trusted false memories | Action brief cards | Expected action delta | False memory resistance | Relevance recall | Pollution rate | Scoped suppression | Expired suppression | Evidence consolidation | Max support |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in [*report.baseline_rows, report.cem0_row]:
         lines.append(
@@ -28,6 +28,7 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
                     _format_float(row.action_brief_relevance_recall),
                     _format_float(row.action_brief_pollution_rate),
                     _format_float(row.scoped_memory_suppression),
+                    _format_float(row.expired_memory_suppression),
                     str(row.evidence_consolidation_count),
                     str(row.max_evidence_support_count),
                 ]

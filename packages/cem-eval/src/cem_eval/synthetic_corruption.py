@@ -39,6 +39,7 @@ class SyntheticMemoryExpectation(BaseModel):
     expected_status: ExpectedStatus
     risk_type: RiskType
     applies_to_held_out: bool = True
+    expired_for_held_out: bool = False
 
 
 class WritePathMetrics(BaseModel):
@@ -50,6 +51,7 @@ class WritePathMetrics(BaseModel):
     action_brief_relevance_recall: float = 0.0
     action_brief_pollution_rate: float = 0.0
     scoped_memory_suppression: float = 0.0
+    expired_memory_suppression: float = 0.0
     evidence_consolidation_count: int = 0
     max_evidence_support_count: int = 0
     stale_memory_suppression: float = 0.0
@@ -79,6 +81,7 @@ class EvalReportRow(BaseModel):
     action_brief_relevance_recall: float
     action_brief_pollution_rate: float
     scoped_memory_suppression: float
+    expired_memory_suppression: float
     evidence_consolidation_count: int
     max_evidence_support_count: int
 
@@ -404,6 +407,7 @@ def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
                 expected_status="promote",
                 risk_type="valid_instruction",
                 applies_to_held_out=False,
+                expired_for_held_out=True,
             ),
             SyntheticMemoryExpectation(
                 content="database=mysql",
@@ -483,6 +487,10 @@ def _run_unvalidated_memory(
                 brief.recommended_next_actions,
                 expectations,
             ),
+            expired_memory_suppression=_expired_memory_suppression(
+                brief.recommended_next_actions,
+                expectations,
+            ),
             evidence_consolidation_count=_evidence_consolidation_count(cards),
             max_evidence_support_count=_max_evidence_support_count(cards),
             stale_memory_suppression=0.0,
@@ -514,6 +522,7 @@ def _run_no_memory() -> MemoryRunResult:
             action_brief_relevance_recall=0.0,
             action_brief_pollution_rate=0.0,
             scoped_memory_suppression=0.0,
+            expired_memory_suppression=0.0,
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             stale_memory_suppression=0.0,
@@ -553,6 +562,10 @@ def _run_raw_trace_retrieval(
                 expectations,
             ),
             scoped_memory_suppression=_scoped_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
+            expired_memory_suppression=_expired_memory_suppression(
                 recommended_actions,
                 expectations,
             ),
@@ -612,6 +625,10 @@ def _run_summary_reflection(
                 recommended_actions,
                 expectations,
             ),
+            expired_memory_suppression=_expired_memory_suppression(
+                recommended_actions,
+                expectations,
+            ),
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             stale_memory_suppression=0.0,
@@ -661,6 +678,7 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         action_brief_relevance_recall=run.metrics.action_brief_relevance_recall,
         action_brief_pollution_rate=run.metrics.action_brief_pollution_rate,
         scoped_memory_suppression=run.metrics.scoped_memory_suppression,
+        expired_memory_suppression=run.metrics.expired_memory_suppression,
         evidence_consolidation_count=run.metrics.evidence_consolidation_count,
         max_evidence_support_count=run.metrics.max_evidence_support_count,
     )
@@ -769,6 +787,10 @@ def _cem0_metrics(
             expectations,
         ),
         scoped_memory_suppression=_scoped_memory_suppression(
+            action_brief_recommended_actions,
+            expectations,
+        ),
+        expired_memory_suppression=_expired_memory_suppression(
             action_brief_recommended_actions,
             expectations,
         ),
@@ -1091,6 +1113,20 @@ def _scoped_memory_suppression(
     ]
     suppressed = [content for content in off_task_expected if content not in action_set]
     return _ratio(len(suppressed), len(off_task_expected))
+
+
+def _expired_memory_suppression(
+    recommended_actions: list[str],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> float:
+    action_set = set(recommended_actions)
+    expired_expected = [
+        expectation.content
+        for expectation in expectations.values()
+        if expectation.expired_for_held_out
+    ]
+    suppressed = [content for content in expired_expected if content not in action_set]
+    return _ratio(len(suppressed), len(expired_expected))
 
 
 def _content_is_unsafe(

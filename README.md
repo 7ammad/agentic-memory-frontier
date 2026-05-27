@@ -63,7 +63,8 @@ Current expected signal:
     "metrics": {
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.6111111111111112,
-      "scoped_memory_suppression": 0.0
+      "scoped_memory_suppression": 0.0,
+      "expired_memory_suppression": 0.0
     }
   },
   "summary_reflection": {
@@ -72,7 +73,8 @@ Current expected signal:
     "metrics": {
       "action_brief_relevance_recall": 0.6666666666666666,
       "action_brief_pollution_rate": 0.6153846153846154,
-      "scoped_memory_suppression": 0.25
+      "scoped_memory_suppression": 0.25,
+      "expired_memory_suppression": 0.0
     }
   },
   "unvalidated_memory": {
@@ -84,6 +86,7 @@ Current expected signal:
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.5,
       "scoped_memory_suppression": 1.0,
+      "expired_memory_suppression": 1.0,
       "evidence_consolidation_count": 0,
       "max_evidence_support_count": 1
     }
@@ -105,6 +108,7 @@ Current expected signal:
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.0,
       "scoped_memory_suppression": 1.0,
+      "expired_memory_suppression": 1.0,
       "evidence_consolidation_count": 1,
       "max_evidence_support_count": 2,
       "stale_memory_suppression": 1.0,
@@ -137,7 +141,7 @@ Current expected signal:
 }
 ```
 
-The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, evidence consolidation, and max support.
+The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, and max support.
 
 Run tests:
 
