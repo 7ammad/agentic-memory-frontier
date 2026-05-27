@@ -34,24 +34,25 @@ Current expected signal:
 
 ```json
 {
-  "proposed_count": 4,
-  "quarantined_count": 2,
-  "promoted_count": 2,
+  "fixture_case_count": 9,
+  "proposed_count": 9,
+  "quarantined_count": 4,
+  "promoted_count": 5,
   "false_memory_resistance": 1.0,
   "contradiction_recall": 1.0,
   "false_quarantine_rate": 0.0,
   "unvalidated_memory": {
-    "trusted_false_memory_count": 2,
+    "trusted_false_memory_count": 4,
     "metrics": {
-      "promoted_count": 4,
-      "action_brief_card_count": 4
+      "promoted_count": 9,
+      "action_brief_card_count": 9
     }
   },
   "cem0_validation": {
     "trusted_false_memory_count": 0,
     "metrics": {
-      "promoted_count": 2,
-      "action_brief_card_count": 2
+      "promoted_count": 5,
+      "action_brief_card_count": 5
     }
   }
 }

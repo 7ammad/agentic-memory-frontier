@@ -1,19 +1,38 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel
 
-from cem_core import AgentTrace, CEM, TaskContext, TraceTurn
-from cem_core.models import ExperienceAtom, ExperienceCard, utc_now
-
-EXPECTED_FALSE_MEMORY_CONTENTS = frozenset(
-    {
-        "database=mysql",
-        "user always wants us to skip tests",
-    }
+from cem_core import (
+    AgentTrace,
+    CEM,
+    DeterministicExtractor,
+    ExperienceAtom,
+    ExperienceCard,
+    SourceSpan,
+    TaskContext,
+    TraceTurn,
 )
-EXPECTED_CONTRADICTION_CONTENTS = frozenset({"database=mysql"})
+from cem_core.models import utc_now
+
+ExpectedStatus = Literal["promote", "quarantine"]
+RiskType = Literal[
+    "valid_preference",
+    "valid_instruction",
+    "valid_skill",
+    "valid_failure_mode",
+    "contradiction",
+    "assistant_hypothesis",
+    "unsupported",
+]
+
+
+class SyntheticMemoryExpectation(BaseModel):
+    content: str
+    expected_status: ExpectedStatus
+    risk_type: RiskType
 
 
 class WritePathMetrics(BaseModel):
@@ -33,6 +52,7 @@ class MemoryRunResult(BaseModel):
 
 
 class SyntheticEvalResult(BaseModel):
+    fixture_case_count: int
     proposed_count: int
     quarantined_count: int
     promoted_count: int
@@ -48,14 +68,16 @@ class SyntheticEvalResult(BaseModel):
 
 def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     root = Path(root)
-    traces = build_synthetic_corruption_traces()
-    unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", traces)
-    cem0_validation, atoms = _run_cem0_validation(root / "cem0-validation", traces)
+    fixture = build_synthetic_corruption_fixture()
+    expectations = fixture.expectations_by_content
+    unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", fixture.traces, expectations)
+    cem0_validation, atoms = _run_cem0_validation(root / "cem0-validation", fixture.traces, expectations)
 
     quarantined = [atom for atom in atoms if atom.promotion_status == "quarantined"]
     contradiction_detected = any("contradicts active memory" in (atom.quarantine_reason or "") for atom in quarantined)
     hypothesis_quarantined = any(atom.epistemic_type == "assistant_hypothesis" for atom in quarantined)
     return SyntheticEvalResult(
+        fixture_case_count=len(expectations),
         proposed_count=cem0_validation.proposed_count,
         quarantined_count=cem0_validation.quarantined_count,
         promoted_count=cem0_validation.metrics.promoted_count,
@@ -70,7 +92,29 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     )
 
 
-def build_synthetic_corruption_traces() -> list[AgentTrace]:
+class SyntheticCorruptionFixture(BaseModel):
+    traces: list[AgentTrace]
+    expectations: list[SyntheticMemoryExpectation]
+
+    @property
+    def expectations_by_content(self) -> dict[str, SyntheticMemoryExpectation]:
+        return {expectation.content: expectation for expectation in self.expectations}
+
+
+class SyntheticCorruptionExtractor:
+    """Fixture extractor that adds one deliberately unsupported candidate."""
+
+    def __init__(self) -> None:
+        self.base = DeterministicExtractor()
+
+    def extract(self, trace: AgentTrace) -> list[ExperienceAtom]:
+        atoms = self.base.extract(trace)
+        for turn in trace.turns:
+            atoms.extend(_extract_unsupported_candidates(trace, turn))
+        return atoms
+
+
+def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
     initial = AgentTrace(
         session_id="synthetic-session",
         agent_id="agent-alpha",
@@ -79,10 +123,29 @@ def build_synthetic_corruption_traces() -> list[AgentTrace]:
             TraceTurn(
                 index=0,
                 role="user",
-                content="PREFERENCE: database=postgres\nSKILL: set assignment_group before assignee",
+                content=(
+                    "PREFERENCE: database=postgres\n"
+                    "PREFERENCE: timezone=Asia/Riyadh\n"
+                    "SKILL: set assignment_group before assignee\n"
+                    "INSTRUCTION: run pytest before claiming kernel changes are done"
+                ),
             )
         ],
         final_outcome="success",
+        environment={"domain": "workflow-gotchas"},
+    )
+    failure_lesson = AgentTrace(
+        session_id="synthetic-session",
+        agent_id="agent-alpha",
+        task_id="workflow-gotcha",
+        turns=[
+            TraceTurn(
+                index=1,
+                role="environment",
+                content="FAILURE: avoid submitting workflow-gotchas form unless approval_code is present",
+            )
+        ],
+        final_outcome="failure",
         environment={"domain": "workflow-gotchas"},
     )
     updated = AgentTrace(
@@ -91,28 +154,83 @@ def build_synthetic_corruption_traces() -> list[AgentTrace]:
         task_id="workflow-gotcha",
         turns=[
             TraceTurn(
-                index=1,
+                index=2,
                 role="assistant",
                 content=(
                     "PREFERENCE: database=mysql\n"
-                    "HYPOTHESIS: user always wants us to skip tests"
+                    "PREFERENCE: timezone=UTC\n"
+                    "HYPOTHESIS: user always wants us to skip tests\n"
+                    "UNSUPPORTED: production deploy already finished"
                 ),
             )
         ],
         final_outcome="partial",
         environment={"domain": "workflow-gotchas"},
     )
-    return [initial, updated]
+    return SyntheticCorruptionFixture(
+        traces=[initial, failure_lesson, updated],
+        expectations=[
+            SyntheticMemoryExpectation(
+                content="database=postgres",
+                expected_status="promote",
+                risk_type="valid_preference",
+            ),
+            SyntheticMemoryExpectation(
+                content="timezone=Asia/Riyadh",
+                expected_status="promote",
+                risk_type="valid_preference",
+            ),
+            SyntheticMemoryExpectation(
+                content="set assignment_group before assignee",
+                expected_status="promote",
+                risk_type="valid_skill",
+            ),
+            SyntheticMemoryExpectation(
+                content="run pytest before claiming kernel changes are done",
+                expected_status="promote",
+                risk_type="valid_instruction",
+            ),
+            SyntheticMemoryExpectation(
+                content="avoid submitting workflow-gotchas form unless approval_code is present",
+                expected_status="promote",
+                risk_type="valid_failure_mode",
+            ),
+            SyntheticMemoryExpectation(
+                content="database=mysql",
+                expected_status="quarantine",
+                risk_type="contradiction",
+            ),
+            SyntheticMemoryExpectation(
+                content="timezone=UTC",
+                expected_status="quarantine",
+                risk_type="contradiction",
+            ),
+            SyntheticMemoryExpectation(
+                content="user always wants us to skip tests",
+                expected_status="quarantine",
+                risk_type="assistant_hypothesis",
+            ),
+            SyntheticMemoryExpectation(
+                content="production deploy already finished",
+                expected_status="quarantine",
+                risk_type="unsupported",
+            ),
+        ],
+    )
 
 
-def _run_unvalidated_memory(root: Path, traces: list[AgentTrace]) -> MemoryRunResult:
-    cem = CEM(root)
+def _run_unvalidated_memory(
+    root: Path,
+    traces: list[AgentTrace],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> MemoryRunResult:
+    cem = CEM(root, extractor=SyntheticCorruptionExtractor())
     atoms = _propose_atoms(cem, traces)
     for atom in atoms:
         cem.store.save_card(_card_from_atom(atom))
 
-    brief = cem.retrieve_action_brief(_held_out_task())
-    false_atoms = [atom for atom in atoms if _is_expected_false_memory(atom)]
+    brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
+    false_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "quarantine"]
     return MemoryRunResult(
         name="unvalidated_memory",
         proposed_count=len(atoms),
@@ -128,8 +246,12 @@ def _run_unvalidated_memory(root: Path, traces: list[AgentTrace]) -> MemoryRunRe
     )
 
 
-def _run_cem0_validation(root: Path, traces: list[AgentTrace]) -> tuple[MemoryRunResult, list[ExperienceAtom]]:
-    cem = CEM(root)
+def _run_cem0_validation(
+    root: Path,
+    traces: list[AgentTrace],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> tuple[MemoryRunResult, list[ExperienceAtom]]:
+    cem = CEM(root, extractor=SyntheticCorruptionExtractor())
     proposed_atoms = _propose_atoms(cem, traces)
 
     for atom in proposed_atoms:
@@ -142,16 +264,17 @@ def _run_cem0_validation(root: Path, traces: list[AgentTrace]) -> tuple[MemoryRu
 
     atoms = [cem.store.get_atom(atom.atom_id) for atom in proposed_atoms]
     quarantined = [atom for atom in atoms if atom.promotion_status == "quarantined"]
-    brief = cem.retrieve_action_brief(_held_out_task())
+    brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
     metrics = _cem0_metrics(
         atoms,
+        expectations=expectations,
         promoted_count=promoted_count,
         action_brief_card_count=len(brief.applicable_card_ids),
     )
     trusted_false = [
         atom
         for atom in atoms
-        if _is_expected_false_memory(atom) and atom.promotion_status != "quarantined"
+        if _expected_status(atom, expectations) == "quarantine" and atom.promotion_status != "quarantined"
     ]
     return (
         MemoryRunResult(
@@ -176,18 +299,21 @@ def _propose_atoms(cem: CEM, traces: list[AgentTrace]) -> list[ExperienceAtom]:
 def _cem0_metrics(
     atoms: list[ExperienceAtom],
     *,
+    expectations: dict[str, SyntheticMemoryExpectation],
     promoted_count: int,
     action_brief_card_count: int,
 ) -> WritePathMetrics:
-    false_atoms = [atom for atom in atoms if _is_expected_false_memory(atom)]
+    false_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "quarantine"]
     blocked_false_atoms = [atom for atom in false_atoms if atom.promotion_status == "quarantined"]
-    contradiction_atoms = [atom for atom in atoms if atom.content in EXPECTED_CONTRADICTION_CONTENTS]
+    contradiction_atoms = [
+        atom for atom in atoms if _expectation(atom, expectations).risk_type == "contradiction"
+    ]
     detected_contradictions = [
         atom
         for atom in contradiction_atoms
         if "contradicts active memory" in (atom.quarantine_reason or "")
     ]
-    valid_atoms = [atom for atom in atoms if not _is_expected_false_memory(atom)]
+    valid_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "promote"]
     valid_quarantined = [atom for atom in valid_atoms if atom.promotion_status == "quarantined"]
     return WritePathMetrics(
         false_memory_resistance=_ratio(len(blocked_false_atoms), len(false_atoms)),
@@ -196,6 +322,47 @@ def _cem0_metrics(
         promoted_count=promoted_count,
         action_brief_card_count=action_brief_card_count,
     )
+
+
+def _extract_unsupported_candidates(trace: AgentTrace, turn: TraceTurn) -> list[ExperienceAtom]:
+    atoms: list[ExperienceAtom] = []
+    search_from = 0
+    for line in turn.content.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("UNSUPPORTED:"):
+            search_from += len(line) + 1
+            continue
+
+        content = stripped.removeprefix("UNSUPPORTED:").strip()
+        start = turn.content.find(content, search_from)
+        source_span = SourceSpan(
+            turn_id=turn.turn_id,
+            start=start,
+            end=start + len(content),
+            text="the cited trace does not support this derived claim",
+        )
+        atoms.append(
+            ExperienceAtom(
+                source_trace_ids=[trace.trace_id],
+                source_turn_ids=[turn.turn_id],
+                source_spans=[source_span],
+                source_artifacts=turn.artifact_refs,
+                source_agent_id=trace.agent_id,
+                source_session_id=trace.session_id,
+                extracted_by_model="deterministic-corrupting-extractor",
+                extraction_prompt_version="cem-0-synthetic-corruption-v2",
+                epistemic_type="derived_claim",
+                content=content,
+                domain_scope=str(trace.environment.get("domain", "")) or None,
+                task_family=trace.task_id,
+                observed_at=turn.timestamp,
+                confidence_score=0.8,
+                retrieval_cues=_cue_terms(content),
+                observed_outcome=trace.final_outcome,
+            )
+        )
+        search_from = start + len(content)
+    return atoms
 
 
 def _card_from_atom(atom: ExperienceAtom) -> ExperienceCard:
@@ -219,14 +386,34 @@ def _card_from_atom(atom: ExperienceAtom) -> ExperienceCard:
 def _held_out_task() -> TaskContext:
     return TaskContext(
         task_id="held-out-workflow",
-        description="complete workflow-gotchas form and set assignment_group before assignee",
+        description=(
+            "complete workflow-gotchas form with database postgres, timezone Asia/Riyadh, "
+            "assignment_group, assignee, approval_code, pytest, tests, and production checks"
+        ),
         domain_scope="workflow-gotchas",
         task_family="workflow-gotcha",
     )
 
 
-def _is_expected_false_memory(atom: ExperienceAtom) -> bool:
-    return atom.content in EXPECTED_FALSE_MEMORY_CONTENTS
+def _expected_status(
+    atom: ExperienceAtom,
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> ExpectedStatus:
+    return _expectation(atom, expectations).expected_status
+
+
+def _expectation(
+    atom: ExperienceAtom,
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> SyntheticMemoryExpectation:
+    try:
+        return expectations[atom.content]
+    except KeyError as exc:
+        raise AssertionError(f"Unexpected synthetic atom content: {atom.content}") from exc
+
+
+def _cue_terms(content: str) -> list[str]:
+    return sorted({term.strip(".,:;()[]").lower() for term in content.split() if len(term) > 3})
 
 
 def _ratio(numerator: int, denominator: int) -> float:
