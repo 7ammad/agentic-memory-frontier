@@ -50,6 +50,8 @@ class WritePathMetrics(BaseModel):
     action_brief_relevance_recall: float = 0.0
     action_brief_pollution_rate: float = 0.0
     scoped_memory_suppression: float = 0.0
+    evidence_consolidation_count: int = 0
+    max_evidence_support_count: int = 0
     stale_memory_suppression: float = 0.0
     false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
     valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
@@ -426,6 +428,7 @@ def _run_unvalidated_memory(
         cem.store.save_card(_card_from_atom(atom))
 
     brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
+    cards = cem.store.list_cards()
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     return MemoryRunResult(
         name="unvalidated_memory",
@@ -453,6 +456,8 @@ def _run_unvalidated_memory(
                 brief.recommended_next_actions,
                 expectations,
             ),
+            evidence_consolidation_count=_evidence_consolidation_count(cards),
+            max_evidence_support_count=_max_evidence_support_count(cards),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -482,6 +487,8 @@ def _run_no_memory() -> MemoryRunResult:
             action_brief_relevance_recall=0.0,
             action_brief_pollution_rate=0.0,
             scoped_memory_suppression=0.0,
+            evidence_consolidation_count=0,
+            max_evidence_support_count=0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={},
             valid_memory_retention_by_risk={},
@@ -522,6 +529,8 @@ def _run_raw_trace_retrieval(
                 recommended_actions,
                 expectations,
             ),
+            evidence_consolidation_count=0,
+            max_evidence_support_count=0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -576,6 +585,8 @@ def _run_summary_reflection(
                 recommended_actions,
                 expectations,
             ),
+            evidence_consolidation_count=0,
+            max_evidence_support_count=0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -729,6 +740,8 @@ def _cem0_metrics(
             action_brief_recommended_actions,
             expectations,
         ),
+        evidence_consolidation_count=_evidence_consolidation_count(cem.store.list_cards()),
+        max_evidence_support_count=_max_evidence_support_count(cem.store.list_cards()),
         stale_memory_suppression=_ratio(len(stale_suppressed), len(stale_atoms)),
         false_memory_resistance_by_risk=_false_memory_resistance_by_risk(cem, atoms, expectations),
         valid_memory_retention_by_risk=_valid_memory_retention_by_risk(cem, atoms, expectations),
@@ -910,6 +923,14 @@ def _card_from_atom(atom: ExperienceAtom) -> ExperienceCard:
         last_validated_at=utc_now(),
         action_brief_template=atom.recommended_use or atom.content,
     )
+
+
+def _evidence_consolidation_count(cards: list[ExperienceCard]) -> int:
+    return sum(max(0, len(card.evidence_atom_ids) - 1) for card in cards)
+
+
+def _max_evidence_support_count(cards: list[ExperienceCard]) -> int:
+    return max((len(card.evidence_atom_ids) for card in cards), default=0)
 
 
 def _held_out_task() -> TaskContext:

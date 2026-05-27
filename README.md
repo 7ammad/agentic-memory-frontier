@@ -83,7 +83,9 @@ Current expected signal:
       "action_brief_card_count": 14,
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.5,
-      "scoped_memory_suppression": 1.0
+      "scoped_memory_suppression": 1.0,
+      "evidence_consolidation_count": 0,
+      "max_evidence_support_count": 1
     }
   },
   "cem0_validation": {
@@ -103,6 +105,8 @@ Current expected signal:
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.0,
       "scoped_memory_suppression": 1.0,
+      "evidence_consolidation_count": 1,
+      "max_evidence_support_count": 2,
       "stale_memory_suppression": 1.0,
       "false_memory_resistance_by_risk": {
         "assistant_hypothesis": 1.0,

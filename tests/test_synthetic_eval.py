@@ -55,6 +55,8 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.unvalidated_memory.metrics.action_brief_relevance_recall == 1.0
     assert result.unvalidated_memory.metrics.action_brief_pollution_rate == 0.5
     assert result.unvalidated_memory.metrics.scoped_memory_suppression == 1.0
+    assert result.unvalidated_memory.metrics.evidence_consolidation_count == 0
+    assert result.unvalidated_memory.metrics.max_evidence_support_count == 1
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
     assert round(result.unvalidated_memory.expected_action_delta, 3) == 0.3
@@ -63,6 +65,8 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.cem0_validation.metrics.action_brief_relevance_recall == 1.0
     assert result.cem0_validation.metrics.action_brief_pollution_rate == 0.0
     assert result.cem0_validation.metrics.scoped_memory_suppression == 1.0
+    assert result.cem0_validation.metrics.evidence_consolidation_count == 1
+    assert result.cem0_validation.metrics.max_evidence_support_count == 2
     assert result.cem0_validation.trusted_false_memory_count == 0
     assert result.cem0_validation.expected_action_delta == 1.0
     assert result.cem0_validation.decision_reason_codes["database=mysql"] == ["contradiction"]
