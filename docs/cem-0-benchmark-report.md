@@ -62,6 +62,7 @@ Current fixture coverage:
 | raw_trace_retrieval | 0 | 0 | 7 | 18 | 0 | 0 | 1 | 0.611 | 0 | 0 | 0 | 0 | 0 |
 | summary_reflection | 0 | 0 | 5 | 13 | -0.061 | 0 | 0.667 | 0.615 | 0.25 | 0 | 0 | 0 | 0 |
 | unvalidated_memory | 18 | 0 | 7 | 14 | 0.364 | 0 | 1 | 0.5 | 1 | 1 | 0 | 1 | 0 |
+| human_curated_runbook | 0 | 0 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 0 | 0 | 0 |
 | cem0_validation | 18 | 6 | 0 | 6 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 2 | 1 |
 
 ## CEM-0 Deltas
@@ -75,6 +76,7 @@ Current fixture coverage:
 | raw_trace_retrieval | 1 | 1 | 1 | 7 | 12 |
 | summary_reflection | 1 | 1.061 | 1 | 5 | 7 |
 | unvalidated_memory | 1 | 0.636 | 1 | 7 | 8 |
+| human_curated_runbook | 0 | 0 | 0 | 0 | 0 |
 
 ## Held-Out Workflow
 
@@ -94,6 +96,7 @@ The held-out workflow requires these decisive behaviors:
 | raw_trace_retrieval | no | Retrieves useful actions but also polluted, stale, and contradictory actions. |
 | summary_reflection | no | Drops one required action and keeps several polluted actions. |
 | unvalidated_memory | no | Promotes useful actions but also trusts false and stale actions. |
+| human_curated_runbook | yes | Curated upper bound contains exactly the required actions. |
 | cem0_validation | yes | Keeps the required actions and suppresses the polluted ones. |
 
 ## Audit Coverage
@@ -121,6 +124,7 @@ Audit completeness is strict. A promoted card counts only when it has:
 | raw_trace_retrieval | 0 | 0 | 0 |
 | summary_reflection | 0 | 0 | 0 |
 | unvalidated_memory | 0 | 0 | 1 |
+| human_curated_runbook | 0 | 0 | 0 |
 | cem0_validation | 1 | 1 | 2 |
 
 ## Interpretation
@@ -138,7 +142,6 @@ The current report does not prove:
 - external HaluMem performance;
 - MemoryArena performance;
 - LongMemEval-V2 performance;
-- human-curated runbook upper bound;
 - extraction precision/recall/F1;
 - contradiction precision;
 - action influence rate from real agent traces;

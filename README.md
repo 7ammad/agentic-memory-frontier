@@ -128,6 +128,17 @@ Current expected signal:
       "audit_completeness_rate": 0.0
     }
   },
+  "human_curated_runbook": {
+    "trusted_false_memory_count": 0,
+    "expected_action_delta": 1.0,
+    "metrics": {
+      "false_memory_resistance": 1.0,
+      "action_brief_card_count": 6,
+      "action_brief_relevance_recall": 1.0,
+      "action_brief_pollution_rate": 0.0,
+      "audit_completeness_rate": 0.0
+    }
+  },
   "cem0_validation": {
     "trusted_false_memory_count": 0,
     "expected_action_delta": 1.0,
@@ -189,6 +200,13 @@ Current expected signal:
         "workflow_success_delta": 1.0,
         "trusted_false_memory_reduction": 7,
         "action_brief_card_reduction": 8
+      },
+      "human_curated_runbook": {
+        "false_memory_resistance_delta": 0.0,
+        "expected_action_delta_delta": 0.0,
+        "workflow_success_delta": 0.0,
+        "trusted_false_memory_reduction": 0,
+        "action_brief_card_reduction": 0
       }
     },
     "workflow_rows": {
@@ -199,6 +217,7 @@ Current expected signal:
       "raw_trace_retrieval": false,
       "summary_reflection": false,
       "unvalidated_memory": false,
+      "human_curated_runbook": true,
       "cem0_validation": true
     }
   }

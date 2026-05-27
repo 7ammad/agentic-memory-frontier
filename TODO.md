@@ -100,7 +100,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Vanilla vector memory baseline.
 - [x] Time-aware vector memory baseline.
 - [x] Unverified reflection / unvalidated memory baseline.
-- [ ] Human-curated runbook upper bound.
+- [x] Human-curated runbook upper bound.
 
 ### First Demo Acceptance Criteria
 
@@ -109,7 +109,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Held-out workflow task succeeds with CEM-0 where no-memory fails.
 - [x] Raw vector retrieval returns related traces but misses or fails the decisive precondition.
 - [x] `audit(memory_id)` explains why the memory exists, where it came from, why it was promoted/quarantined, and when it is valid.
-- [ ] Eval report includes all required baselines, including a dumb baseline expected to lose.
+- [x] Eval report includes all required baselines, including a dumb baseline expected to lose.
 
 ### 30-Day Sprint Status
 
@@ -288,7 +288,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: required baselines include "time-aware vector memory."
   - Needed outcome: compare CEM-0 against recency-aware semantic retrieval.
 
-- [ ] Add human-curated runbook upper bound.
+- [x] Add human-curated runbook upper bound.
   - Original source: required baselines include "human-curated runbook upper bound."
   - Needed outcome: establish the best expected action brief for the fixture.
 
