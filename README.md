@@ -326,3 +326,13 @@ The report object normalizes runner outputs into one table with proposed/trusted
 CEM-0 storage is now behind a small backend protocol. The default remains persistent SQLite + JSONL via `CEM("tmp/cem-run")`; tests and eval fixtures can use `CEM(store=InMemoryStore())`.
 
 The storage slice is documented in [docs/cem-0-storage-backends.md](docs/cem-0-storage-backends.md). It is backend-agnostic kernel wiring, not MCP integration or a hosted memory platform.
+
+## MCP Tool Bridge
+
+CEM-0 exposes a minimal stdio MCP tool bridge over the kernel API:
+
+```powershell
+python scripts/run_cem_mcp_stdio.py --root tmp\cem-mcp
+```
+
+The bridge supports `initialize`, `tools/list`, and `tools/call` for CEM write-path and action-brief tools. It is documented in [docs/cem-0-mcp-integration.md](docs/cem-0-mcp-integration.md).

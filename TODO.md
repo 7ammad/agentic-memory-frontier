@@ -136,7 +136,7 @@ Backend adapters, MCP integration, and multi-agent protocol stay gated until the
 Do not start these until CEM-0 proof items above and the external benchmark runner layer are done and verified.
 
 - [x] Storage/backend adapters.
-- [ ] MCP integration.
+- [x] MCP integration.
 - [ ] Multi-agent protocol.
 
 ## Historical Schedule Note
