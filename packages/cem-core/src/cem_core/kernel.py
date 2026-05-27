@@ -123,6 +123,11 @@ class CEM:
         )
 
     def _card_in_scope(self, card: ExperienceCard, task: TaskContext) -> bool:
+        if card.valid_from is not None and card.valid_from > task.current_time:
+            return False
+        if card.valid_until is not None and card.valid_until < task.current_time:
+            return False
+
         if task.session_id is None:
             return True
 

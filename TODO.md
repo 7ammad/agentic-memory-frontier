@@ -132,3 +132,17 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 
 - [x] Add markdown/report rows for the new action-brief utility metrics.
   - Needed outcome: humans can read utility, integrity, and scope behavior without decoding raw JSON.
+
+## Next Lane: Temporal Validity V1
+
+- [x] Add expired-card retrieval suppression.
+  - Needed outcome: cards outside `valid_from` / `valid_until` do not appear in action briefs.
+
+- [ ] Add temporal-validity synthetic fixture.
+  - Needed outcome: stale-but-on-topic true memories are stored or deprecated correctly but not recommended after expiry.
+
+- [ ] Add temporal validity metrics to the synthetic report.
+  - Needed outcome: report exposes expired memory suppression separately from contradiction and false-memory resistance.
+
+- [ ] Update README with temporal-validity expected signal.
+  - Needed outcome: current smoke output documents the time-validity behavior.

@@ -1,6 +1,8 @@
+from datetime import timedelta
 from collections.abc import Sequence
 
 from cem_core import AgentTrace, CEM, ContradictionMatch, ExperienceAtom, TaskContext, TraceTurn
+from cem_core.models import utc_now
 
 
 def test_trace_ingest_extract_validate_promote_and_retrieve(tmp_path):
@@ -294,6 +296,39 @@ def test_action_brief_filters_cross_session_memory_without_matching_scope(tmp_pa
 
     assert out_of_scope.applicable_card_ids == []
     assert in_scope.applicable_card_ids == [card.card_id]
+
+
+def test_action_brief_excludes_expired_cards(tmp_path):
+    cem = CEM(tmp_path)
+    now = utc_now()
+    trace = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        task_id="profile-settings",
+        turns=[TraceTurn(index=0, role="user", content="PREFERENCE: editor_theme=dark")],
+        environment={"domain": "project-alpha"},
+    )
+
+    cem.ingest_trace(trace)
+    atom = cem.propose_memories(trace.trace_id)[0]
+    cem.validate(atom.atom_id)
+    card = cem.promote(atom.atom_id)
+    assert card is not None
+    card.valid_until = now - timedelta(days=1)
+    cem.store.save_card(card)
+
+    brief = cem.retrieve_action_brief(
+        TaskContext(
+            session_id="s1",
+            description="Configure project alpha editor_theme dark preference",
+            domain_scope="project-alpha",
+            task_family="profile-settings",
+            current_time=now,
+        )
+    )
+
+    assert brief.applicable_card_ids == []
+    assert brief.recommended_next_actions == []
 
 
 def test_derived_claim_without_causal_support_is_quarantined(tmp_path):
