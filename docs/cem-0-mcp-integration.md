@@ -47,6 +47,7 @@ It returns tool results with both text content and `structuredContent`.
 - `cem_audit_memory`
 - `cem_confirm_memory`
 - `cem_reject_memory`
+- `cem_import_shared_trace`
 
 These tools map directly to the existing CEM-0 kernel API. They do not bypass validation or promote raw memory as trusted experience.
 

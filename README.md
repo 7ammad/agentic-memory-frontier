@@ -336,3 +336,13 @@ python scripts/run_cem_mcp_stdio.py --root tmp\cem-mcp
 ```
 
 The bridge supports `initialize`, `tools/list`, and `tools/call` for CEM write-path and action-brief tools. It is documented in [docs/cem-0-mcp-integration.md](docs/cem-0-mcp-integration.md).
+
+## Multi-Agent Shared Experience
+
+CEM-0 now has a small shared-trace envelope for multi-agent experience intake:
+
+```powershell
+python scripts/run_cem_import_shared_trace.py envelope.json --root tmp\cem-shared --trusted-agent-id agent-alpha
+```
+
+The protocol is documented in [docs/cem-0-multi-agent-protocol.md](docs/cem-0-multi-agent-protocol.md). It preserves untrusted shared traces as evidence but prevents them from becoming trusted operational memory by default.

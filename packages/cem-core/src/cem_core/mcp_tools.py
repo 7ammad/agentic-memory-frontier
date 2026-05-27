@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from .kernel import CEM
 from .models import AgentTrace, TaskContext
+from .multi_agent import MultiAgentTrustPolicy, SharedTraceEnvelope, import_shared_trace
 
 
 class MCPToolDefinition(BaseModel):
@@ -63,6 +64,11 @@ class CEMMCPToolServer:
         if name == "cem_reject_memory":
             self.cem.reject(str(arguments["memory_id"]), str(arguments["reason"]))
             return _tool_result({"rejected": True, "memory_id": str(arguments["memory_id"])})
+        if name == "cem_import_shared_trace":
+            envelope = SharedTraceEnvelope.model_validate(arguments["envelope"])
+            policy = MultiAgentTrustPolicy.model_validate(arguments.get("trust_policy", {}))
+            receipt = import_shared_trace(self.cem, envelope, trust_policy=policy)
+            return _tool_result({"receipt": receipt.model_dump(mode="json")})
         raise KeyError(f"Unknown CEM MCP tool: {name}")
 
 
@@ -154,6 +160,19 @@ def _tool_definitions() -> list[MCPToolDefinition]:
                     "reason": {"type": "string"},
                 },
                 "required": ["memory_id", "reason"],
+                "additionalProperties": False,
+            },
+        ),
+        MCPToolDefinition(
+            name="cem_import_shared_trace",
+            description="Import a hash-bound shared AgentTrace envelope through a multi-agent trust policy.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "envelope": SharedTraceEnvelope.model_json_schema(),
+                    "trust_policy": MultiAgentTrustPolicy.model_json_schema(),
+                },
+                "required": ["envelope"],
                 "additionalProperties": False,
             },
         ),

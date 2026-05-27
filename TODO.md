@@ -137,7 +137,7 @@ Do not start these until CEM-0 proof items above and the external benchmark runn
 
 - [x] Storage/backend adapters.
 - [x] MCP integration.
-- [ ] Multi-agent protocol.
+- [x] Multi-agent protocol.
 
 ## Historical Schedule Note
 

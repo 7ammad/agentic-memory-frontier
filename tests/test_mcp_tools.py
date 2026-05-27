@@ -1,4 +1,5 @@
 from cem_core import AgentTrace, CEM, CEMMCPToolServer, InMemoryStore, TraceTurn
+from cem_core import build_shared_trace_envelope
 
 
 def test_cem_mcp_tool_server_exposes_write_path_and_action_brief():
@@ -22,6 +23,7 @@ def test_cem_mcp_tool_server_exposes_write_path_and_action_brief():
         "cem_audit_memory",
         "cem_confirm_memory",
         "cem_reject_memory",
+        "cem_import_shared_trace",
     } == tool_names
 
     receipt_result = server.call_tool("cem_ingest_trace", {"trace": trace.model_dump(mode="json")})
@@ -74,3 +76,30 @@ def test_cem_mcp_tool_server_can_reject_and_confirm_memory():
     assert confirm_result["structuredContent"] == {"confirmed": True, "memory_id": atom_id}
     assert confirmed_audit["promotion_status"] == "candidate"
     assert confirmed_audit["quarantine_reason"] is None
+
+
+def test_cem_mcp_tool_server_imports_shared_trace_with_trust_policy():
+    server = CEMMCPToolServer(CEM(store=InMemoryStore()))
+    trace = AgentTrace(
+        session_id="shared-session",
+        agent_id="agent-alpha",
+        turns=[TraceTurn(index=0, role="environment", content="SKILL: open approvals tab")],
+        final_outcome="success",
+        environment={"domain": "workflow-nav"},
+    )
+    envelope = build_shared_trace_envelope(
+        trace,
+        sender_agent_id="agent-alpha",
+        recipient_agent_id="codex",
+    )
+
+    result = server.call_tool(
+        "cem_import_shared_trace",
+        {
+            "envelope": envelope.model_dump(mode="json"),
+            "trust_policy": {"trusted_agent_ids": ["agent-alpha"]},
+        },
+    )
+
+    assert result["structuredContent"]["receipt"]["trusted_sender"] is True
+    assert result["structuredContent"]["receipt"]["imported_agent_id"] == "agent-alpha"
