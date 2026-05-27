@@ -259,6 +259,14 @@ python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
 
 CEM-0's LongMemEval-V2 runner ingests trajectories as traces, runs the write path, retrieves Action Brief answers for questions, and scores both exact answer output and haystack-member trajectory retrieval.
 
+Unified external report command:
+
+```powershell
+python scripts/run_external_benchmark_report.py --halumem-result halumem.json --memoryarena-result memoryarena.json --longmemeval-v2-result longmemeval.json --markdown
+```
+
+The unified report object combines CEM-backed HaluMem, MemoryArena, and LongMemEval-V2 runner outputs into one machine-readable report with proposed/trusted/quarantined counts, suite primary metrics, secondary metric maps, and validation reason-code counts.
+
 ## Not Proven Yet
 
 The current report does not prove:
@@ -276,5 +284,5 @@ Those remain unchecked in `TODO.md`.
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
 1. Run the CEM-backed HaluMem runner on the downloaded real dataset and compare proposed versus trusted memory scores.
-2. Add a unified external benchmark report object that combines HaluMem, MemoryArena, and LongMemEval-V2 runner output.
+2. Run the unified report over real downloaded benchmark outputs once available.
 3. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.

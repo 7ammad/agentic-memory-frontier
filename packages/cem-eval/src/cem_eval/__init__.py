@@ -56,7 +56,14 @@ from .memoryarena_runner import (
     run_memoryarena_cem0_eval,
     run_memoryarena_cem0_eval_from_dataset,
 )
-from .reports import render_synthetic_eval_markdown
+from .reports import (
+    ExternalBenchmarkReport,
+    ExternalBenchmarkReportRow,
+    build_external_benchmark_report,
+    build_external_benchmark_report_from_json_files,
+    render_external_benchmark_report_markdown,
+    render_synthetic_eval_markdown,
+)
 from .synthetic_corruption import (
     EvalReportRow,
     MemoryRunResult,
@@ -75,6 +82,8 @@ from .workflow_gotchas import (
 
 __all__ = [
     "EvalReportRow",
+    "ExternalBenchmarkReport",
+    "ExternalBenchmarkReportRow",
     "HaluMemDataset",
     "HaluMemDatasetSummary",
     "HaluMemExtractionScore",
@@ -104,6 +113,8 @@ __all__ = [
     "WorkflowGotchaDemoResult",
     "WorkflowReportRow",
     "WritePathMetrics",
+    "build_external_benchmark_report",
+    "build_external_benchmark_report_from_json_files",
     "halumem_facsimile_from_synthetic",
     "halumem_sessions_to_agent_traces",
     "load_halumem_dataset",
@@ -111,6 +122,7 @@ __all__ = [
     "load_memoryarena_dataset",
     "longmemeval_v2_trajectories_to_agent_traces",
     "memoryarena_tasks_to_agent_traces",
+    "render_external_benchmark_report_markdown",
     "render_synthetic_eval_markdown",
     "run_halumem_cem0_eval",
     "run_halumem_cem0_eval_from_dataset",

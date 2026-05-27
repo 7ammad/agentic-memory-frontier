@@ -310,3 +310,13 @@ python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
 ```
 
 The CEM-backed runner ingests trajectories as traces, validates promoted experience, retrieves action briefs for each question, and scores both exact answer output and haystack-member trajectory retrieval.
+
+## External Benchmark Report
+
+Combine saved JSON outputs from the CEM-backed external runners:
+
+```powershell
+python scripts/run_external_benchmark_report.py --halumem-result halumem.json --memoryarena-result memoryarena.json --longmemeval-v2-result longmemeval.json --markdown
+```
+
+The report object normalizes runner outputs into one table with proposed/trusted/quarantined counts, the primary metric for each suite, secondary metric maps, and validation reason-code counts.
