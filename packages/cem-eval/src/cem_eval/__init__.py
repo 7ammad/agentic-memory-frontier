@@ -12,8 +12,11 @@ from .halumem_adapter import (
     summarize_halumem_dataset,
 )
 from .halumem_runner import (
+    HaluMemCEM0EvalResult,
     HaluMemFacsimileResult,
     halumem_facsimile_from_synthetic,
+    run_halumem_cem0_eval,
+    run_halumem_cem0_eval_from_dataset,
     run_halumem_facsimile_eval,
 )
 from .longmemeval_v2_adapter import (
@@ -65,6 +68,7 @@ __all__ = [
     "HaluMemDataset",
     "HaluMemDatasetSummary",
     "HaluMemExtractionScore",
+    "HaluMemCEM0EvalResult",
     "HaluMemFacsimileResult",
     "HaluMemMemoryPoint",
     "HaluMemQuestion",
@@ -96,6 +100,8 @@ __all__ = [
     "longmemeval_v2_trajectories_to_agent_traces",
     "memoryarena_tasks_to_agent_traces",
     "render_synthetic_eval_markdown",
+    "run_halumem_cem0_eval",
+    "run_halumem_cem0_eval_from_dataset",
     "run_halumem_facsimile_eval",
     "run_synthetic_corruption_eval",
     "run_workflow_gotcha_demo",

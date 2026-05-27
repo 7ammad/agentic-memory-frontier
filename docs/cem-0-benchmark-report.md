@@ -219,6 +219,14 @@ Smoke command:
 python scripts/run_halumem_adapter.py path\to\halumem.json
 ```
 
+CEM-backed write-path command:
+
+```powershell
+python scripts/run_halumem_cem0_eval.py path\to\halumem.json
+```
+
+CEM-0's HaluMem runner ingests HaluMem sessions as traces, runs `ingest -> propose -> validate -> promote`, and reports separate proposed-candidate and trusted-memory extraction scores.
+
 CEM-0 also includes a local MemoryArena-style adapter that can load JSON, JSONL, or directories of JSON/JSONL files, normalize ordered subtasks from `questions`, `answers`, and `backgrounds`, convert tasks into `AgentTrace` records, and score predictions with progress score and task success rate.
 
 Smoke command:
@@ -251,5 +259,6 @@ Those remain unchecked in `TODO.md`.
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
-1. Run the HaluMem adapter on the downloaded real dataset and wire CEM-0 candidate extraction into the scoring layer.
-2. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
+1. Run the CEM-backed HaluMem runner on the downloaded real dataset and compare proposed versus trusted memory scores.
+2. Add CEM-backed MemoryArena and LongMemEval-V2 runners for action-coupling and trajectory-retrieval ablations.
+3. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.

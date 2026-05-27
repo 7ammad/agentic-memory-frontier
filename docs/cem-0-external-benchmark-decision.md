@@ -39,11 +39,19 @@ CEM-0 now has a local HaluMem adapter that:
 python scripts/run_halumem_adapter.py path\to\halumem.json
 ```
 
+The HaluMem slice now also includes a CEM-backed runner:
+
+```powershell
+python scripts/run_halumem_cem0_eval.py path\to\halumem.json
+```
+
+That runner ingests HaluMem sessions as traces, runs CEM-0's current `ingest -> propose -> validate -> promote` write path, and reports separate scores for proposed candidates versus final trusted memory.
+
 ## What This Does Not Claim
 
 This is not a published HaluMem benchmark score yet.
 
-The current adapter proves local ingestion and scoring against the official-style schema. A real benchmark result still requires running CEM-0 or a wrapped memory system over the downloaded HaluMem dataset and comparing against baselines.
+The current adapter and runner prove local ingestion, write-path execution, and scoring against the official-style schema. A real benchmark result still requires running CEM-0 or a wrapped memory system over the downloaded HaluMem dataset and comparing against baselines.
 
 ## MemoryArena Adapter Slice
 

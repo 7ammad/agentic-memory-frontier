@@ -124,9 +124,16 @@ Backend adapters, MCP integration, and multi-agent protocol stay gated until the
 - [x] MemoryArena-style adapter.
 - [x] LongMemEval-V2-style adapter.
 
-### 7. Gated Later Work
+### 7. External Benchmark Runner Layer
 
-Do not start these until CEM-0 proof items above are done and verified.
+- [x] CEM-backed HaluMem write-path runner.
+- [ ] CEM-backed MemoryArena action-coupling runner.
+- [ ] CEM-backed LongMemEval-V2 trajectory/retrieval runner.
+- [ ] Unified external benchmark report object.
+
+### 8. Gated Later Work
+
+Do not start these until CEM-0 proof items above and the external benchmark runner layer are done and verified.
 
 - [ ] Storage/backend adapters.
 - [ ] MCP integration.
