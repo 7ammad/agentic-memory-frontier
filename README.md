@@ -24,6 +24,8 @@ The implementation kickoff spec is in [specs/2026-05-27-cem-0-memguard-kernel-sp
 
 The active build queue is in [TODO.md](TODO.md). Codex should update it and continue to the next unchecked item after each verified commit unless blocked or redirected.
 
+The current V0 benchmark report is in [docs/cem-0-benchmark-report.md](docs/cem-0-benchmark-report.md).
+
 ## CEM-0 Quick Smoke
 
 Run the current synthetic corruption eval:
@@ -132,21 +134,30 @@ Current expected signal:
       "summary_reflection": {
         "false_memory_resistance_delta": 1.0,
         "expected_action_delta_delta": 1.0606060606060606,
+        "workflow_success_delta": 1.0,
         "trusted_false_memory_reduction": 5,
         "action_brief_card_reduction": 7
       },
       "unvalidated_memory": {
         "false_memory_resistance_delta": 1.0,
         "expected_action_delta_delta": 0.6363636363636364,
+        "workflow_success_delta": 1.0,
         "trusted_false_memory_reduction": 7,
         "action_brief_card_reduction": 8
       }
+    },
+    "workflow_rows": {
+      "no_memory": false,
+      "raw_trace_retrieval": false,
+      "summary_reflection": false,
+      "unvalidated_memory": false,
+      "cem0_validation": true
     }
   }
 }
 ```
 
-The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
+The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
 
 Run tests:
 

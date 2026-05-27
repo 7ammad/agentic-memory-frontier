@@ -59,7 +59,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Experience Card promotion: candidate atoms promote into cards and repeated evidence consolidates.
 - [x] Action Brief retrieval: verified cards become task-scoped action briefs instead of raw memory dumps.
 - [x] Workflow demo: local workflow-gotcha demo compares baseline attempts against CEM-0.
-- [ ] Public benchmark report: polished, reproducible report suitable for external readers.
+- [x] Public benchmark report: polished, reproducible report suitable for external readers.
 
 ### Evaluation Targets
 
@@ -118,7 +118,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Week 3: local HaluMem facsimile, partial baselines, first integrity table.
 - [ ] Week 3 remaining: real/external benchmark adapter decision and missing baseline coverage.
 - [x] Week 4: workflow demo, Experience Card promotion, Action Brief retrieval, held-out task comparison.
-- [ ] Week 4 remaining: public-ready benchmark report.
+- [x] Week 4 remaining: public-ready benchmark report.
 
 ## Current State
 
@@ -270,6 +270,32 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: benchmark strategy says `MMA = TaskSuccess(memory_agent) - TaskSuccess(no_memory_agent)`.
   - Needed outcome: eval reports CEM-0's held-out workflow advantage against each baseline, not just write-path integrity.
 
-- [ ] Write public-ready benchmark report.
+- [x] Write public-ready benchmark report.
   - Original source: Week 4 says "Write public-ready benchmark report."
   - Needed outcome: current smoke output connects audit/write-path quality to held-out task behavior and is readable outside the codebase.
+
+## Next From Original Plan: Missing Baselines And Metrics
+
+- [ ] Add full-context baseline.
+  - Original source: required baselines include "full context."
+  - Needed outcome: compare CEM-0 against an agent given all fixture trace text.
+
+- [ ] Add vanilla vector memory baseline.
+  - Original source: required baselines include "vanilla vector memory."
+  - Needed outcome: compare CEM-0 against semantic retrieval over raw memories/traces.
+
+- [ ] Add time-aware vector memory baseline.
+  - Original source: required baselines include "time-aware vector memory."
+  - Needed outcome: compare CEM-0 against recency-aware semantic retrieval.
+
+- [ ] Add human-curated runbook upper bound.
+  - Original source: required baselines include "human-curated runbook upper bound."
+  - Needed outcome: establish the best expected action brief for the fixture.
+
+- [ ] Add extraction precision/recall/F1.
+  - Original source: required metrics include extraction precision, recall, and F1.
+  - Needed outcome: evaluate proposed atoms against fixture labels before validation.
+
+- [ ] Add contradiction detection precision.
+  - Original source: required metrics include contradiction detection precision.
+  - Needed outcome: distinguish true contradictions from safe same-key/different-scope cases.
