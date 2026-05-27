@@ -124,7 +124,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add action-brief relevance recall and pollution-rate metrics.
   - Needed outcome: reports separate "retrieved the right operational experience" from "avoided wrong/out-of-scope experience".
 
-- [ ] Add scoped-memory suppression metric.
+- [x] Add scoped-memory suppression metric.
   - Needed outcome: off-task true memories can be promoted while being excluded from unrelated held-out briefs.
 
 - [ ] Add evidence consolidation metric.

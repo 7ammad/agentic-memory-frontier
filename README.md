@@ -62,7 +62,8 @@ Current expected signal:
     "expected_action_delta": 0.0,
     "metrics": {
       "action_brief_relevance_recall": 1.0,
-      "action_brief_pollution_rate": 0.5882352941176471
+      "action_brief_pollution_rate": 0.5882352941176471,
+      "scoped_memory_suppression": 0.0
     }
   },
   "summary_reflection": {
@@ -70,7 +71,8 @@ Current expected signal:
     "expected_action_delta": -0.033333333333333326,
     "metrics": {
       "action_brief_relevance_recall": 0.6666666666666666,
-      "action_brief_pollution_rate": 0.5833333333333334
+      "action_brief_pollution_rate": 0.5833333333333334,
+      "scoped_memory_suppression": 0.3333333333333333
     }
   },
   "unvalidated_memory": {
@@ -80,7 +82,8 @@ Current expected signal:
       "promoted_count": 17,
       "action_brief_card_count": 14,
       "action_brief_relevance_recall": 1.0,
-      "action_brief_pollution_rate": 0.5
+      "action_brief_pollution_rate": 0.5,
+      "scoped_memory_suppression": 1.0
     }
   },
   "cem0_validation": {
@@ -99,6 +102,7 @@ Current expected signal:
       "action_brief_card_count": 6,
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.0,
+      "scoped_memory_suppression": 1.0,
       "stale_memory_suppression": 1.0,
       "false_memory_resistance_by_risk": {
         "assistant_hypothesis": 1.0,

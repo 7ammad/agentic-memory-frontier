@@ -49,6 +49,7 @@ class WritePathMetrics(BaseModel):
     action_brief_card_count: int
     action_brief_relevance_recall: float = 0.0
     action_brief_pollution_rate: float = 0.0
+    scoped_memory_suppression: float = 0.0
     stale_memory_suppression: float = 0.0
     false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
     valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
@@ -448,6 +449,10 @@ def _run_unvalidated_memory(
                 brief.recommended_next_actions,
                 expectations,
             ),
+            scoped_memory_suppression=_scoped_memory_suppression(
+                brief.recommended_next_actions,
+                expectations,
+            ),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -476,6 +481,7 @@ def _run_no_memory() -> MemoryRunResult:
             action_brief_card_count=0,
             action_brief_relevance_recall=0.0,
             action_brief_pollution_rate=0.0,
+            scoped_memory_suppression=0.0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={},
             valid_memory_retention_by_risk={},
@@ -509,6 +515,10 @@ def _run_raw_trace_retrieval(
                 expectations,
             ),
             action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
             ),
@@ -559,6 +569,10 @@ def _run_summary_reflection(
                 expectations,
             ),
             action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
+            scoped_memory_suppression=_scoped_memory_suppression(
                 recommended_actions,
                 expectations,
             ),
@@ -708,6 +722,10 @@ def _cem0_metrics(
             expectations,
         ),
         action_brief_pollution_rate=_action_brief_pollution_rate(
+            action_brief_recommended_actions,
+            expectations,
+        ),
+        scoped_memory_suppression=_scoped_memory_suppression(
             action_brief_recommended_actions,
             expectations,
         ),
@@ -963,6 +981,20 @@ def _action_brief_pollution_rate(
     }
     polluted = [content for content in recommended_actions if content not in relevant_expected]
     return len(polluted) / len(recommended_actions)
+
+
+def _scoped_memory_suppression(
+    recommended_actions: list[str],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> float:
+    action_set = set(recommended_actions)
+    off_task_expected = [
+        expectation.content
+        for expectation in expectations.values()
+        if expectation.expected_status == "promote" and not expectation.applies_to_held_out
+    ]
+    suppressed = [content for content in off_task_expected if content not in action_set]
+    return _ratio(len(suppressed), len(off_task_expected))
 
 
 def _content_is_unsafe(
