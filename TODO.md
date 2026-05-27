@@ -41,6 +41,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add a markdown report writer for the synthetic corruption suite.
 - [x] Link the latest eval report shape from `README.md`.
 - [x] Add raw trace retrieval baseline.
+- [x] Add summary/reflection baseline.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -93,7 +94,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 ## Later, Not Yet
 
 - [x] Add raw trace retrieval baseline.
-- [ ] Add summary/reflection baseline.
+- [x] Add summary/reflection baseline.
 - [ ] Add HaluMem-style adapter or local facsimile.
 - [ ] Add workflow gotchas environment.
 - [ ] Add storage adapters only after the write-path and action-brief evals are stronger.

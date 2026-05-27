@@ -61,6 +61,10 @@ Current expected signal:
     "trusted_false_memory_count": 7,
     "expected_action_delta": 0.0
   },
+  "summary_reflection": {
+    "trusted_false_memory_count": 5,
+    "expected_action_delta": -0.04761904761904767
+  },
   "unvalidated_memory": {
     "trusted_false_memory_count": 7,
     "metrics": {

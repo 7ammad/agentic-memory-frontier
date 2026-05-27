@@ -21,12 +21,15 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert [row.name for row in result.report.baseline_rows] == [
         "no_memory",
         "raw_trace_retrieval",
+        "summary_reflection",
         "unvalidated_memory",
     ]
     assert result.report.cem0_row.name == "cem0_validation"
     assert result.report.cem0_row.expected_action_delta == 1.0
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
     assert result.raw_trace_retrieval.expected_action_delta == 0.0
+    assert result.summary_reflection.trusted_false_memory_count == 5
+    assert result.summary_reflection.expected_action_delta < 0.0
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
     assert result.unvalidated_memory.expected_action_delta == 0.0
@@ -93,6 +96,7 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "# synthetic_corruption Report" in markdown
     assert "| no_memory | 0 | 0 | 0 | 0 | 0 | 0 |" in markdown
     assert "| raw_trace_retrieval | 0 | 0 | 7 | 13 | 0 | 0 |" in markdown
+    assert "| summary_reflection | 0 | 0 | 5 | 9 | -0.048 | 0 |" in markdown
     assert "| unvalidated_memory | 13 | 0 | 7 | 13 | 0 | 0 |" in markdown
     assert "| cem0_validation | 13 | 6 | 0 | 6 | 1 | 1 |" in markdown
     assert "`database=mysql`: contradiction" in markdown

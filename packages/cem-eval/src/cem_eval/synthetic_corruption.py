@@ -92,6 +92,7 @@ class SyntheticEvalResult(BaseModel):
     false_quarantine_rate: float
     no_memory: MemoryRunResult
     raw_trace_retrieval: MemoryRunResult
+    summary_reflection: MemoryRunResult
     unvalidated_memory: MemoryRunResult
     cem0_validation: MemoryRunResult
     report: SyntheticEvalReport
@@ -103,6 +104,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     expectations = fixture.expectations_by_content
     no_memory = _run_no_memory()
     raw_trace_retrieval = _run_raw_trace_retrieval(fixture.traces, expectations)
+    summary_reflection = _run_summary_reflection(fixture.traces, expectations)
     unvalidated_memory = _run_unvalidated_memory(root / "unvalidated-memory", fixture.traces, expectations)
     cem0_validation, atoms = _run_cem0_validation(root / "cem0-validation", fixture.traces, expectations)
 
@@ -114,6 +116,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
     report = _build_report(
         no_memory=no_memory,
         raw_trace_retrieval=raw_trace_retrieval,
+        summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
         cem0_validation=cem0_validation,
     )
@@ -130,6 +133,7 @@ def run_synthetic_corruption_eval(root: str | Path) -> SyntheticEvalResult:
         false_quarantine_rate=cem0_validation.metrics.false_quarantine_rate,
         no_memory=no_memory,
         raw_trace_retrieval=raw_trace_retrieval,
+        summary_reflection=summary_reflection,
         unvalidated_memory=unvalidated_memory,
         cem0_validation=cem0_validation,
         report=report,
@@ -405,10 +409,53 @@ def _run_raw_trace_retrieval(
     )
 
 
+def _run_summary_reflection(
+    traces: list[AgentTrace],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> MemoryRunResult:
+    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    keyed: dict[str, str] = {}
+    actions: list[str] = []
+    for atom in atoms:
+        key = _key_value_key(atom.content)
+        if key is not None:
+            keyed[key] = atom.content
+            continue
+        if atom.epistemic_type != "assistant_hypothesis":
+            actions.append(atom.content)
+
+    recommended_actions = [*actions, *keyed.values()]
+    false_count = len([content for content in recommended_actions if _content_is_unsafe(content, expectations)])
+    return MemoryRunResult(
+        name="summary_reflection",
+        proposed_count=0,
+        quarantined_count=0,
+        trusted_false_memory_count=false_count,
+        action_brief_recommended_actions=recommended_actions,
+        expected_action_delta=_expected_action_delta(recommended_actions, expectations),
+        decision_reason_codes={},
+        metrics=WritePathMetrics(
+            false_memory_resistance=0.0,
+            contradiction_recall=0.0,
+            false_quarantine_rate=0.0,
+            promoted_count=0,
+            action_brief_card_count=len(recommended_actions),
+            stale_memory_suppression=0.0,
+            false_memory_resistance_by_risk={
+                risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
+            },
+            valid_memory_retention_by_risk={
+                risk_type: 1.0 for risk_type in _risk_types(expectations, expected_status="promote")
+            },
+        ),
+    )
+
+
 def _build_report(
     *,
     no_memory: MemoryRunResult,
     raw_trace_retrieval: MemoryRunResult,
+    summary_reflection: MemoryRunResult,
     unvalidated_memory: MemoryRunResult,
     cem0_validation: MemoryRunResult,
 ) -> SyntheticEvalReport:
@@ -418,6 +465,7 @@ def _build_report(
         baseline_rows=[
             _report_row(no_memory),
             _report_row(raw_trace_retrieval),
+            _report_row(summary_reflection),
             _report_row(unvalidated_memory),
         ],
         cem0_row=_report_row(cem0_validation),
@@ -737,6 +785,25 @@ def _expected_action_delta(
         len(unsafe_expected),
     )
     return valid_coverage - unsafe_pollution
+
+
+def _content_is_unsafe(
+    content: str,
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> bool:
+    expectation = expectations.get(content)
+    if expectation is None:
+        return True
+    return expectation.expected_status != "promote"
+
+
+def _key_value_key(content: str) -> str | None:
+    if "=" not in content:
+        return None
+    key, value = content.split("=", 1)
+    if not key.strip() or not value.strip():
+        return None
+    return key.strip().lower()
 
 
 def _expected_status(
