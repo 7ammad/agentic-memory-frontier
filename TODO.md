@@ -108,7 +108,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
   - Example: the same valid skill appears in multiple successful traces.
   - Needed outcome: support count increases without duplicating action-brief cards.
 
-- [ ] Add false-quarantine negative-control fixture.
+- [x] Add false-quarantine negative-control fixture.
   - Example: two similar-looking memories have different scopes and should both survive.
   - Needed outcome: contradiction detection respects scope before quarantine.
 

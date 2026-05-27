@@ -34,6 +34,8 @@ class KeyValueContradictionDetector:
 
         conflicting_ids: list[str] = []
         for other in active_atoms:
+            if not _same_operational_scope(atom, other):
+                continue
             other_key, other_value = contradiction_pair(other.content)
             if other_key == key and other_value != value:
                 conflicting_ids.append(other.atom_id)
@@ -57,3 +59,11 @@ def contradiction_pair(content: str) -> tuple[str | None, str | None]:
             if key and value:
                 return key, value
     return None, None
+
+
+def _same_operational_scope(left: ExperienceAtom, right: ExperienceAtom) -> bool:
+    if left.domain_scope and right.domain_scope and left.domain_scope != right.domain_scope:
+        return False
+    if left.task_family and right.task_family and left.task_family != right.task_family:
+        return False
+    return True

@@ -79,6 +79,36 @@ def test_contradiction_is_quarantined_with_audit_trail(tmp_path):
     assert any(result.check_name == "contradiction" and not result.passed for result in audit.validation_results)
 
 
+def test_same_key_different_scope_is_not_quarantined(tmp_path):
+    cem = CEM(tmp_path)
+    trace_one = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        task_id="billing-export",
+        turns=[TraceTurn(index=0, role="user", content="PREFERENCE: report_format=csv")],
+        environment={"domain": "billing-export"},
+    )
+    trace_two = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        task_id="inventory-dashboard",
+        turns=[TraceTurn(index=1, role="user", content="PREFERENCE: report_format=json")],
+        environment={"domain": "inventory-dashboard"},
+    )
+
+    cem.ingest_trace(trace_one)
+    first = cem.propose_memories(trace_one.trace_id)[0]
+    cem.validate(first.atom_id)
+    cem.ingest_trace(trace_two)
+    second = cem.propose_memories(trace_two.trace_id)[0]
+    decision = cem.validate(second.atom_id)
+
+    stored = cem.store.get_atom(second.atom_id)
+    assert stored.promotion_status == "candidate"
+    assert decision.reason_codes == []
+    assert stored.contradiction_links == []
+
+
 def test_assistant_hypothesis_cannot_promote_without_evidence(tmp_path):
     cem = CEM(tmp_path)
     trace = AgentTrace(

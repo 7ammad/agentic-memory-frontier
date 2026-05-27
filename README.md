@@ -45,10 +45,10 @@ Current expected signal:
 
 ```json
 {
-  "fixture_case_count": 13,
-  "proposed_count": 14,
+  "fixture_case_count": 15,
+  "proposed_count": 16,
   "quarantined_count": 6,
-  "promoted_count": 7,
+  "promoted_count": 9,
   "false_memory_resistance": 1.0,
   "contradiction_recall": 1.0,
   "false_quarantine_rate": 0.0,
@@ -63,12 +63,13 @@ Current expected signal:
   },
   "summary_reflection": {
     "trusted_false_memory_count": 5,
-    "expected_action_delta": -0.04761904761904767
+    "expected_action_delta": 0.0
   },
   "unvalidated_memory": {
     "trusted_false_memory_count": 7,
+    "expected_action_delta": 0.2222222222222222,
     "metrics": {
-      "promoted_count": 14,
+      "promoted_count": 16,
       "action_brief_card_count": 14
     }
   },
@@ -84,7 +85,7 @@ Current expected signal:
       "click refresh before submitting workflow-gotchas form": ["non_causal"]
     },
     "metrics": {
-      "promoted_count": 7,
+      "promoted_count": 9,
       "action_brief_card_count": 6,
       "stale_memory_suppression": 1.0,
       "false_memory_resistance_by_risk": {
