@@ -72,7 +72,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 
 ### Required Metrics
 
-- [ ] Extraction precision/recall/F1.
+- [x] Extraction precision/recall/F1.
 - [x] Update recall via local HaluMem facsimile.
 - [x] False memory resistance.
 - [ ] Contradiction detection precision.
@@ -292,7 +292,7 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: required baselines include "human-curated runbook upper bound."
   - Needed outcome: establish the best expected action brief for the fixture.
 
-- [ ] Add extraction precision/recall/F1.
+- [x] Add extraction precision/recall/F1.
   - Original source: required metrics include extraction precision, recall, and F1.
   - Needed outcome: evaluate proposed atoms against fixture labels before validation.
 

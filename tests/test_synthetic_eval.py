@@ -137,6 +137,9 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.unvalidated_memory.metrics.evidence_consolidation_count == 0
     assert result.unvalidated_memory.metrics.max_evidence_support_count == 1
     assert result.unvalidated_memory.metrics.audit_completeness_rate == 0.0
+    assert result.unvalidated_memory.metrics.extraction_precision == 1.0
+    assert result.unvalidated_memory.metrics.extraction_recall == 1.0
+    assert result.unvalidated_memory.metrics.extraction_f1 == 1.0
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
     assert round(result.unvalidated_memory.expected_action_delta, 3) == 0.364
@@ -158,6 +161,9 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.cem0_validation.metrics.evidence_consolidation_count == 1
     assert result.cem0_validation.metrics.max_evidence_support_count == 2
     assert result.cem0_validation.metrics.audit_completeness_rate == 1.0
+    assert result.cem0_validation.metrics.extraction_precision == 1.0
+    assert result.cem0_validation.metrics.extraction_recall == 1.0
+    assert result.cem0_validation.metrics.extraction_f1 == 1.0
     assert result.cem0_validation.trusted_false_memory_count == 0
     assert result.cem0_validation.expected_action_delta == 1.0
     assert result.cem0_validation.decision_reason_codes["database=mysql"] == ["contradiction"]
@@ -242,6 +248,9 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "| human_curated_runbook | 0 | 0 | 0 | 0 | 0 |" in markdown
     assert "| summary_reflection | 1 | 1.061 | 1 | 5 | 7 |" in markdown
     assert "| unvalidated_memory | 1 | 0.636 | 1 | 7 | 8 |" in markdown
+    assert "## Extraction Quality" in markdown
+    assert "| unvalidated_memory | 1 | 1 | 1 |" in markdown
+    assert "| cem0_validation | 1 | 1 | 1 |" in markdown
     assert "## Audit Coverage" in markdown
     assert "| unvalidated_memory | 0 | 0 | 1 |" in markdown
     assert "| cem0_validation | 1 | 1 | 2 |" in markdown

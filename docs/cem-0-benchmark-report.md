@@ -99,6 +99,22 @@ The held-out workflow requires these decisive behaviors:
 | human_curated_runbook | yes | Curated upper bound contains exactly the required actions. |
 | cem0_validation | yes | Keeps the required actions and suppresses the polluted ones. |
 
+## Extraction Quality
+
+Extraction quality is measured against the synthetic fixture labels before validation. It is only meaningful for runs that propose candidate atoms.
+
+| Run | Precision | Recall | F1 |
+| --- | ---: | ---: | ---: |
+| no_memory | 0 | 0 | 0 |
+| full_context | 0 | 0 | 0 |
+| vanilla_vector_memory | 0 | 0 | 0 |
+| time_aware_vector_memory | 0 | 0 | 0 |
+| raw_trace_retrieval | 0 | 0 | 0 |
+| summary_reflection | 0 | 0 | 0 |
+| unvalidated_memory | 1 | 1 | 1 |
+| human_curated_runbook | 0 | 0 | 0 |
+| cem0_validation | 1 | 1 | 1 |
+
 ## Audit Coverage
 
 Audit completeness is strict. A promoted card counts only when it has:
@@ -142,7 +158,6 @@ The current report does not prove:
 - external HaluMem performance;
 - MemoryArena performance;
 - LongMemEval-V2 performance;
-- extraction precision/recall/F1;
 - contradiction precision;
 - action influence rate from real agent traces;
 - latency or token-cost claims.

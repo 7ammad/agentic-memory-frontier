@@ -63,6 +63,28 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
     lines.extend(
         [
             "",
+            "## Extraction Quality",
+            "",
+            "| Run | Precision | Recall | F1 |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+    for row in [*report.baseline_rows, report.cem0_row]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    row.name,
+                    _format_float(row.extraction_precision),
+                    _format_float(row.extraction_recall),
+                    _format_float(row.extraction_f1),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Audit Coverage",
             "",
             "| Run | Audit completeness | Evidence consolidation | Max support |",

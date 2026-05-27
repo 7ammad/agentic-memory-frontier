@@ -118,6 +118,9 @@ Current expected signal:
     "expected_action_delta": 0.36363636363636365,
     "metrics": {
       "promoted_count": 18,
+      "extraction_precision": 1.0,
+      "extraction_recall": 1.0,
+      "extraction_f1": 1.0,
       "action_brief_card_count": 14,
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.5,
@@ -152,6 +155,9 @@ Current expected signal:
     },
     "metrics": {
       "promoted_count": 11,
+      "extraction_precision": 1.0,
+      "extraction_recall": 1.0,
+      "extraction_f1": 1.0,
       "action_brief_card_count": 6,
       "action_brief_relevance_recall": 1.0,
       "action_brief_pollution_rate": 0.0,
@@ -224,7 +230,7 @@ Current expected signal:
 }
 ```
 
-The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
+The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, extraction quality, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
 
 Run tests:
 

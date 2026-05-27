@@ -46,6 +46,9 @@ class SyntheticMemoryExpectation(BaseModel):
 
 
 class WritePathMetrics(BaseModel):
+    extraction_precision: float = 0.0
+    extraction_recall: float = 0.0
+    extraction_f1: float = 0.0
     false_memory_resistance: float
     contradiction_recall: float
     false_quarantine_rate: float
@@ -81,6 +84,9 @@ class EvalReportRow(BaseModel):
     trusted_false_memory_count: int
     action_brief_card_count: int
     expected_action_delta: float
+    extraction_precision: float
+    extraction_recall: float
+    extraction_f1: float
     false_memory_resistance: float
     action_brief_relevance_recall: float
     action_brief_pollution_rate: float
@@ -490,6 +496,7 @@ def _run_unvalidated_memory(
     brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
     cards = cem.store.list_cards()
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
+    extraction_precision, extraction_recall, extraction_f1 = _extraction_scores(atoms, expectations)
     return MemoryRunResult(
         name="unvalidated_memory",
         proposed_count=len(atoms),
@@ -499,6 +506,9 @@ def _run_unvalidated_memory(
         expected_action_delta=_expected_action_delta(brief.recommended_next_actions, expectations),
         decision_reason_codes={},
         metrics=WritePathMetrics(
+            extraction_precision=extraction_precision,
+            extraction_recall=extraction_recall,
+            extraction_f1=extraction_f1,
             false_memory_resistance=0.0,
             contradiction_recall=0.0,
             false_quarantine_rate=0.0,
@@ -961,6 +971,9 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         trusted_false_memory_count=run.trusted_false_memory_count,
         action_brief_card_count=run.metrics.action_brief_card_count,
         expected_action_delta=run.expected_action_delta,
+        extraction_precision=run.metrics.extraction_precision,
+        extraction_recall=run.metrics.extraction_recall,
+        extraction_f1=run.metrics.extraction_f1,
         false_memory_resistance=run.metrics.false_memory_resistance,
         action_brief_relevance_recall=run.metrics.action_brief_relevance_recall,
         action_brief_pollution_rate=run.metrics.action_brief_pollution_rate,
@@ -1115,7 +1128,11 @@ def _cem0_metrics(
     valid_quarantined = [atom for atom in valid_atoms if _decision(cem, atom).decision == "quarantined"]
     stale_atoms = [atom for atom in atoms if _expected_status(atom, expectations) == "deprecated"]
     stale_suppressed = [atom for atom in stale_atoms if _is_suppressed(cem, atom)]
+    extraction_precision, extraction_recall, extraction_f1 = _extraction_scores(atoms, expectations)
     return WritePathMetrics(
+        extraction_precision=extraction_precision,
+        extraction_recall=extraction_recall,
+        extraction_f1=extraction_f1,
         false_memory_resistance=_ratio(len(blocked_false_atoms), len(false_atoms)),
         contradiction_recall=_ratio(len(detected_contradictions), len(contradiction_atoms)),
         false_quarantine_rate=_ratio(len(valid_quarantined), len(valid_atoms)),
@@ -1197,6 +1214,20 @@ def _valid_memory_retention_by_risk(
         retained = [atom for atom in valid_atoms if _decision(cem, atom).decision == "candidate"]
         results[risk_type] = _ratio(len(retained), len(valid_atoms))
     return results
+
+
+def _extraction_scores(
+    atoms: list[ExperienceAtom],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> tuple[float, float, float]:
+    proposed_contents = [atom.content for atom in atoms]
+    expected_contents = set(expectations)
+    true_positive_count = len([content for content in proposed_contents if content in expected_contents])
+    recalled_content_count = len(set(proposed_contents) & expected_contents)
+    precision = _ratio(true_positive_count, len(proposed_contents))
+    recall = _ratio(recalled_content_count, len(expected_contents))
+    f1 = _ratio(2 * precision * recall, precision + recall)
+    return precision, recall, f1
 
 
 def _audit_completeness_rate(cem: CEM) -> float:
@@ -1550,7 +1581,7 @@ def _cue_terms(content: str) -> list[str]:
     return sorted({term.strip(".,:;()[]").lower() for term in content.split() if len(term) > 3})
 
 
-def _ratio(numerator: int, denominator: int) -> float:
+def _ratio(numerator: float, denominator: float) -> float:
     if denominator == 0:
         return 0.0
     return numerator / denominator
