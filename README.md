@@ -243,7 +243,9 @@ Current expected signal:
 }
 ```
 
-The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, extraction quality, contradiction detection, memory harm, action influence, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
+The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, extraction quality, contradiction detection, memory harm, action influence, latency, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
+
+Latency fields are emitted as `p95_write_latency_ms` and `p95_retrieval_latency_ms` under each run's metrics. Values are local-run dependent.
 
 Run tests:
 

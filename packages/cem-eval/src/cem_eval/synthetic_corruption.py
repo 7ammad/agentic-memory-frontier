@@ -5,7 +5,8 @@ import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Literal
+from time import perf_counter
+from typing import Callable, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +22,8 @@ from cem_core import (
     ValidationDecision,
 )
 from cem_core.models import utc_now
+
+T = TypeVar("T")
 
 ExpectedStatus = Literal["promote", "quarantine", "deprecated"]
 RiskType = Literal[
@@ -70,6 +73,8 @@ class WritePathMetrics(BaseModel):
     evidence_consolidation_count: int = 0
     max_evidence_support_count: int = 0
     audit_completeness_rate: float = 0.0
+    p95_write_latency_ms: float = 0.0
+    p95_retrieval_latency_ms: float = 0.0
     stale_memory_suppression: float = 0.0
     false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
     valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
@@ -108,6 +113,8 @@ class EvalReportRow(BaseModel):
     evidence_consolidation_count: int
     max_evidence_support_count: int
     audit_completeness_rate: float
+    p95_write_latency_ms: float
+    p95_retrieval_latency_ms: float
 
 
 class EvalReportComparisonRow(BaseModel):
@@ -504,11 +511,14 @@ def _run_unvalidated_memory(
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> MemoryRunResult:
     cem = CEM(root, extractor=SyntheticCorruptionExtractor())
-    atoms = _propose_atoms(cem, traces)
+    atoms, write_latency_samples = _propose_atoms_with_latency(cem, traces)
     for atom in atoms:
-        cem.store.save_card(_card_from_atom(atom))
+        _, save_latency_ms = _measure_ms(lambda atom=atom: cem.store.save_card(_card_from_atom(atom)))
+        write_latency_samples.append(save_latency_ms)
 
-    brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
+    brief, retrieval_latency_ms = _measure_ms(
+        lambda: cem.retrieve_action_brief(_held_out_task(), max_cards=20)
+    )
     cards = cem.store.list_cards()
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     extraction_precision, extraction_recall, extraction_f1 = _extraction_scores(atoms, expectations)
@@ -553,6 +563,8 @@ def _run_unvalidated_memory(
             evidence_consolidation_count=_evidence_consolidation_count(cards),
             max_evidence_support_count=_max_evidence_support_count(cards),
             audit_completeness_rate=_audit_completeness_rate(cem),
+            p95_write_latency_ms=_p95(write_latency_samples),
+            p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -599,7 +611,9 @@ def _run_full_context(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> MemoryRunResult:
-    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    atoms, retrieval_latency_ms = _measure_ms(
+        lambda: [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    )
     recommended_actions = [atom.content for atom in atoms]
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     return MemoryRunResult(
@@ -640,6 +654,7 @@ def _run_full_context(
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
+            p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -655,7 +670,9 @@ def _run_raw_trace_retrieval(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> MemoryRunResult:
-    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    atoms, retrieval_latency_ms = _measure_ms(
+        lambda: [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    )
     recommended_actions = [atom.content for atom in atoms]
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     return MemoryRunResult(
@@ -696,6 +713,7 @@ def _run_raw_trace_retrieval(
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
+            p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -711,15 +729,9 @@ def _run_vanilla_vector_memory(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> MemoryRunResult:
-    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
-    task = _held_out_task()
-    query = " ".join([task.description, task.domain_scope or "", task.task_family or ""])
-    scored = sorted(
-        ((lexical_vector_score(query, atom.content), atom) for atom in atoms),
-        key=lambda item: (item[0], item[1].content),
-        reverse=True,
+    (atoms, recommended_actions), retrieval_latency_ms = _measure_ms(
+        lambda: _retrieve_vanilla_vector_actions(traces)
     )
-    recommended_actions = [atom.content for score, atom in scored if score > 0][:10]
     false_atoms = [
         atom
         for atom in atoms
@@ -763,6 +775,7 @@ def _run_vanilla_vector_memory(
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
+            p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -778,19 +791,9 @@ def _run_time_aware_vector_memory(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> MemoryRunResult:
-    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
-    task = _held_out_task()
-    query = " ".join([task.description, task.domain_scope or "", task.task_family or ""])
-    total = max(1, len(atoms) - 1)
-    scored = sorted(
-        (
-            (lexical_vector_score(query, atom.content) + (index / total * 0.05), atom)
-            for index, atom in enumerate(atoms)
-        ),
-        key=lambda item: (item[0], item[1].content),
-        reverse=True,
+    (atoms, recommended_actions), retrieval_latency_ms = _measure_ms(
+        lambda: _retrieve_time_aware_vector_actions(traces)
     )
-    recommended_actions = [atom.content for score, atom in scored if score > 0][:10]
     false_atoms = [
         atom
         for atom in atoms
@@ -834,6 +837,7 @@ def _run_time_aware_vector_memory(
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
+            p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -849,18 +853,9 @@ def _run_summary_reflection(
     traces: list[AgentTrace],
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> MemoryRunResult:
-    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
-    keyed: dict[str, str] = {}
-    actions: list[str] = []
-    for atom in atoms:
-        key = _key_value_key(atom.content)
-        if key is not None:
-            keyed[key] = atom.content
-            continue
-        if atom.epistemic_type != "assistant_hypothesis":
-            actions.append(atom.content)
-
-    recommended_actions = [*actions, *keyed.values()]
+    recommended_actions, retrieval_latency_ms = _measure_ms(
+        lambda: _retrieve_summary_reflection_actions(traces)
+    )
     false_count = len([content for content in recommended_actions if _content_is_unsafe(content, expectations)])
     return MemoryRunResult(
         name="summary_reflection",
@@ -900,6 +895,7 @@ def _run_summary_reflection(
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
+            p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -914,11 +910,13 @@ def _run_summary_reflection(
 def _run_human_curated_runbook(
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> MemoryRunResult:
-    recommended_actions = [
-        expectation.content
-        for expectation in expectations.values()
-        if expectation.expected_status == "promote" and expectation.applies_to_held_out
-    ]
+    recommended_actions, retrieval_latency_ms = _measure_ms(
+        lambda: [
+            expectation.content
+            for expectation in expectations.values()
+            if expectation.expected_status == "promote" and expectation.applies_to_held_out
+        ]
+    )
     return MemoryRunResult(
         name="human_curated_runbook",
         proposed_count=0,
@@ -957,6 +955,7 @@ def _run_human_curated_runbook(
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
+            p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
             stale_memory_suppression=1.0,
             false_memory_resistance_by_risk={
                 risk_type: 1.0 for risk_type in _unsafe_risk_types(expectations)
@@ -1038,6 +1037,8 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         evidence_consolidation_count=run.metrics.evidence_consolidation_count,
         max_evidence_support_count=run.metrics.max_evidence_support_count,
         audit_completeness_rate=run.metrics.audit_completeness_rate,
+        p95_write_latency_ms=run.metrics.p95_write_latency_ms,
+        p95_retrieval_latency_ms=run.metrics.p95_retrieval_latency_ms,
     )
 
 
@@ -1088,6 +1089,52 @@ def workflow_report_row_from_run(run: MemoryRunResult) -> WorkflowReportRow:
     )
 
 
+def _retrieve_vanilla_vector_actions(
+    traces: list[AgentTrace],
+) -> tuple[list[ExperienceAtom], list[str]]:
+    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    task = _held_out_task()
+    query = " ".join([task.description, task.domain_scope or "", task.task_family or ""])
+    scored = sorted(
+        ((lexical_vector_score(query, atom.content), atom) for atom in atoms),
+        key=lambda item: (item[0], item[1].content),
+        reverse=True,
+    )
+    return atoms, [atom.content for score, atom in scored if score > 0][:10]
+
+
+def _retrieve_time_aware_vector_actions(
+    traces: list[AgentTrace],
+) -> tuple[list[ExperienceAtom], list[str]]:
+    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    task = _held_out_task()
+    query = " ".join([task.description, task.domain_scope or "", task.task_family or ""])
+    total = max(1, len(atoms) - 1)
+    scored = sorted(
+        (
+            (lexical_vector_score(query, atom.content) + (index / total * 0.05), atom)
+            for index, atom in enumerate(atoms)
+        ),
+        key=lambda item: (item[0], item[1].content),
+        reverse=True,
+    )
+    return atoms, [atom.content for score, atom in scored if score > 0][:10]
+
+
+def _retrieve_summary_reflection_actions(traces: list[AgentTrace]) -> list[str]:
+    atoms = [atom for trace in traces for atom in SyntheticCorruptionExtractor().extract(trace)]
+    keyed: dict[str, str] = {}
+    actions: list[str] = []
+    for atom in atoms:
+        key = _key_value_key(atom.content)
+        if key is not None:
+            keyed[key] = atom.content
+            continue
+        if atom.epistemic_type != "assistant_hypothesis":
+            actions.append(atom.content)
+    return [*actions, *keyed.values()]
+
+
 def lexical_vector_score(query: str, document: str) -> float:
     query_counts = _term_counts(query)
     document_counts = _term_counts(document)
@@ -1112,19 +1159,24 @@ def _run_cem0_validation(
     expectations: dict[str, SyntheticMemoryExpectation],
 ) -> tuple[MemoryRunResult, list[ExperienceAtom]]:
     cem = CEM(root, extractor=SyntheticCorruptionExtractor())
-    proposed_atoms = _propose_atoms(cem, traces)
+    proposed_atoms, write_latency_samples = _propose_atoms_with_latency(cem, traces)
 
     for atom in proposed_atoms:
-        cem.validate(atom.atom_id)
+        _, validate_latency_ms = _measure_ms(lambda atom_id=atom.atom_id: cem.validate(atom_id))
+        write_latency_samples.append(validate_latency_ms)
 
     promoted_count = 0
     for atom in proposed_atoms:
-        if cem.promote(atom.atom_id) is not None:
+        card, promote_latency_ms = _measure_ms(lambda atom_id=atom.atom_id: cem.promote(atom_id))
+        write_latency_samples.append(promote_latency_ms)
+        if card is not None:
             promoted_count += 1
 
     atoms = [cem.store.get_atom(atom.atom_id) for atom in proposed_atoms]
     quarantined = [atom for atom in atoms if atom.promotion_status == "quarantined"]
-    brief = cem.retrieve_action_brief(_held_out_task(), max_cards=20)
+    brief, retrieval_latency_ms = _measure_ms(
+        lambda: cem.retrieve_action_brief(_held_out_task(), max_cards=20)
+    )
     metrics = _cem0_metrics(
         cem,
         atoms,
@@ -1132,6 +1184,8 @@ def _run_cem0_validation(
         promoted_count=promoted_count,
         action_brief_card_count=len(brief.applicable_card_ids),
         action_brief_recommended_actions=brief.recommended_next_actions,
+        p95_write_latency_ms=_p95(write_latency_samples),
+        p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
     )
     trusted_false = [
         atom
@@ -1154,11 +1208,39 @@ def _run_cem0_validation(
 
 
 def _propose_atoms(cem: CEM, traces: list[AgentTrace]) -> list[ExperienceAtom]:
+    atoms, _latency_samples = _propose_atoms_with_latency(cem, traces)
+    return atoms
+
+
+def _propose_atoms_with_latency(
+    cem: CEM,
+    traces: list[AgentTrace],
+) -> tuple[list[ExperienceAtom], list[float]]:
     atom_ids: list[str] = []
+    latency_samples: list[float] = []
     for trace in traces:
-        cem.ingest_trace(trace)
-        atom_ids.extend(atom.atom_id for atom in cem.propose_memories(trace.trace_id))
-    return [cem.store.get_atom(atom_id) for atom_id in atom_ids]
+        _, ingest_latency_ms = _measure_ms(lambda trace=trace: cem.ingest_trace(trace))
+        latency_samples.append(ingest_latency_ms)
+        proposed_atoms, propose_latency_ms = _measure_ms(
+            lambda trace_id=trace.trace_id: cem.propose_memories(trace_id)
+        )
+        latency_samples.append(propose_latency_ms)
+        atom_ids.extend(atom.atom_id for atom in proposed_atoms)
+    return [cem.store.get_atom(atom_id) for atom_id in atom_ids], latency_samples
+
+
+def _measure_ms(operation: Callable[[], T]) -> tuple[T, float]:
+    started = perf_counter()
+    result = operation()
+    return result, (perf_counter() - started) * 1000
+
+
+def _p95(samples: list[float]) -> float:
+    if not samples:
+        return 0.0
+    ordered = sorted(samples)
+    index = max(0, math.ceil(0.95 * len(ordered)) - 1)
+    return ordered[min(index, len(ordered) - 1)]
 
 
 def _cem0_metrics(
@@ -1169,6 +1251,8 @@ def _cem0_metrics(
     promoted_count: int,
     action_brief_card_count: int,
     action_brief_recommended_actions: list[str],
+    p95_write_latency_ms: float,
+    p95_retrieval_latency_ms: float,
 ) -> WritePathMetrics:
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     blocked_false_atoms = [atom for atom in false_atoms if _is_suppressed(cem, atom)]
@@ -1212,6 +1296,8 @@ def _cem0_metrics(
         evidence_consolidation_count=_evidence_consolidation_count(cem.store.list_cards()),
         max_evidence_support_count=_max_evidence_support_count(cem.store.list_cards()),
         audit_completeness_rate=_audit_completeness_rate(cem),
+        p95_write_latency_ms=p95_write_latency_ms,
+        p95_retrieval_latency_ms=p95_retrieval_latency_ms,
         stale_memory_suppression=_ratio(len(stale_suppressed), len(stale_atoms)),
         false_memory_resistance_by_risk=_false_memory_resistance_by_risk(cem, atoms, expectations),
         valid_memory_retention_by_risk=_valid_memory_retention_by_risk(cem, atoms, expectations),

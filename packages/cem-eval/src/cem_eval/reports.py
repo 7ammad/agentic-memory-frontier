@@ -146,6 +146,27 @@ def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
     lines.extend(
         [
             "",
+            "## Latency",
+            "",
+            "| Run | p95 write ms | p95 retrieval ms |",
+            "| --- | ---: | ---: |",
+        ]
+    )
+    for row in [*report.baseline_rows, report.cem0_row]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    row.name,
+                    _format_float(row.p95_write_latency_ms),
+                    _format_float(row.p95_retrieval_latency_ms),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Audit Coverage",
             "",
             "| Run | Audit completeness | Evidence consolidation | Max support |",

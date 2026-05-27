@@ -82,8 +82,8 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
 - [x] Memory harm rate as a named report metric.
 - [x] Action influence rate.
 - [x] Evidence support/consolidation metrics.
-- [ ] p95 write latency.
-- [ ] p95 retrieval latency.
+- [x] p95 write latency.
+- [x] p95 retrieval latency.
 - [ ] Tokens per write.
 - [ ] Tokens per retrieval.
 - [x] Action-brief relevance recall.
@@ -308,6 +308,14 @@ This is the source-of-truth checklist from the CEM-0 spec and foundation plan. K
   - Original source: required metrics include action influence rate.
   - Needed outcome: report how often promoted CEM-0 recommendations are decisive for the held-out workflow outcome.
 
-- [ ] Add p95 write latency.
+- [x] Add p95 write latency.
   - Original source: required metrics include p95 write latency.
-  - Needed outcome: report deterministic local write-path timing for candidate extraction and validation.
+  - Needed outcome: report local write-path timing for candidate extraction and validation.
+
+- [x] Add p95 retrieval latency.
+  - Original source: required metrics include p95 retrieval latency.
+  - Needed outcome: report local action-selection or Action Brief timing for each run.
+
+- [ ] Add tokens per write.
+  - Original source: required metrics include tokens per write.
+  - Needed outcome: report deterministic token accounting for the marker-based extractor and validator path.

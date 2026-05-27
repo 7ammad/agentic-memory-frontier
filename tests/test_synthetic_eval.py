@@ -150,6 +150,8 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.unvalidated_memory.metrics.evidence_consolidation_count == 0
     assert result.unvalidated_memory.metrics.max_evidence_support_count == 1
     assert result.unvalidated_memory.metrics.audit_completeness_rate == 0.0
+    assert result.unvalidated_memory.metrics.p95_write_latency_ms >= 0.0
+    assert result.unvalidated_memory.metrics.p95_retrieval_latency_ms >= 0.0
     assert result.unvalidated_memory.metrics.extraction_precision == 1.0
     assert result.unvalidated_memory.metrics.extraction_recall == 1.0
     assert result.unvalidated_memory.metrics.extraction_f1 == 1.0
@@ -178,6 +180,8 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.cem0_validation.metrics.evidence_consolidation_count == 1
     assert result.cem0_validation.metrics.max_evidence_support_count == 2
     assert result.cem0_validation.metrics.audit_completeness_rate == 1.0
+    assert result.cem0_validation.metrics.p95_write_latency_ms >= 0.0
+    assert result.cem0_validation.metrics.p95_retrieval_latency_ms >= 0.0
     assert result.cem0_validation.metrics.extraction_precision == 1.0
     assert result.cem0_validation.metrics.extraction_recall == 1.0
     assert result.cem0_validation.metrics.extraction_f1 == 1.0
@@ -281,6 +285,8 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "| no_memory | 0 |" in markdown
     assert "| vanilla_vector_memory | 0.667 |" in markdown
     assert "| cem0_validation | 1 |" in markdown
+    assert "## Latency" in markdown
+    assert "| Run | p95 write ms | p95 retrieval ms |" in markdown
     assert "## Audit Coverage" in markdown
     assert "| unvalidated_memory | 0 | 0 | 1 |" in markdown
     assert "| cem0_validation | 1 | 1 | 2 |" in markdown
