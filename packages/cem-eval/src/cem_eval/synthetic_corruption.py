@@ -47,6 +47,8 @@ class WritePathMetrics(BaseModel):
     false_quarantine_rate: float
     promoted_count: int
     action_brief_card_count: int
+    action_brief_relevance_recall: float = 0.0
+    action_brief_pollution_rate: float = 0.0
     stale_memory_suppression: float = 0.0
     false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
     valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
@@ -438,6 +440,14 @@ def _run_unvalidated_memory(
             false_quarantine_rate=0.0,
             promoted_count=len(atoms),
             action_brief_card_count=len(brief.applicable_card_ids),
+            action_brief_relevance_recall=_action_brief_relevance_recall(
+                brief.recommended_next_actions,
+                expectations,
+            ),
+            action_brief_pollution_rate=_action_brief_pollution_rate(
+                brief.recommended_next_actions,
+                expectations,
+            ),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -464,6 +474,8 @@ def _run_no_memory() -> MemoryRunResult:
             false_quarantine_rate=0.0,
             promoted_count=0,
             action_brief_card_count=0,
+            action_brief_relevance_recall=0.0,
+            action_brief_pollution_rate=0.0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={},
             valid_memory_retention_by_risk={},
@@ -492,6 +504,14 @@ def _run_raw_trace_retrieval(
             false_quarantine_rate=0.0,
             promoted_count=0,
             action_brief_card_count=len(recommended_actions),
+            action_brief_relevance_recall=_action_brief_relevance_recall(
+                recommended_actions,
+                expectations,
+            ),
+            action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -534,6 +554,14 @@ def _run_summary_reflection(
             false_quarantine_rate=0.0,
             promoted_count=0,
             action_brief_card_count=len(recommended_actions),
+            action_brief_relevance_recall=_action_brief_relevance_recall(
+                recommended_actions,
+                expectations,
+            ),
+            action_brief_pollution_rate=_action_brief_pollution_rate(
+                recommended_actions,
+                expectations,
+            ),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -616,6 +644,7 @@ def _run_cem0_validation(
         expectations=expectations,
         promoted_count=promoted_count,
         action_brief_card_count=len(brief.applicable_card_ids),
+        action_brief_recommended_actions=brief.recommended_next_actions,
     )
     trusted_false = [
         atom
@@ -652,6 +681,7 @@ def _cem0_metrics(
     expectations: dict[str, SyntheticMemoryExpectation],
     promoted_count: int,
     action_brief_card_count: int,
+    action_brief_recommended_actions: list[str],
 ) -> WritePathMetrics:
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     blocked_false_atoms = [atom for atom in false_atoms if _is_suppressed(cem, atom)]
@@ -673,6 +703,14 @@ def _cem0_metrics(
         false_quarantine_rate=_ratio(len(valid_quarantined), len(valid_atoms)),
         promoted_count=promoted_count,
         action_brief_card_count=action_brief_card_count,
+        action_brief_relevance_recall=_action_brief_relevance_recall(
+            action_brief_recommended_actions,
+            expectations,
+        ),
+        action_brief_pollution_rate=_action_brief_pollution_rate(
+            action_brief_recommended_actions,
+            expectations,
+        ),
         stale_memory_suppression=_ratio(len(stale_suppressed), len(stale_atoms)),
         false_memory_resistance_by_risk=_false_memory_resistance_by_risk(cem, atoms, expectations),
         valid_memory_retention_by_risk=_valid_memory_retention_by_risk(cem, atoms, expectations),
@@ -894,6 +932,37 @@ def _expected_action_delta(
         len(unsafe_expected),
     )
     return valid_coverage - unsafe_pollution
+
+
+def _action_brief_relevance_recall(
+    recommended_actions: list[str],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> float:
+    action_set = set(recommended_actions)
+    relevant_expected = [
+        expectation.content
+        for expectation in expectations.values()
+        if expectation.expected_status == "promote" and expectation.applies_to_held_out
+    ]
+    return _ratio(
+        len([content for content in relevant_expected if content in action_set]),
+        len(relevant_expected),
+    )
+
+
+def _action_brief_pollution_rate(
+    recommended_actions: list[str],
+    expectations: dict[str, SyntheticMemoryExpectation],
+) -> float:
+    if not recommended_actions:
+        return 0.0
+    relevant_expected = {
+        expectation.content
+        for expectation in expectations.values()
+        if expectation.expected_status == "promote" and expectation.applies_to_held_out
+    }
+    polluted = [content for content in recommended_actions if content not in relevant_expected]
+    return len(polluted) / len(recommended_actions)
 
 
 def _content_is_unsafe(

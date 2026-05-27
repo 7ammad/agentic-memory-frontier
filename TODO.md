@@ -118,3 +118,17 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 
 - [x] Add report comparison against the new hardening cases.
   - Needed outcome: synthetic report distinguishes write-path integrity from action-brief utility.
+
+## Next Lane: Action-Brief Metrics V2
+
+- [x] Add action-brief relevance recall and pollution-rate metrics.
+  - Needed outcome: reports separate "retrieved the right operational experience" from "avoided wrong/out-of-scope experience".
+
+- [ ] Add scoped-memory suppression metric.
+  - Needed outcome: off-task true memories can be promoted while being excluded from unrelated held-out briefs.
+
+- [ ] Add evidence consolidation metric.
+  - Needed outcome: repeated evidence increases support without inflating action-brief card count.
+
+- [ ] Add markdown/report rows for the new action-brief utility metrics.
+  - Needed outcome: humans can read utility, integrity, and scope behavior without decoding raw JSON.

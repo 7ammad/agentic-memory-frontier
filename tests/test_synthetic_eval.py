@@ -39,18 +39,26 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert round(comparisons["summary_reflection"].expected_action_delta_delta, 3) == 1.033
     assert result.raw_trace_retrieval.trusted_false_memory_count == 7
     assert result.raw_trace_retrieval.metrics.action_brief_card_count == 17
+    assert result.raw_trace_retrieval.metrics.action_brief_relevance_recall == 1.0
+    assert round(result.raw_trace_retrieval.metrics.action_brief_pollution_rate, 3) == 0.588
     assert result.raw_trace_retrieval.expected_action_delta == 0.0
     assert result.summary_reflection.trusted_false_memory_count == 5
     assert result.summary_reflection.metrics.action_brief_card_count == 12
+    assert round(result.summary_reflection.metrics.action_brief_relevance_recall, 3) == 0.667
+    assert round(result.summary_reflection.metrics.action_brief_pollution_rate, 3) == 0.583
     assert round(result.summary_reflection.expected_action_delta, 3) == -0.033
     assert result.unvalidated_memory.proposed_count == 17
     assert result.unvalidated_memory.metrics.promoted_count == 17
     assert result.unvalidated_memory.metrics.action_brief_card_count == 14
+    assert result.unvalidated_memory.metrics.action_brief_relevance_recall == 1.0
+    assert result.unvalidated_memory.metrics.action_brief_pollution_rate == 0.5
     assert result.unvalidated_memory.metrics.false_memory_resistance == 0.0
     assert result.unvalidated_memory.trusted_false_memory_count == 7
     assert round(result.unvalidated_memory.expected_action_delta, 3) == 0.3
     assert result.cem0_validation.metrics.promoted_count == 10
     assert result.cem0_validation.metrics.action_brief_card_count == 6
+    assert result.cem0_validation.metrics.action_brief_relevance_recall == 1.0
+    assert result.cem0_validation.metrics.action_brief_pollution_rate == 0.0
     assert result.cem0_validation.trusted_false_memory_count == 0
     assert result.cem0_validation.expected_action_delta == 1.0
     assert result.cem0_validation.decision_reason_codes["database=mysql"] == ["contradiction"]

@@ -59,18 +59,28 @@ Current expected signal:
   },
   "raw_trace_retrieval": {
     "trusted_false_memory_count": 7,
-    "expected_action_delta": 0.0
+    "expected_action_delta": 0.0,
+    "metrics": {
+      "action_brief_relevance_recall": 1.0,
+      "action_brief_pollution_rate": 0.5882352941176471
+    }
   },
   "summary_reflection": {
     "trusted_false_memory_count": 5,
-    "expected_action_delta": -0.033333333333333326
+    "expected_action_delta": -0.033333333333333326,
+    "metrics": {
+      "action_brief_relevance_recall": 0.6666666666666666,
+      "action_brief_pollution_rate": 0.5833333333333334
+    }
   },
   "unvalidated_memory": {
     "trusted_false_memory_count": 7,
     "expected_action_delta": 0.30000000000000004,
     "metrics": {
       "promoted_count": 17,
-      "action_brief_card_count": 14
+      "action_brief_card_count": 14,
+      "action_brief_relevance_recall": 1.0,
+      "action_brief_pollution_rate": 0.5
     }
   },
   "cem0_validation": {
@@ -87,6 +97,8 @@ Current expected signal:
     "metrics": {
       "promoted_count": 10,
       "action_brief_card_count": 6,
+      "action_brief_relevance_recall": 1.0,
+      "action_brief_pollution_rate": 0.0,
       "stale_memory_suppression": 1.0,
       "false_memory_resistance_by_risk": {
         "assistant_hypothesis": 1.0,
