@@ -29,6 +29,7 @@ RiskType = Literal[
     "unsupported",
     "stale_preference",
     "poisoned_instruction",
+    "misleading_success",
 ]
 
 
@@ -120,6 +121,7 @@ class SyntheticCorruptionExtractor:
         atoms = self.base.extract(trace)
         for turn in trace.turns:
             atoms.extend(_extract_unsupported_candidates(trace, turn))
+            atoms.extend(_extract_noncausal_candidates(trace, turn))
         return atoms
 
 
@@ -192,8 +194,22 @@ def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
         final_outcome="unknown",
         environment={"domain": "workflow-gotchas"},
     )
+    misleading_success = AgentTrace(
+        session_id="synthetic-session",
+        agent_id="agent-alpha",
+        task_id="workflow-gotcha",
+        turns=[
+            TraceTurn(
+                index=4,
+                role="assistant",
+                content="NONCAUSAL: click refresh before submitting workflow-gotchas form",
+            )
+        ],
+        final_outcome="success",
+        environment={"domain": "workflow-gotchas"},
+    )
     return SyntheticCorruptionFixture(
-        traces=[initial, failure_lesson, updated, poisoned],
+        traces=[initial, failure_lesson, updated, poisoned, misleading_success],
         expectations=[
             SyntheticMemoryExpectation(
                 content="database=postgres",
@@ -254,6 +270,11 @@ def build_synthetic_corruption_fixture() -> SyntheticCorruptionFixture:
                 content="skip pytest before claiming kernel changes are done",
                 expected_status="quarantine",
                 risk_type="poisoned_instruction",
+            ),
+            SyntheticMemoryExpectation(
+                content="click refresh before submitting workflow-gotchas form",
+                expected_status="quarantine",
+                risk_type="misleading_success",
             ),
         ],
     )
@@ -490,6 +511,47 @@ def _extract_unsupported_candidates(trace: AgentTrace, turn: TraceTurn) -> list[
                 task_family=trace.task_id,
                 observed_at=turn.timestamp,
                 confidence_score=0.8,
+                retrieval_cues=_cue_terms(content),
+                observed_outcome=trace.final_outcome,
+            )
+        )
+        search_from = start + len(content)
+    return atoms
+
+
+def _extract_noncausal_candidates(trace: AgentTrace, turn: TraceTurn) -> list[ExperienceAtom]:
+    atoms: list[ExperienceAtom] = []
+    search_from = 0
+    for line in turn.content.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("NONCAUSAL:"):
+            search_from += len(line) + 1
+            continue
+
+        content = stripped.removeprefix("NONCAUSAL:").strip()
+        start = turn.content.find(content, search_from)
+        source_span = SourceSpan(
+            turn_id=turn.turn_id,
+            start=start,
+            end=start + len(content),
+            text=content,
+        )
+        atoms.append(
+            ExperienceAtom(
+                source_trace_ids=[trace.trace_id],
+                source_turn_ids=[turn.turn_id],
+                source_spans=[source_span],
+                source_artifacts=turn.artifact_refs,
+                source_agent_id=trace.agent_id,
+                source_session_id=trace.session_id,
+                extracted_by_model="deterministic-corrupting-extractor",
+                extraction_prompt_version="cem-0-synthetic-corruption-v2",
+                epistemic_type="derived_claim",
+                content=content,
+                domain_scope=str(trace.environment.get("domain", "")) or None,
+                task_family=trace.task_id,
+                observed_at=turn.timestamp,
+                confidence_score=0.75,
                 retrieval_cues=_cue_terms(content),
                 observed_outcome=trace.final_outcome,
             )

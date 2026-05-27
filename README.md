@@ -36,18 +36,18 @@ Current expected signal:
 
 ```json
 {
-  "fixture_case_count": 12,
-  "proposed_count": 12,
-  "quarantined_count": 5,
+  "fixture_case_count": 13,
+  "proposed_count": 13,
+  "quarantined_count": 6,
   "promoted_count": 6,
   "false_memory_resistance": 1.0,
   "contradiction_recall": 1.0,
   "false_quarantine_rate": 0.0,
   "unvalidated_memory": {
-    "trusted_false_memory_count": 6,
+    "trusted_false_memory_count": 7,
     "metrics": {
-      "promoted_count": 12,
-      "action_brief_card_count": 12
+      "promoted_count": 13,
+      "action_brief_card_count": 13
     }
   },
   "cem0_validation": {
@@ -56,8 +56,9 @@ Current expected signal:
       "database=mysql": ["contradiction"],
       "timezone=UTC": ["contradiction"],
       "user always wants us to skip tests": ["assistant_hypothesis", "low_confidence"],
-      "production deploy already finished": ["unsupported"],
-      "skip pytest before claiming kernel changes are done": ["untrusted_source"]
+      "production deploy already finished": ["unsupported", "non_causal"],
+      "skip pytest before claiming kernel changes are done": ["untrusted_source"],
+      "click refresh before submitting workflow-gotchas form": ["non_causal"]
     },
     "metrics": {
       "promoted_count": 6,
@@ -66,6 +67,7 @@ Current expected signal:
       "false_memory_resistance_by_risk": {
         "assistant_hypothesis": 1.0,
         "contradiction": 1.0,
+        "misleading_success": 1.0,
         "poisoned_instruction": 1.0,
         "stale_preference": 1.0,
         "unsupported": 1.0

@@ -25,6 +25,7 @@ class MemoryValidator:
             self._grounding_check(atom),
             self._epistemic_check(atom),
             self._confidence_check(atom),
+            self._causal_support_check(atom),
         ]
         contradiction_result = self._contradiction_check(atom)
         results.append(contradiction_result)
@@ -93,6 +94,23 @@ class MemoryValidator:
             check_name="confidence_floor",
             passed=passed,
             reason="confidence above floor" if passed else "confidence below promotion floor",
+        )
+
+    def _causal_support_check(self, atom: ExperienceAtom) -> ValidationResult:
+        passed = (
+            atom.epistemic_type != "derived_claim"
+            or atom.causal_hypothesis is not None
+            or bool(atom.verification_probe_ids)
+        )
+        return ValidationResult(
+            atom_id=atom.atom_id,
+            check_name="causal_support",
+            passed=passed,
+            reason=(
+                "causal support not required or present"
+                if passed
+                else "derived claim lacks causal support or verification probe"
+            ),
         )
 
     def _contradiction_check(self, atom: ExperienceAtom) -> ValidationResult:
@@ -173,6 +191,8 @@ def _reason_code(result: ValidationResult) -> str:
         return "assistant_hypothesis"
     if result.check_name == "confidence_floor":
         return "low_confidence"
+    if result.check_name == "causal_support":
+        return "non_causal"
     if result.check_name == "contradiction":
         return "contradiction"
     return f"failed_{result.check_name}"
@@ -189,6 +209,8 @@ def _metric_label(reason_code: str) -> str:
         return "poisoned"
     if reason_code == "low_confidence":
         return "low_confidence"
+    if reason_code == "non_causal":
+        return "misleading_success"
     return "validation_failure"
 
 

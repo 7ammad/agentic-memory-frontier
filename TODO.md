@@ -31,6 +31,8 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add validation decision aggregation, decision reason codes, and per-risk metric breakdown.
 - [x] Add stale-memory fixture cases with explicit update supersession.
 - [x] Add poisoned-memory fixture cases with untrusted-source quarantine.
+- [x] Add misleading-success fixture cases with non-causal derived-claim quarantine.
+- [x] Add failed-trace lesson fixture cases with valid failure-mode promotion.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -58,11 +60,11 @@ Do not stop at "task complete" when there is a clear next unchecked item.
   - Example: adversarial or unrelated trace tries to insert an operational instruction.
   - Needed outcome: quarantine or scope-block before it becomes trusted experience.
 
-- [ ] Add misleading-success fixture cases.
+- [x] Add misleading-success fixture cases.
   - Example: successful trace includes irrelevant action that should not become the recommended strategy.
   - Needed outcome: unsupported or non-causal action does not become a promoted card.
 
-- [ ] Add failed-trace lesson fixture cases.
+- [x] Add failed-trace lesson fixture cases.
   - Example: a failure trace contains the critical negative rule.
   - Needed outcome: valid failure mode can be promoted into an action brief warning.
 

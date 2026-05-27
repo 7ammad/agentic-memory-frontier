@@ -194,3 +194,23 @@ def test_untrusted_source_is_quarantined(tmp_path):
     assert stored.promotion_status == "quarantined"
     assert decision.reason_codes == ["untrusted_source"]
     assert decision.metric_labels == ["poisoned"]
+
+
+def test_derived_claim_without_causal_support_is_quarantined(tmp_path):
+    cem = CEM(tmp_path)
+    trace = AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        turns=[TraceTurn(index=0, role="assistant", content="NONCAUSAL: click refresh before submit")],
+    )
+    from cem_eval.synthetic_corruption import SyntheticCorruptionExtractor
+
+    cem.extractor = SyntheticCorruptionExtractor()
+    cem.ingest_trace(trace)
+    atom = cem.propose_memories(trace.trace_id)[0]
+    decision = cem.validate(atom.atom_id)
+
+    stored = cem.store.get_atom(atom.atom_id)
+    assert stored.promotion_status == "quarantined"
+    assert decision.reason_codes == ["non_causal"]
+    assert decision.metric_labels == ["misleading_success"]
