@@ -34,6 +34,11 @@ from .longmemeval_v2_adapter import (
     score_longmemeval_v2_retrieval,
     summarize_longmemeval_v2_dataset,
 )
+from .longmemeval_v2_runner import (
+    LongMemEvalV2CEM0EvalResult,
+    run_longmemeval_v2_cem0_eval,
+    run_longmemeval_v2_cem0_eval_from_dataset,
+)
 from .memoryarena_adapter import (
     MemoryArenaDataset,
     MemoryArenaDatasetSummary,
@@ -79,6 +84,7 @@ __all__ = [
     "HaluMemQuestion",
     "HaluMemSession",
     "LongMemEvalV2AnswerScore",
+    "LongMemEvalV2CEM0EvalResult",
     "LongMemEvalV2Dataset",
     "LongMemEvalV2DatasetSummary",
     "LongMemEvalV2Question",
@@ -109,6 +115,8 @@ __all__ = [
     "run_halumem_cem0_eval",
     "run_halumem_cem0_eval_from_dataset",
     "run_halumem_facsimile_eval",
+    "run_longmemeval_v2_cem0_eval",
+    "run_longmemeval_v2_cem0_eval_from_dataset",
     "run_memoryarena_cem0_eval",
     "run_memoryarena_cem0_eval_from_dataset",
     "run_synthetic_corruption_eval",

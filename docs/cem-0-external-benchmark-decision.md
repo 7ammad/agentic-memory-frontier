@@ -94,4 +94,12 @@ CEM-0 also has a local LongMemEval-V2 adapter that:
 python scripts/run_longmemeval_v2_adapter.py path\to\longmemeval-v2
 ```
 
-This is not a full LongMemEval-V2 benchmark result yet. It is the local adapter layer needed before CEM-0 can compare action briefs, raw trajectory retrieval, and unvalidated memory against the real web-environment tasks.
+The LongMemEval-V2 slice now also includes a CEM-backed runner:
+
+```powershell
+python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
+```
+
+That runner ingests LongMemEval-V2 trajectories as traces, runs CEM-0's current write path, retrieves Action Brief answers for each question, and scores both exact answers and retrieved trajectory IDs against the configured haystack.
+
+This is not a full LongMemEval-V2 benchmark result yet. It is the local adapter and runner layer needed before CEM-0 can compare action briefs, raw trajectory retrieval, and unvalidated memory against the real web-environment tasks.

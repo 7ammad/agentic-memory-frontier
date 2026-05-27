@@ -302,3 +302,11 @@ python scripts/run_longmemeval_v2_adapter.py path\to\longmemeval-v2
 ```
 
 The adapter expects `questions.jsonl`, `trajectories.jsonl`, and optional `haystacks/*.json`. It normalizes questions, browser/workflow trajectories, state screenshots, haystack maps, exact answer scoring, haystack-member retrieval scoring, and trajectory-to-`AgentTrace` conversion.
+
+Run CEM-0 Action Brief scoring against a local LongMemEval-V2 dataset root:
+
+```powershell
+python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
+```
+
+The CEM-backed runner ingests trajectories as traces, validates promoted experience, retrieves action briefs for each question, and scores both exact answer output and haystack-member trajectory retrieval.

@@ -325,8 +325,8 @@ def _state_action(state: LongMemEvalV2State) -> str:
     return "\n".join(
         item
         for item in (
-            f"THOUGHT: {state.thought}" if state.thought else "",
-            f"ACTION: {state.action}" if state.action else "",
+            state.thought or "",
+            state.action or "",
         )
         if item
     )

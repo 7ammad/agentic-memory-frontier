@@ -128,7 +128,7 @@ Backend adapters, MCP integration, and multi-agent protocol stay gated until the
 
 - [x] CEM-backed HaluMem write-path runner.
 - [x] CEM-backed MemoryArena action-coupling runner.
-- [ ] CEM-backed LongMemEval-V2 trajectory/retrieval runner.
+- [x] CEM-backed LongMemEval-V2 trajectory/retrieval runner.
 - [ ] Unified external benchmark report object.
 
 ### 8. Gated Later Work

@@ -251,6 +251,14 @@ Smoke command:
 python scripts/run_longmemeval_v2_adapter.py path\to\longmemeval-v2
 ```
 
+CEM-backed trajectory/retrieval command:
+
+```powershell
+python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
+```
+
+CEM-0's LongMemEval-V2 runner ingests trajectories as traces, runs the write path, retrieves Action Brief answers for questions, and scores both exact answer output and haystack-member trajectory retrieval.
+
 ## Not Proven Yet
 
 The current report does not prove:
@@ -268,5 +276,5 @@ Those remain unchecked in `TODO.md`.
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
 1. Run the CEM-backed HaluMem runner on the downloaded real dataset and compare proposed versus trusted memory scores.
-2. Add CEM-backed MemoryArena and LongMemEval-V2 runners for action-coupling and trajectory-retrieval ablations.
+2. Add a unified external benchmark report object that combines HaluMem, MemoryArena, and LongMemEval-V2 runner output.
 3. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
