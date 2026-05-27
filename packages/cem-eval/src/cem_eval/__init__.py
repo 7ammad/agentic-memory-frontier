@@ -12,6 +12,11 @@ from .synthetic_corruption import (
     WritePathMetrics,
     run_synthetic_corruption_eval,
 )
+from .workflow_gotchas import (
+    WorkflowGotchaAttempt,
+    WorkflowGotchaDemoResult,
+    run_workflow_gotcha_demo,
+)
 
 __all__ = [
     "EvalReportRow",
@@ -19,9 +24,12 @@ __all__ = [
     "MemoryRunResult",
     "SyntheticEvalReport",
     "SyntheticEvalResult",
+    "WorkflowGotchaAttempt",
+    "WorkflowGotchaDemoResult",
     "WritePathMetrics",
     "halumem_facsimile_from_synthetic",
     "render_synthetic_eval_markdown",
     "run_halumem_facsimile_eval",
     "run_synthetic_corruption_eval",
+    "run_workflow_gotcha_demo",
 ]

@@ -43,6 +43,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add raw trace retrieval baseline.
 - [x] Add summary/reflection baseline.
 - [x] Add HaluMem-style local facsimile runner.
+- [x] Add workflow gotchas environment.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -97,5 +98,5 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Add raw trace retrieval baseline.
 - [x] Add summary/reflection baseline.
 - [x] Add HaluMem-style adapter or local facsimile.
-- [ ] Add workflow gotchas environment.
+- [x] Add workflow gotchas environment.
 - [ ] Add storage adapters only after the write-path and action-brief evals are stronger.

@@ -2,6 +2,7 @@ from cem_eval import (
     render_synthetic_eval_markdown,
     run_halumem_facsimile_eval,
     run_synthetic_corruption_eval,
+    run_workflow_gotcha_demo,
 )
 
 
@@ -117,3 +118,14 @@ def test_halumem_facsimile_maps_operation_metrics(tmp_path):
     assert result.baseline_action_delta == 0.0
     assert result.cem0_quarantined_count == 6
     assert result.trusted_false_memory_count == 0
+
+
+def test_workflow_gotcha_demo_scores_action_briefs(tmp_path):
+    result = run_workflow_gotcha_demo(tmp_path)
+    attempts = {attempt.run_name: attempt for attempt in result.attempts}
+
+    assert attempts["no_memory"].success is False
+    assert attempts["raw_trace_retrieval"].success is False
+    assert attempts["summary_reflection"].success is False
+    assert attempts["unvalidated_memory"].success is False
+    assert attempts["cem0_validation"].success is True
