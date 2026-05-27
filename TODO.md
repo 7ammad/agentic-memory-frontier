@@ -30,6 +30,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
 - [x] Expand synthetic corruption eval to 9 labeled fixture cases.
 - [x] Add validation decision aggregation, decision reason codes, and per-risk metric breakdown.
 - [x] Add stale-memory fixture cases with explicit update supersession.
+- [x] Add poisoned-memory fixture cases with untrusted-source quarantine.
 
 ## Active Lane: Write-Path Decision Quality
 
@@ -53,7 +54,7 @@ Do not stop at "task complete" when there is a clear next unchecked item.
   - Example: later user preference supersedes old preference without treating historical truth as deleted.
   - Needed outcome: current memory is promoted or selected, stale memory is suppressed or marked contested.
 
-- [ ] Add poisoned-memory fixture cases.
+- [x] Add poisoned-memory fixture cases.
   - Example: adversarial or unrelated trace tries to insert an operational instruction.
   - Needed outcome: quarantine or scope-block before it becomes trusted experience.
 

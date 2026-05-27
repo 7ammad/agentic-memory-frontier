@@ -21,6 +21,7 @@ class MemoryValidator:
         atom = self.store.get_atom(atom_id)
         results = [
             self._source_span_check(atom),
+            self._source_agent_check(atom),
             self._grounding_check(atom),
             self._epistemic_check(atom),
             self._confidence_check(atom),
@@ -51,6 +52,15 @@ class MemoryValidator:
             check_name="source_span_presence",
             passed=passed,
             reason="source spans present" if passed else "candidate has no source span evidence",
+        )
+
+    def _source_agent_check(self, atom: ExperienceAtom) -> ValidationResult:
+        passed = not atom.source_agent_id.startswith("untrusted")
+        return ValidationResult(
+            atom_id=atom.atom_id,
+            check_name="source_agent_trust",
+            passed=passed,
+            reason="source agent trusted" if passed else "source agent is not trusted for memory promotion",
         )
 
     def _grounding_check(self, atom: ExperienceAtom) -> ValidationResult:
@@ -157,6 +167,8 @@ def _reason_code(result: ValidationResult) -> str:
         return "missing_source_span"
     if result.check_name == "source_grounding":
         return "unsupported"
+    if result.check_name == "source_agent_trust":
+        return "untrusted_source"
     if result.check_name == "epistemic_role":
         return "assistant_hypothesis"
     if result.check_name == "confidence_floor":
@@ -173,6 +185,8 @@ def _metric_label(reason_code: str) -> str:
         return "assistant_hypothesis"
     if reason_code == "contradiction":
         return "contradiction"
+    if reason_code == "untrusted_source":
+        return "poisoned"
     if reason_code == "low_confidence":
         return "low_confidence"
     return "validation_failure"
