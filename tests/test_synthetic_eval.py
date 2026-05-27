@@ -152,6 +152,8 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.unvalidated_memory.metrics.audit_completeness_rate == 0.0
     assert result.unvalidated_memory.metrics.p95_write_latency_ms >= 0.0
     assert result.unvalidated_memory.metrics.p95_retrieval_latency_ms >= 0.0
+    assert result.unvalidated_memory.metrics.tokens_per_write > 0.0
+    assert result.unvalidated_memory.metrics.tokens_per_retrieval > 0.0
     assert result.unvalidated_memory.metrics.extraction_precision == 1.0
     assert result.unvalidated_memory.metrics.extraction_recall == 1.0
     assert result.unvalidated_memory.metrics.extraction_f1 == 1.0
@@ -182,6 +184,8 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.cem0_validation.metrics.audit_completeness_rate == 1.0
     assert result.cem0_validation.metrics.p95_write_latency_ms >= 0.0
     assert result.cem0_validation.metrics.p95_retrieval_latency_ms >= 0.0
+    assert result.cem0_validation.metrics.tokens_per_write > 0.0
+    assert result.cem0_validation.metrics.tokens_per_retrieval > 0.0
     assert result.cem0_validation.metrics.extraction_precision == 1.0
     assert result.cem0_validation.metrics.extraction_recall == 1.0
     assert result.cem0_validation.metrics.extraction_f1 == 1.0
@@ -287,6 +291,8 @@ def test_synthetic_eval_markdown_report(tmp_path):
     assert "| cem0_validation | 1 |" in markdown
     assert "## Latency" in markdown
     assert "| Run | p95 write ms | p95 retrieval ms |" in markdown
+    assert "## Token Accounting" in markdown
+    assert "| Run | Tokens per write | Tokens per retrieval |" in markdown
     assert "## Audit Coverage" in markdown
     assert "| unvalidated_memory | 0 | 0 | 1 |" in markdown
     assert "| cem0_validation | 1 | 1 | 2 |" in markdown

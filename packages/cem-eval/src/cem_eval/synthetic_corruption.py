@@ -75,6 +75,8 @@ class WritePathMetrics(BaseModel):
     audit_completeness_rate: float = 0.0
     p95_write_latency_ms: float = 0.0
     p95_retrieval_latency_ms: float = 0.0
+    tokens_per_write: float = 0.0
+    tokens_per_retrieval: float = 0.0
     stale_memory_suppression: float = 0.0
     false_memory_resistance_by_risk: dict[str, float] = Field(default_factory=dict)
     valid_memory_retention_by_risk: dict[str, float] = Field(default_factory=dict)
@@ -115,6 +117,8 @@ class EvalReportRow(BaseModel):
     audit_completeness_rate: float
     p95_write_latency_ms: float
     p95_retrieval_latency_ms: float
+    tokens_per_write: float
+    tokens_per_retrieval: float
 
 
 class EvalReportComparisonRow(BaseModel):
@@ -565,6 +569,8 @@ def _run_unvalidated_memory(
             audit_completeness_rate=_audit_completeness_rate(cem),
             p95_write_latency_ms=_p95(write_latency_samples),
             p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+            tokens_per_write=_tokens_per_write(traces, len(atoms)),
+            tokens_per_retrieval=_tokens_per_retrieval(brief.recommended_next_actions),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -600,6 +606,8 @@ def _run_no_memory() -> MemoryRunResult:
             evidence_consolidation_count=0,
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
+            tokens_per_write=0.0,
+            tokens_per_retrieval=0.0,
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={},
             valid_memory_retention_by_risk={},
@@ -655,6 +663,8 @@ def _run_full_context(
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
             p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+            tokens_per_write=0.0,
+            tokens_per_retrieval=_tokens_per_retrieval(recommended_actions),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -714,6 +724,8 @@ def _run_raw_trace_retrieval(
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
             p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+            tokens_per_write=0.0,
+            tokens_per_retrieval=_tokens_per_retrieval(recommended_actions),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -776,6 +788,8 @@ def _run_vanilla_vector_memory(
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
             p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+            tokens_per_write=0.0,
+            tokens_per_retrieval=_tokens_per_retrieval(recommended_actions),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -838,6 +852,8 @@ def _run_time_aware_vector_memory(
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
             p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+            tokens_per_write=0.0,
+            tokens_per_retrieval=_tokens_per_retrieval(recommended_actions),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -896,6 +912,8 @@ def _run_summary_reflection(
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
             p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+            tokens_per_write=0.0,
+            tokens_per_retrieval=_tokens_per_retrieval(recommended_actions),
             stale_memory_suppression=0.0,
             false_memory_resistance_by_risk={
                 risk_type: 0.0 for risk_type in _unsafe_risk_types(expectations)
@@ -956,6 +974,8 @@ def _run_human_curated_runbook(
             max_evidence_support_count=0,
             audit_completeness_rate=0.0,
             p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+            tokens_per_write=0.0,
+            tokens_per_retrieval=_tokens_per_retrieval(recommended_actions),
             stale_memory_suppression=1.0,
             false_memory_resistance_by_risk={
                 risk_type: 1.0 for risk_type in _unsafe_risk_types(expectations)
@@ -1039,6 +1059,8 @@ def _report_row(run: MemoryRunResult) -> EvalReportRow:
         audit_completeness_rate=run.metrics.audit_completeness_rate,
         p95_write_latency_ms=run.metrics.p95_write_latency_ms,
         p95_retrieval_latency_ms=run.metrics.p95_retrieval_latency_ms,
+        tokens_per_write=run.metrics.tokens_per_write,
+        tokens_per_retrieval=run.metrics.tokens_per_retrieval,
     )
 
 
@@ -1186,6 +1208,8 @@ def _run_cem0_validation(
         action_brief_recommended_actions=brief.recommended_next_actions,
         p95_write_latency_ms=_p95(write_latency_samples),
         p95_retrieval_latency_ms=_p95([retrieval_latency_ms]),
+        tokens_per_write=_tokens_per_write(traces, len(atoms)),
+        tokens_per_retrieval=_tokens_per_retrieval(brief.recommended_next_actions),
     )
     trusted_false = [
         atom
@@ -1253,6 +1277,8 @@ def _cem0_metrics(
     action_brief_recommended_actions: list[str],
     p95_write_latency_ms: float,
     p95_retrieval_latency_ms: float,
+    tokens_per_write: float,
+    tokens_per_retrieval: float,
 ) -> WritePathMetrics:
     false_atoms = [atom for atom in atoms if _is_unsafe_expected(atom, expectations)]
     blocked_false_atoms = [atom for atom in false_atoms if _is_suppressed(cem, atom)]
@@ -1298,6 +1324,8 @@ def _cem0_metrics(
         audit_completeness_rate=_audit_completeness_rate(cem),
         p95_write_latency_ms=p95_write_latency_ms,
         p95_retrieval_latency_ms=p95_retrieval_latency_ms,
+        tokens_per_write=tokens_per_write,
+        tokens_per_retrieval=tokens_per_retrieval,
         stale_memory_suppression=_ratio(len(stale_suppressed), len(stale_atoms)),
         false_memory_resistance_by_risk=_false_memory_resistance_by_risk(cem, atoms, expectations),
         valid_memory_retention_by_risk=_valid_memory_retention_by_risk(cem, atoms, expectations),
@@ -1685,6 +1713,27 @@ def _memory_harm_rate(
         )
     ]
     return len(harmful_actions) / len(recommended_actions)
+
+
+def _tokens_per_write(traces: list[AgentTrace], proposed_count: int) -> float:
+    trace_tokens = sum(
+        _token_count(turn.content)
+        for trace in traces
+        for turn in trace.turns
+    )
+    return _ratio(trace_tokens, proposed_count)
+
+
+def _tokens_per_retrieval(recommended_actions: list[str]) -> float:
+    if not recommended_actions:
+        return 0.0
+    task = _held_out_task()
+    retrieval_text = " ".join([task.description, *recommended_actions])
+    return float(_token_count(retrieval_text))
+
+
+def _token_count(text: str) -> int:
+    return len(re.findall(r"[a-z0-9_]+", text.lower()))
 
 
 def _action_influence_rate(recommended_actions: list[str]) -> float:

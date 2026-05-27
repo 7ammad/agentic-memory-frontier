@@ -167,6 +167,10 @@ Action influence rate is the fraction of held-out decisive actions present in th
 
 The synthetic eval now emits `p95_write_latency_ms` and `p95_retrieval_latency_ms` for every run. Values are local-run dependent, so this static report does not pin exact milliseconds. The write-path samples cover CEM ingestion, proposal, validation, promotion, and unvalidated card writes. The retrieval samples cover action-selection or Action Brief generation.
 
+## Token Accounting
+
+The synthetic eval now emits `tokens_per_write` and `tokens_per_retrieval`. These are deterministic regex-token counts over the local fixture, not vendor billing tokens. They are useful for regression comparison while the extractor is marker-based.
+
 ## Audit Coverage
 
 Audit completeness is strict. A promoted card counts only when it has:
@@ -211,7 +215,7 @@ The current report does not prove:
 - MemoryArena performance;
 - LongMemEval-V2 performance;
 - action influence measurement from real agent traces;
-- token-cost claims.
+- vendor token-cost claims.
 
 Those remain unchecked in `TODO.md`.
 
@@ -219,6 +223,5 @@ Those remain unchecked in `TODO.md`.
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
-1. Add token/cost measurements.
-2. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
-3. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
+1. Decide whether to integrate real HaluMem first or keep expanding the local facsimile until the adapter is worth the dependency cost.
+2. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.

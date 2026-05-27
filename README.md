@@ -247,6 +247,8 @@ The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline delta
 
 Latency fields are emitted as `p95_write_latency_ms` and `p95_retrieval_latency_ms` under each run's metrics. Values are local-run dependent.
 
+Token accounting fields are emitted as `tokens_per_write` and `tokens_per_retrieval`. CEM-0 currently uses deterministic regex token accounting for the marker-based fixture, not vendor billing tokens.
+
 Run tests:
 
 ```powershell
