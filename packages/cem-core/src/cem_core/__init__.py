@@ -30,8 +30,6 @@ from .multi_agent import (
     SharedTraceImportReceipt,
     build_shared_trace_envelope,
     import_shared_trace,
-    trace_body_hash,
-    verify_shared_trace_envelope,
 )
 from .storage import CEMStore, InMemoryStore, SQLiteStore
 
@@ -68,6 +66,4 @@ __all__ = [
     "VerificationResult",
     "build_shared_trace_envelope",
     "import_shared_trace",
-    "trace_body_hash",
-    "verify_shared_trace_envelope",
 ]
