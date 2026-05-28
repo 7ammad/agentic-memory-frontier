@@ -262,12 +262,12 @@ Entry format:
 - Type: verification
 - Status: resolved
 - Source: First real code commit run through the new Greptile review-loop workflow. Closes the standing Open Follow-Up (MCP `current_time` offset-naive/offset-aware comparison), originally observed live in LEDGER-20260528-009.
-- Summary: A client (MCP/CLI) supplying `current_time` as a timezone-less ISO string had it parsed offset-naive by Pydantic, while card `valid_from`/`valid_until` are offset-aware (`utc_now`). `_card_in_scope` then raised `TypeError: can't compare offset-naive and offset-aware datetimes` inside `retrieve_action_brief`. Fix: a `TaskContext.current_time` field validator coerces naive input to UTC, centralising the UTC-aware invariant at the model boundary.
+- Summary: A client (MCP/CLI) supplying `current_time` as a timezone-less ISO string had it parsed offset-naive by Pydantic, while card `valid_from`/`valid_until` are offset-aware (`utc_now`). `_card_in_scope` then raised `TypeError: can't compare offset-naive and offset-aware datetimes` inside `retrieve_action_brief`. Fix: a `TaskContext.current_time` field validator coerces naive input to UTC. After Greptile's PR #2 review (4/5) flagged the symmetric gap, the same coercion was added to `ExperienceCard.valid_from`/`valid_until`, so naive card validity bounds (legacy storage / external writes) can't crash from the card side either. The UTC-aware invariant is now enforced at the model boundary on both sides.
 - Files:
   - `packages/cem-core/src/cem_core/models.py`
   - `tests/test_naive_current_time.py`
   - `CHANGELOG.md`
-- Verification: Added a regression test that first reproduced the exact `TypeError` at `kernel.py:202`, then passed after the fix; `python -m pytest` -> 92 passed (1 new), full suite green (EXIT 0).
+- Verification: Two regression tests first reproduced the exact `TypeError` at `kernel.py:202` (client `current_time` and naive card bounds), then passed after the fix; `python -m pytest` -> 93 passed (2 new), full suite green (EXIT 0).
 - Follow-up: None for this bug; resume CEM Phase 2.
 
 ## Open Follow-Ups

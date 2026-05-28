@@ -149,6 +149,15 @@ class ExperienceCard(StrictModel):
     deactivated_reason: str | None = None
     superseded_by_card_ids: list[str] = Field(default_factory=list)
 
+    @field_validator("valid_from", "valid_until")
+    @classmethod
+    def _ensure_utc_aware(cls, value: datetime | None) -> datetime | None:
+        # Coerce naive validity bounds (legacy storage / external writes) to UTC
+        # so _card_in_scope can compare them against an offset-aware current_time.
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
 
 class TaskContext(StrictModel):
     task_id: str | None = None

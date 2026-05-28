@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from cem_core import CEM, AgentTrace, TaskContext, TraceTurn
 from cem_core.models import utc_now
@@ -46,3 +46,22 @@ def test_retrieve_action_brief_tolerates_naive_current_time(tmp_path):
     brief = cem.retrieve_action_brief(task)
     assert brief.task_id == task.task_id
     assert task.current_time.tzinfo is not None  # normalized to offset-aware
+
+
+def test_retrieve_tolerates_naive_card_validity_bounds(tmp_path):
+    # Symmetric to current_time (Greptile review of PR #2): a card persisted with
+    # timezone-naive validity bounds (e.g. legacy storage or an external write)
+    # must not crash _card_in_scope when compared against an offset-aware
+    # current_time. ExperienceCard coerces naive bounds to UTC on (re)load.
+    cem = CEM(tmp_path)
+    card = _seed_card_with_validity(cem)
+    card.valid_from = datetime(2026, 1, 1, 0, 0, 0)  # naive
+    card.valid_until = datetime(2030, 1, 1, 0, 0, 0)  # naive
+    cem.store.save_card(card)
+    brief = cem.retrieve_action_brief(
+        TaskContext(description="set assignment_group before assignee")
+    )
+    assert brief is not None
+    reloaded = cem.store.get_card(card.card_id)
+    assert reloaded.valid_from.tzinfo is not None
+    assert reloaded.valid_until.tzinfo is not None

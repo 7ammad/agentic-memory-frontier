@@ -25,7 +25,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 ### Fixed
 
-- Fixed a `TypeError` in action-brief retrieval when a client (MCP/CLI) supplies a timezone-naive `current_time`: `TaskContext` now coerces naive `current_time` to UTC, so scope comparisons against offset-aware card validity bounds no longer crash. Closes the standing `current_time` offset-naive/offset-aware follow-up.
+- Fixed a `TypeError` in action-brief retrieval on timezone-naive datetimes: `TaskContext.current_time` and `ExperienceCard.valid_from`/`valid_until` now coerce naive values to UTC, so `_card_in_scope` comparisons no longer crash whether the naive value comes from a client-supplied `current_time` or naive card validity bounds (legacy storage / external writes). Closes the standing `current_time` offset-naive/offset-aware follow-up.
 
 ### Verification
 
