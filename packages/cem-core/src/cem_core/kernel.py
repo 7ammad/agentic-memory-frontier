@@ -6,6 +6,7 @@ from .contradiction import ContradictionDetector
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .models import (
     ActionBrief,
+    ActionBriefRecord,
     AgentTrace,
     ExperienceAtom,
     ExperienceCard,
@@ -140,7 +141,7 @@ class CEM:
             expected_delta = None
             delta_source = "none"
         influence_id = new_id("influence")
-        return ActionBrief(
+        brief = ActionBrief(
             task_id=task.task_id,
             applicable_card_ids=[card.card_id for card in selected_cards],
             why_applicable=[f"matched task terms with '{card.title}'" for card in selected_cards],
@@ -158,6 +159,19 @@ class CEM:
             expected_action_delta_source=delta_source,
             score_breakdown_by_card=score_breakdown,
         )
+        self.store.save_action_brief_record(
+            ActionBriefRecord(
+                brief_id=brief.brief_id,
+                task_id=task.task_id,
+                candidate_card_ids=[card.card_id for card in in_scope],
+                selected_card_ids=brief.applicable_card_ids,
+                score_breakdown_by_card=score_breakdown,
+                scorer_version=SCORER_VERSION,
+                expected_action_delta_source=delta_source,
+                influence_id=influence_id,
+            )
+        )
+        return brief
 
     def _card_in_scope(self, card: ExperienceCard, task: TaskContext) -> bool:
         if card.valid_from is not None and card.valid_from > task.current_time:

@@ -1,4 +1,5 @@
 from cem_core import AgentTrace, CEM, TaskContext, TraceTurn
+from cem_core.storage import SQLiteStore
 
 
 def _seed_card(cem):
@@ -58,3 +59,19 @@ def test_brief_never_presents_untagged_delta(tmp_path):
         assert brief.expected_action_delta_source != "none"
     # and Phase 1 never claims causal verification it does not have
     assert brief.expected_action_delta_source != "probe_verified"
+
+
+def test_retrieval_persists_action_brief_record(tmp_path):
+    cem = CEM(tmp_path)
+    _seed_card(cem)
+    brief = cem.retrieve_action_brief(
+        TaskContext(description="set assignment_group before assignee")
+    )
+    # a fresh kernel over the SAME root must find the persisted record
+    reopened = CEM(store=SQLiteStore(tmp_path))
+    record = reopened.store.get_action_brief_record(brief.brief_id)
+    assert record.influence_id == brief.influence_id
+    assert record.selected_card_ids == brief.applicable_card_ids
+    assert set(record.candidate_card_ids) >= set(record.selected_card_ids)
+    assert record.scorer_version == "lexical_overlap_v0"
+    assert record.expected_action_delta_source == brief.expected_action_delta_source
