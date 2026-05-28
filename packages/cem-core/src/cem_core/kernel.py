@@ -7,6 +7,7 @@ from .extractor import DeterministicExtractor, MemoryExtractor
 from .models import (
     ActionBrief,
     ActionBriefRecord,
+    ActionInfluenceEvent,
     AgentTrace,
     ExperienceAtom,
     ExperienceCard,
@@ -172,6 +173,30 @@ class CEM:
             )
         )
         return brief
+
+    def close_influence(
+        self,
+        brief_id: str,
+        *,
+        action_taken: str | None = None,
+        outcome: str = "unknown",
+        observed_post_brief_delta: float | None = None,
+        counterfactual_method: str | None = None,
+        baseline_comparison: str | None = None,
+    ) -> ActionInfluenceEvent:
+        record = self.store.get_action_brief_record(brief_id)
+        event = ActionInfluenceEvent(
+            influence_id=record.influence_id,
+            brief_id=brief_id,
+            task_id=record.task_id,
+            action_taken=action_taken,
+            outcome=outcome,
+            observed_post_brief_delta=observed_post_brief_delta,
+            counterfactual_method=counterfactual_method or "observational_no_counterfactual",
+            baseline_comparison=baseline_comparison,
+        )
+        self.store.save_action_influence_event(event)
+        return event
 
     def _card_in_scope(self, card: ExperienceCard, task: TaskContext) -> bool:
         if card.valid_from is not None and card.valid_from > task.current_time:
