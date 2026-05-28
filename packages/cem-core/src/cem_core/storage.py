@@ -4,7 +4,17 @@ import sqlite3
 from pathlib import Path
 from typing import Protocol
 
-from .models import AgentTrace, ExperienceAtom, ExperienceCard, ValidationDecision, ValidationResult
+from .models import (
+    ActionBriefRecord,
+    ActionInfluenceEvent,
+    AgentTrace,
+    ExperienceAtom,
+    ExperienceCard,
+    ValidationDecision,
+    ValidationResult,
+    VerificationProbe,
+    VerificationResult,
+)
 
 
 class CEMStore(Protocol):
@@ -21,6 +31,15 @@ class CEMStore(Protocol):
     def save_validation_decision(self, decision: ValidationDecision) -> None: ...
     def list_validation_decisions(self, atom_id: str) -> list[ValidationDecision]: ...
     def get_latest_validation_decision(self, atom_id: str) -> ValidationDecision | None: ...
+    def save_probe(self, probe: VerificationProbe) -> None: ...
+    def get_probe(self, probe_id: str) -> VerificationProbe: ...
+    def list_probes(self) -> list[VerificationProbe]: ...
+    def save_verification_result(self, result: VerificationResult) -> None: ...
+    def list_verification_results(self, card_id: str) -> list[VerificationResult]: ...
+    def save_action_brief_record(self, record: ActionBriefRecord) -> None: ...
+    def get_action_brief_record(self, brief_id: str) -> ActionBriefRecord: ...
+    def save_action_influence_event(self, event: ActionInfluenceEvent) -> None: ...
+    def list_action_influence_events(self, influence_id: str) -> list[ActionInfluenceEvent]: ...
 
 
 class SQLiteStore:
@@ -60,6 +79,26 @@ class SQLiteStore:
                 CREATE TABLE IF NOT EXISTS validation_decisions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     atom_id TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS verification_probes (
+                    probe_id TEXT PRIMARY KEY,
+                    target_card_id TEXT,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS verification_results (
+                    result_id TEXT PRIMARY KEY,
+                    card_id TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS action_brief_records (
+                    brief_id TEXT PRIMARY KEY,
+                    influence_id TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS action_influence_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    influence_id TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -169,6 +208,73 @@ class SQLiteStore:
             return None
         return ValidationDecision.model_validate_json(row[0])
 
+    def save_probe(self, probe: VerificationProbe) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO verification_probes(probe_id, target_card_id, payload) VALUES(?, ?, ?)",
+                (probe.probe_id, probe.target_card_id, probe.model_dump_json()),
+            )
+
+    def get_probe(self, probe_id: str) -> VerificationProbe:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM verification_probes WHERE probe_id = ?", (probe_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Probe not found: {probe_id}")
+        return VerificationProbe.model_validate_json(row[0])
+
+    def list_probes(self) -> list[VerificationProbe]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM verification_probes").fetchall()
+        return [VerificationProbe.model_validate_json(row[0]) for row in rows]
+
+    def save_verification_result(self, result: VerificationResult) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO verification_results(result_id, card_id, payload) VALUES(?, ?, ?)",
+                (result.result_id, result.card_id, result.model_dump_json()),
+            )
+
+    def list_verification_results(self, card_id: str) -> list[VerificationResult]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT payload FROM verification_results WHERE card_id = ? ORDER BY rowid",
+                (card_id,),
+            ).fetchall()
+        return [VerificationResult.model_validate_json(row[0]) for row in rows]
+
+    def save_action_brief_record(self, record: ActionBriefRecord) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO action_brief_records(brief_id, influence_id, payload) VALUES(?, ?, ?)",
+                (record.brief_id, record.influence_id, record.model_dump_json()),
+            )
+
+    def get_action_brief_record(self, brief_id: str) -> ActionBriefRecord:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM action_brief_records WHERE brief_id = ?", (brief_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Action brief record not found: {brief_id}")
+        return ActionBriefRecord.model_validate_json(row[0])
+
+    def save_action_influence_event(self, event: ActionInfluenceEvent) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO action_influence_events(influence_id, payload) VALUES(?, ?)",
+                (event.influence_id, event.model_dump_json()),
+            )
+
+    def list_action_influence_events(self, influence_id: str) -> list[ActionInfluenceEvent]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT payload FROM action_influence_events WHERE influence_id = ? ORDER BY id",
+                (influence_id,),
+            ).fetchall()
+        return [ActionInfluenceEvent.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -179,6 +285,10 @@ class InMemoryStore:
         self._cards: dict[str, str] = {}
         self._validations: list[tuple[str, str]] = []
         self._validation_decisions: list[tuple[str, str]] = []
+        self._probes: dict[str, str] = {}
+        self._verification_results: list[tuple[str, str]] = []
+        self._action_brief_records: dict[str, str] = {}
+        self._action_influence_events: list[tuple[str, str]] = []
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -238,3 +348,44 @@ class InMemoryStore:
             if stored_atom_id == atom_id:
                 return ValidationDecision.model_validate_json(payload)
         return None
+
+    def save_probe(self, probe: VerificationProbe) -> None:
+        self._probes[probe.probe_id] = probe.model_dump_json()
+
+    def get_probe(self, probe_id: str) -> VerificationProbe:
+        payload = self._probes.get(probe_id)
+        if payload is None:
+            raise KeyError(f"Probe not found: {probe_id}")
+        return VerificationProbe.model_validate_json(payload)
+
+    def list_probes(self) -> list[VerificationProbe]:
+        return [VerificationProbe.model_validate_json(payload) for payload in self._probes.values()]
+
+    def save_verification_result(self, result: VerificationResult) -> None:
+        self._verification_results.append((result.card_id, result.model_dump_json()))
+
+    def list_verification_results(self, card_id: str) -> list[VerificationResult]:
+        return [
+            VerificationResult.model_validate_json(payload)
+            for stored_card_id, payload in self._verification_results
+            if stored_card_id == card_id
+        ]
+
+    def save_action_brief_record(self, record: ActionBriefRecord) -> None:
+        self._action_brief_records[record.brief_id] = record.model_dump_json()
+
+    def get_action_brief_record(self, brief_id: str) -> ActionBriefRecord:
+        payload = self._action_brief_records.get(brief_id)
+        if payload is None:
+            raise KeyError(f"Action brief record not found: {brief_id}")
+        return ActionBriefRecord.model_validate_json(payload)
+
+    def save_action_influence_event(self, event: ActionInfluenceEvent) -> None:
+        self._action_influence_events.append((event.influence_id, event.model_dump_json()))
+
+    def list_action_influence_events(self, influence_id: str) -> list[ActionInfluenceEvent]:
+        return [
+            ActionInfluenceEvent.model_validate_json(payload)
+            for stored_influence_id, payload in self._action_influence_events
+            if stored_influence_id == influence_id
+        ]
