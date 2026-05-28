@@ -99,6 +99,40 @@ def test_ams_cli_pins_directives_without_creating_cards(tmp_path):
     assert audit["kind"] == "directive"
 
 
+def test_ams_cli_brief_matches_scoped_directive_by_content_tokens(tmp_path):
+    root = tmp_path / "ams"
+
+    directive = (
+        "When Hammad brings a high-conviction system build such as unified KB, "
+        "massive tool registry, Hermes/Kai agent infrastructure, source capture, "
+        "resolver, or organizational AI layer, do not trim it into a cautious "
+        "Markdown skeleton."
+    )
+    _ams(
+        root,
+        "--json",
+        "pin",
+        directive,
+        "--scope",
+        "global",
+        "--domain",
+        "codex-behavior",
+        "--task-family",
+        "bold-system-builds",
+    )
+
+    brief = _ams(
+        root,
+        "--json",
+        "brief",
+        "build a unified KB, massive tools registry, Hermes Kai agent infrastructure, source capture resolver, and organizational AI layer",
+    )
+    unrelated = _ams(root, "--json", "brief", "continue the small pytest verification task")
+
+    assert directive in brief["recommended_next_actions"]
+    assert directive not in unrelated["recommended_next_actions"]
+
+
 def test_ams_cli_bootstrap_codex_is_idempotent_and_briefable(tmp_path):
     root = tmp_path / "ams"
 
@@ -245,12 +279,160 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     dashboard = _ams(root, "--json", "dashboard")
 
     assert monitor["status"] == "pass"
+    assert monitor["scope"]["ams_directive_count"] == 6
+    assert monitor["phase"]["current_phase"] == "AMS v1.2 Memory Use Controller"
     assert (root / "monitor-runs.jsonl").exists()
     assert (root / "monitor-latest.json").exists()
     assert (root / "monitor-latest.md").exists()
     assert dashboard["latest_monitor"]["run_id"] == monitor["run_id"]
     assert dashboard["card_count"] == 1
+    assert dashboard["scope"]["ams_card_count"] == 1
     assert dashboard["directive_count"] == 6
+    assert dashboard["scope"]["global_behavior_directive_count"] == 0
+
+
+def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
+    root = tmp_path / "ams"
+
+    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
+    _ams(
+        root,
+        "--json",
+        "pin",
+        "Use the Hermes writing system before drafting long-form posts.",
+        "--scope",
+        "global",
+        "--domain",
+        "codex-behavior",
+        "--task-family",
+        "writing",
+    )
+    _ams(
+        root,
+        "--json",
+        "remember",
+        "run python scripts/ams.py brief before continuing Agentic Memory System work",
+        "--kind",
+        "skill",
+        "--outcome",
+        "success",
+        "--domain",
+        "agentic-memory-system",
+    )
+
+    monitor = _ams(root, "--json", "monitor")
+    dashboard = _ams(root, "--json", "dashboard")
+
+    assert monitor["status"] == "pass"
+    assert dashboard["directive_count"] == 7
+    assert dashboard["scope"]["ams_directive_count"] == 6
+    assert dashboard["scope"]["global_behavior_directive_count"] == 1
+    assert dashboard["scope"]["other_directive_count"] == 0
+    assert dashboard["phase"]["completed_through"].startswith("AMS v1.1 Monitor-0")
+
+
+def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
+    root = tmp_path / "ams"
+
+    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
+    _ams(
+        root,
+        "--json",
+        "remember",
+        "run python scripts/ams.py brief before continuing Agentic Memory System work",
+        "--kind",
+        "skill",
+        "--outcome",
+        "success",
+        "--domain",
+        "agentic-memory-system",
+        "--task-family",
+        "ams-usage",
+    )
+
+    result = _ams(
+        root,
+        "--json",
+        "startup-brief",
+        "continue building Agentic Memory System",
+        "--domain",
+        "agentic-memory-system",
+        "--max-directives",
+        "4",
+        "--max-tokens",
+        "120",
+    )
+    dashboard = _ams(root, "--json", "dashboard")
+
+    assert result["status"] == "allow"
+    assert result["monitor_id"].startswith("monitor_")
+    assert result["estimated_tokens"] <= result["limits"]["max_tokens"]
+    assert result["required_directives"] == {
+        "waki_boundary": True,
+        "verification_rule": True,
+        "todo_rule": True,
+    }
+    assert len(result["recommended_next_actions"]) <= 5
+    assert (root / "startup-brief-runs.jsonl").exists()
+    assert (root / "startup-brief-latest.json").exists()
+    assert (root / "startup-brief-latest.md").exists()
+    assert dashboard["latest_startup_brief"]["brief_id"] == result["brief_id"]
+
+
+def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
+    root = tmp_path / "ams"
+
+    result = _ams(
+        root,
+        "--json",
+        "startup-brief",
+        "continue building Agentic Memory System",
+        "--domain",
+        "agentic-memory-system",
+    )
+
+    assert result["status"] == "block"
+    assert any(reason.startswith("monitor_failed:") for reason in result["block_reasons"])
+    assert "missing_required_directive:waki_boundary" in result["block_reasons"]
+
+
+def test_ams_cli_startup_brief_human_output_uses_controller_printer(tmp_path):
+    root = tmp_path / "ams"
+    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
+    _ams(
+        root,
+        "--json",
+        "remember",
+        "run python scripts/ams.py brief before continuing Agentic Memory System work",
+        "--kind",
+        "skill",
+        "--outcome",
+        "success",
+        "--domain",
+        "agentic-memory-system",
+    )
+
+    process = subprocess.run(
+        [
+            sys.executable,
+            str(AMS),
+            "--root",
+            str(root),
+            "startup-brief",
+            "continue building Agentic Memory System",
+            "--domain",
+            "agentic-memory-system",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "startup_brief: allow brief_" in process.stdout
+    assert "confidence:" not in process.stdout
 
 
 def test_ams_cli_monitor_fails_visibly_when_memory_is_not_seeded(tmp_path):

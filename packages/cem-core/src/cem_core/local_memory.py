@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Literal
@@ -400,7 +401,81 @@ def _directive_matches(
     if directive.task_family is not None and directive.task_family == task_family:
         return True
     haystack = description.lower()
-    return bool(directive.domain_scope and directive.domain_scope.replace("-", " ") in haystack)
+    if directive.domain_scope and directive.domain_scope.replace("-", " ") in haystack:
+        return True
+    if directive.task_family and directive.task_family.replace("-", " ") in haystack:
+        return True
+    return _has_directive_token_overlap(directive, description)
+
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+_DIRECTIVE_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "but",
+    "by",
+    "do",
+    "for",
+    "from",
+    "if",
+    "in",
+    "into",
+    "is",
+    "it",
+    "not",
+    "of",
+    "on",
+    "or",
+    "the",
+    "this",
+    "to",
+    "use",
+    "when",
+    "with",
+}
+
+
+def _has_directive_token_overlap(directive: Directive, description: str) -> bool:
+    """Return True when a scoped directive is lexically relevant to a task.
+
+    Domain/task exact matches remain the primary route. This fallback catches
+    global behavior directives whose domain labels are not known to the caller
+    yet but whose content clearly names the task family, e.g. "unified KB",
+    "tool registry", "Hermes/Kai", or "organizational AI layer".
+    """
+    task_tokens = _meaningful_tokens(description)
+    if not task_tokens:
+        return False
+    directive_tokens = _meaningful_tokens(
+        " ".join(
+            part
+            for part in [
+                directive.content,
+                directive.source,
+                directive.domain_scope or "",
+                directive.task_family or "",
+            ]
+            if part
+        )
+    )
+    if not directive_tokens:
+        return False
+    return len(task_tokens & directive_tokens) >= 3
+
+
+def _meaningful_tokens(text: str) -> set[str]:
+    tokens: set[str] = set()
+    for raw in _TOKEN_RE.findall(text.lower()):
+        token = raw[:-1] if len(raw) > 4 and raw.endswith("s") else raw
+        if len(token) < 3 or token in _DIRECTIVE_STOPWORDS:
+            continue
+        tokens.add(token)
+    return tokens
 
 
 def _reject_waki(path: Path) -> None:

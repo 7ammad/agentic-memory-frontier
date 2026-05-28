@@ -66,6 +66,8 @@ Curate legacy Codex memory and run Monitor-0:
 python scripts/ams.py migrate dry-run
 python scripts/ams.py migrate apply
 python scripts/ams.py monitor
+python scripts/ams.py monitor --deep
+python scripts/ams.py startup-brief "continue building Agentic Memory System" --domain agentic-memory-system
 python scripts/ams.py dashboard
 ```
 
@@ -86,7 +88,20 @@ migration-latest.md
 monitor-runs.jsonl
 monitor-latest.json
 monitor-latest.md
+startup-brief-runs.jsonl
+startup-brief-latest.json
+startup-brief-latest.md
 ```
+
+The dashboard reports three layers:
+
+- total records;
+- AMS/CEM-scoped records;
+- global Codex behavior records.
+
+It also prints the current phase and next step so the overnight monitor runs show where the build stands, not only whether the store is alive.
+
+`startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, enforces required startup directives, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns `allow` or `block`.
 
 The current V0 benchmark report is in [docs/cem-0-benchmark-report.md](docs/cem-0-benchmark-report.md).
 

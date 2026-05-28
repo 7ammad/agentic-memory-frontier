@@ -22,6 +22,10 @@ from .models import StrictModel, new_id, utc_now
 
 MigrationAction = Literal["pin", "remember", "skip"]
 MonitorStatus = Literal["pass", "fail"]
+StartupStatus = Literal["allow", "block"]
+
+AMS_DOMAIN_SCOPE = "agentic-memory-system"
+GLOBAL_BEHAVIOR_SCOPE = "codex-behavior"
 
 
 class MigrationItem(StrictModel):
@@ -56,12 +60,60 @@ class MonitorCheck(StrictModel):
     detail: str
 
 
+class RecordScopeSummary(StrictModel):
+    total_card_count: int
+    total_atom_count: int
+    total_directive_count: int
+    ams_card_count: int
+    ams_atom_count: int
+    ams_directive_count: int
+    global_behavior_directive_count: int
+    other_directive_count: int
+
+
+class PhaseStatus(StrictModel):
+    completed_through: str
+    current_phase: str
+    status: str
+    next_step: str
+    ready_for_next_phase: bool
+    open_followups: list[str]
+
+
+class StartupLimits(StrictModel):
+    max_directives: int
+    max_cards: int
+    max_evidence: int
+    max_tokens: int
+
+
+class StartupBriefRun(StrictModel):
+    brief_id: str = Field(default_factory=lambda: new_id("brief"))
+    generated_at: datetime = Field(default_factory=utc_now)
+    root: str
+    status: StartupStatus
+    monitor_id: str
+    task_description: str
+    domain_scope: str | None
+    task_family: str | None
+    limits: StartupLimits
+    phase: PhaseStatus
+    scope: RecordScopeSummary
+    required_directives: dict[str, bool]
+    recommended_next_actions: list[str]
+    evidence_ids: list[str]
+    estimated_tokens: int
+    block_reasons: list[str]
+
+
 class MonitorRun(StrictModel):
     run_id: str = Field(default_factory=lambda: new_id("monitor"))
     generated_at: datetime = Field(default_factory=utc_now)
     root: str
     deep: bool
     status: MonitorStatus
+    scope: RecordScopeSummary
+    phase: PhaseStatus
     checks: list[MonitorCheck]
 
 
@@ -148,16 +200,28 @@ def run_monitor(
     root = _root(root)
     init_memory(root)
     checks: list[MonitorCheck] = []
+    scope = record_scope_summary(root)
+    phase = phase_status()
     checks.append(_check("root_exists", root.exists(), str(root)))
     checks.append(_check("sqlite_exists", (root / "cem.sqlite").exists(), str(root / "cem.sqlite")))
     checks.append(_check("directives_file_exists", (root / "directives.json").exists(), str(root / "directives.json")))
 
-    directives = list_memory(root, kind="directives")["directives"]
-    cards = list_memory(root, kind="cards")["cards"]
-    checks.append(_check("minimum_directives", len(directives) >= 6, f"{len(directives)} directives"))
-    checks.append(_check("learned_card_present", len(cards) >= 1, f"{len(cards)} cards"))
+    checks.append(_check("minimum_ams_directives", scope.ams_directive_count >= 6, f"{scope.ams_directive_count} AMS directives"))
+    checks.append(_check("learned_ams_card_present", scope.ams_card_count >= 1, f"{scope.ams_card_count} AMS cards"))
+    checks.append(
+        _check(
+            "global_behavior_separated",
+            scope.ams_directive_count + scope.global_behavior_directive_count + scope.other_directive_count
+            == scope.total_directive_count,
+            (
+                f"{scope.ams_directive_count} AMS directives, "
+                f"{scope.global_behavior_directive_count} global behavior directives, "
+                f"{scope.other_directive_count} other directives"
+            ),
+        )
+    )
 
-    brief = retrieve_brief(root, "continue building Agentic Memory System", domain_scope="agentic-memory-system")
+    brief = retrieve_brief(root, "continue building Agentic Memory System", domain_scope=AMS_DOMAIN_SCOPE)
     actions = "\n".join(brief["recommended_next_actions"]).lower()
     checks.append(_check("brief_has_waki_boundary", "waki" in actions, "Waki boundary present"))
     checks.append(_check("brief_has_verification_rule", "pytest" in actions and "synthetic" in actions, "verification rule present"))
@@ -173,7 +237,7 @@ def run_monitor(
         checks.append(_check("deep_synthetic_eval", metrics_ok, "synthetic corruption metrics checked"))
 
     status: MonitorStatus = "pass" if all(check.status == "pass" for check in checks) else "fail"
-    run = MonitorRun(root=str(root), deep=deep, status=status, checks=checks)
+    run = MonitorRun(root=str(root), deep=deep, status=status, scope=scope, phase=phase, checks=checks)
     _write_monitor_records(root, run)
     return run
 
@@ -181,17 +245,118 @@ def run_monitor(
 def dashboard_status(root: Path | None = None) -> dict[str, Any]:
     root = _root(root)
     init_memory(root)
+    scope = record_scope_summary(root)
+    return {
+        "root": str(root),
+        "card_count": scope.total_card_count,
+        "atom_count": scope.total_atom_count,
+        "directive_count": scope.total_directive_count,
+        "scope": scope.model_dump(mode="json"),
+        "phase": phase_status().model_dump(mode="json"),
+        "latest_migration": _load_json(root / "migration-latest.json"),
+        "latest_monitor": _load_json(root / "monitor-latest.json"),
+        "latest_startup_brief": _load_json(root / "startup-brief-latest.json"),
+    }
+
+
+def startup_brief(
+    root: Path | None = None,
+    *,
+    description: str,
+    domain_scope: str | None = AMS_DOMAIN_SCOPE,
+    task_family: str | None = None,
+    max_directives: int = 8,
+    max_cards: int = 5,
+    max_evidence: int = 20,
+    max_tokens: int = 900,
+) -> StartupBriefRun:
+    root = _root(root)
+    monitor = run_monitor(root, deep=False)
+    brief = retrieve_brief(
+        root,
+        description,
+        domain_scope=domain_scope,
+        task_family=task_family,
+        max_cards=max_cards,
+    )
+    directives = brief["directives"][:max_directives]
+    directive_actions = [directive["content"] for directive in directives]
+    experience_actions = brief["experience"]["recommended_next_actions"]
+    recommended_actions = _cap_items_by_token_budget(directive_actions + experience_actions, max_tokens)
+    evidence_ids = ([directive["directive_id"] for directive in directives] + brief["experience"]["evidence_links"])[:max_evidence]
+
+    action_text = "\n".join(recommended_actions).lower()
+    required_directives = {
+        "waki_boundary": "waki" in action_text,
+        "verification_rule": "pytest" in action_text and "synthetic" in action_text,
+        "todo_rule": "todo.md" in action_text,
+    }
+    block_reasons: list[str] = []
+    if monitor.status != "pass":
+        block_reasons.append(f"monitor_failed:{monitor.run_id}")
+    for name, present in required_directives.items():
+        if not present:
+            block_reasons.append(f"missing_required_directive:{name}")
+
+    run = StartupBriefRun(
+        root=str(root),
+        status="block" if block_reasons else "allow",
+        monitor_id=monitor.run_id,
+        task_description=description,
+        domain_scope=domain_scope,
+        task_family=task_family,
+        limits=StartupLimits(
+            max_directives=max_directives,
+            max_cards=max_cards,
+            max_evidence=max_evidence,
+            max_tokens=max_tokens,
+        ),
+        phase=phase_status(),
+        scope=record_scope_summary(root),
+        required_directives=required_directives,
+        recommended_next_actions=recommended_actions,
+        evidence_ids=evidence_ids,
+        estimated_tokens=_estimate_tokens("\n".join(recommended_actions)),
+        block_reasons=block_reasons,
+    )
+    _write_startup_brief_records(root, run)
+    return run
+
+
+def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
+    root = _root(root)
     cards = list_memory(root, kind="cards")["cards"]
     atoms = list_memory(root, kind="atoms")["atoms"]
     directives = list_memory(root, kind="directives")["directives"]
-    return {
-        "root": str(root),
-        "card_count": len(cards),
-        "atom_count": len(atoms),
-        "directive_count": len(directives),
-        "latest_migration": _load_json(root / "migration-latest.json"),
-        "latest_monitor": _load_json(root / "monitor-latest.json"),
-    }
+    return RecordScopeSummary(
+        total_card_count=len(cards),
+        total_atom_count=len(atoms),
+        total_directive_count=len(directives),
+        ams_card_count=sum(1 for card in cards if _card_is_ams_scoped(card)),
+        ams_atom_count=sum(1 for atom in atoms if _atom_is_ams_scoped(atom)),
+        ams_directive_count=sum(1 for directive in directives if _directive_is_ams_scoped(directive)),
+        global_behavior_directive_count=sum(1 for directive in directives if _directive_is_global_behavior(directive)),
+        other_directive_count=sum(
+            1
+            for directive in directives
+            if not _directive_is_ams_scoped(directive) and not _directive_is_global_behavior(directive)
+        ),
+    )
+
+
+def phase_status() -> PhaseStatus:
+    return PhaseStatus(
+        completed_through="AMS v1.1 Monitor-0: migration ledger, monitor ledger, and dashboard are live",
+        current_phase="AMS v1.2 Memory Use Controller",
+        status="active",
+        next_step="verify global ams-memory MCP availability after Codex runtime restart",
+        ready_for_next_phase=True,
+        open_followups=[
+            "verify global ams-memory MCP availability after Codex runtime restart",
+            "attach startup brief ids to agent work records",
+            "add latency budget enforcement to the startup controller",
+        ],
+    )
 
 
 def _migration_items_from_section(section: str, source_path: Path) -> list[MigrationItem]:
@@ -274,6 +439,13 @@ def _write_monitor_records(root: Path, run: MonitorRun) -> None:
     (root / "monitor-latest.md").write_text(_render_monitor_markdown(run), encoding="utf-8")
 
 
+def _write_startup_brief_records(root: Path, run: StartupBriefRun) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "startup-brief-runs.jsonl", run.model_dump(mode="json"))
+    _write_json(root / "startup-brief-latest.json", run.model_dump(mode="json"))
+    (root / "startup-brief-latest.md").write_text(_render_startup_brief_markdown(run), encoding="utf-8")
+
+
 def _render_migration_markdown(run: MigrationRun) -> str:
     lines = [
         "# AMS Migration Latest",
@@ -304,12 +476,45 @@ def _render_monitor_markdown(run: MonitorRun) -> str:
         f"- status: `{run.status}`",
         f"- deep: `{run.deep}`",
         f"- root: `{run.root}`",
+        f"- phase: `{run.phase.current_phase}`",
+        f"- ams_cards: `{run.scope.ams_card_count}`",
+        f"- ams_atoms: `{run.scope.ams_atom_count}`",
+        f"- ams_directives: `{run.scope.ams_directive_count}`",
+        f"- global_behavior_directives: `{run.scope.global_behavior_directive_count}`",
+        f"- other_directives: `{run.scope.other_directive_count}`",
         "",
         "## Checks",
         "",
     ]
     for check in run.checks:
         lines.append(f"- `{check.status}` `{check.name}`: {check.detail}")
+    return "\n".join(lines) + "\n"
+
+
+def _render_startup_brief_markdown(run: StartupBriefRun) -> str:
+    lines = [
+        "# AMS Startup Brief Latest",
+        "",
+        f"- brief_id: `{run.brief_id}`",
+        f"- status: `{run.status}`",
+        f"- monitor_id: `{run.monitor_id}`",
+        f"- phase: `{run.phase.current_phase}`",
+        f"- task: {run.task_description}",
+        f"- estimated_tokens: `{run.estimated_tokens}`",
+        f"- evidence_ids: `{len(run.evidence_ids)}`",
+        "",
+        "## Required Directives",
+        "",
+    ]
+    for name, present in run.required_directives.items():
+        lines.append(f"- `{name}`: `{present}`")
+    if run.block_reasons:
+        lines.extend(["", "## Block Reasons", ""])
+        for reason in run.block_reasons:
+            lines.append(f"- `{reason}`")
+    lines.extend(["", "## Recommended Actions", ""])
+    for action in run.recommended_next_actions:
+        lines.append(f"- {action}")
     return "\n".join(lines) + "\n"
 
 
@@ -345,6 +550,46 @@ def _card_exists(root: Path, content: str, domain_scope: str | None) -> bool:
     cem = CEM(root)
     use_when = domain_scope or "similar task context"
     return any(card.title == content[:80] and card.use_when == use_when for card in cem.store.list_cards())
+
+
+def _card_is_ams_scoped(card: dict[str, Any]) -> bool:
+    return card.get("use_when") == AMS_DOMAIN_SCOPE
+
+
+def _atom_is_ams_scoped(atom: dict[str, Any]) -> bool:
+    return atom.get("domain_scope") == AMS_DOMAIN_SCOPE
+
+
+def _directive_is_ams_scoped(directive: dict[str, Any]) -> bool:
+    if directive.get("domain_scope") == AMS_DOMAIN_SCOPE:
+        return True
+    source = str(directive.get("source") or "")
+    content = str(directive.get("content") or "")
+    return "Agentic Memory System" in source or "Causal Experience Memory" in content or "CEM-0" in content
+
+
+def _directive_is_global_behavior(directive: dict[str, Any]) -> bool:
+    return directive.get("domain_scope") == GLOBAL_BEHAVIOR_SCOPE or directive.get("scope") == "global"
+
+
+def _cap_items_by_token_budget(items: list[str], max_tokens: int) -> list[str]:
+    selected: list[str] = []
+    used = 0
+    for item in items:
+        cost = _estimate_tokens(item)
+        if selected and used + cost > max_tokens:
+            break
+        if cost > max_tokens:
+            words = item.split()
+            selected.append(" ".join(words[:max_tokens]))
+            break
+        selected.append(item)
+        used += cost
+    return selected
+
+
+def _estimate_tokens(text: str) -> int:
+    return len(text.split())
 
 
 def _stable_id(action: str, content: str) -> str:

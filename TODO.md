@@ -163,6 +163,17 @@ Do not start these until CEM-0 proof items above and the external benchmark runn
 - [x] Dashboard command summarizes counts and latest migration/monitor state.
 - [x] Subprocess tests cover migration, monitor, dashboard, and failure visibility.
 
+### 11. Memory Use Controller
+
+- [x] Dashboard and monitor separate AMS/CEM operational records from global Codex behavior records.
+- [x] Dashboard exposes completed-through, current phase, and next step.
+- [x] Add bounded `startup-brief` / controller command.
+- [x] Enforce directive cap, card cap, evidence cap, and approximate token budget.
+- [x] Attach monitor id, brief id, and evidence ids to startup gate output.
+- [x] Block session-start execution when required startup directives are missing.
+- [x] Wire `startup-brief` into `scripts/session-start-gate.ps1`.
+- [ ] Verify global `ams-memory` MCP availability after Codex runtime restart.
+
 ## Historical Schedule Note
 
 The original spec used Week 1 through Week 4 as a human-readable grouping of work. That is not the active schedule. For this AI build, the active schedule is the ordered queue above: take the next unchecked item, implement it, verify it, commit it, push it, and continue.

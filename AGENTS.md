@@ -14,12 +14,13 @@ This is the project root. **Never write or read files under `C:\Dev\Builds\Waki`
 
 ## To continue right now
 
-1. Load project memories: `memory_search({query: "agentic memory system state", scope: "project:agentic-memory-system", limit: 10, mode: "hybrid"})` — returns the canonical state entry [mem_343df0ac, updated to reflect all 4 done] plus the rest. Don't rely on `memory_load_session` alone — verified in cold-start that it can return cross-scope results.
-2. Decide next phase. Options:
+1. Run session-start hard gate before any implementation command: `powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1`. If it fails, stop and fix memory wiring first.
+2. Load project memories: `memory_search({query: "agentic memory system state", scope: "project:agentic-memory-system", limit: 10, mode: "hybrid"})` — returns the canonical state entry [mem_343df0ac, updated to reflect all 4 done] plus the rest. Don't rely on `memory_load_session` alone — verified in cold-start that it can return cross-scope results.
+3. Decide next phase. Options:
    - **Implement** in dependency order: SC v0.3 Phase 1 → Codex memory C Phase 0+1 → ACS D Phase 1. Each phase has its own acceptance battery in the spec.
    - **Iterate on design** — if anything in A/B/C/D needs revision before code is written, do it now while the dual-counsel context is fresh.
    - **Open a new sub-project E** — e.g., spec for the Phase 2 calibration experiments (cross-store cosine + BF construct validity).
-3. If invoking `/dual-counsel` for a new sub-project: the skill file is at `C:\Users\7amma\.claude\skills\dual-counsel\SKILL.md`. Pattern verified 4 times in session 2 (B → C → D each via dual-counsel + verification gate).
+4. If invoking `/dual-counsel` for a new sub-project: the skill file is at `C:\Users\7amma\.claude\skills\dual-counsel\SKILL.md`. Pattern verified 4 times in session 2 (B → C → D each via dual-counsel + verification gate).
 
 ## Critical rules (locked from prior session)
 
@@ -28,12 +29,17 @@ This is the project root. **Never write or read files under `C:\Dev\Builds\Waki`
 3. **Working directory rule**: research → `research/`, specs → `specs/`, session handoffs → `sessions/`, codex counsels → `research/codex-counsel-*.md`. NEVER touch Waki.
 4. **High-stakes review = `dual-counsel` skill**. The skill is at `C:\Users\7amma\.claude\skills\dual-counsel\SKILL.md` and includes the verification gate.
 5. **Don't re-litigate decisions in the session-handoff §"What was decided"**. They were validated by 3 codex passes.
+6. **Operational memory gate is mandatory**: no implementation, no patches, and no status claims before `scripts/session-start-gate.ps1` passes in the active session.
+7. **Record plan changes, gaps, and mistakes**: update `CHANGELOG.md` for timeline-level changes and `docs/PROJECT-LEDGER.md` for decisions, gaps, mistakes, verification state, and follow-ups.
 
 ## File map
 
 ```
 .\
 ├── AGENTS.md                                                       (this file — auto-loaded by Codex)
+├── CHANGELOG.md                                                    (canonical repo timeline)
+├── docs/
+│   └── PROJECT-LEDGER.md                                           (decisions, gaps, mistakes, verification state)
 ├── research/                                                       (review docs + codex counsels + verification verdicts)
 │   ├── 2026-05-26-superclaude-memory-deep-review.md                (v1)
 │   ├── 2026-05-26-superclaude-memory-deep-review-v2-mit12.md       (v2)

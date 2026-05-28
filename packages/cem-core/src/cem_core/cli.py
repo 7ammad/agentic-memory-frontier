@@ -23,6 +23,7 @@ from .operations import (
     build_codex_memory_migration_run,
     dashboard_status,
     run_monitor,
+    startup_brief,
 )
 
 
@@ -144,6 +145,20 @@ def build_parser() -> argparse.ArgumentParser:
     monitor_parser.add_argument("--deep", action="store_true", help="Also run the synthetic corruption eval.")
     monitor_parser.set_defaults(handler=_cmd_monitor)
 
+    startup_parser = subparsers.add_parser(
+        "startup-brief",
+        parents=[json_parent],
+        help="Build a bounded startup brief and allow/block decision before agent work.",
+    )
+    startup_parser.add_argument("description", help="Task description.")
+    startup_parser.add_argument("--domain", default="agentic-memory-system", help="Domain scope.")
+    startup_parser.add_argument("--task-family", help="Task family.")
+    startup_parser.add_argument("--max-directives", type=int, default=8, help="Maximum directives in startup context.")
+    startup_parser.add_argument("--max-cards", type=int, default=5, help="Maximum CEM cards in startup context.")
+    startup_parser.add_argument("--max-evidence", type=int, default=20, help="Maximum evidence ids in startup context.")
+    startup_parser.add_argument("--max-tokens", type=int, default=900, help="Approximate token budget for actions.")
+    startup_parser.set_defaults(handler=_cmd_startup_brief)
+
     dashboard_parser = subparsers.add_parser("dashboard", parents=[json_parent], help="Show latest AMS operator status.")
     dashboard_parser.set_defaults(handler=_cmd_dashboard)
 
@@ -226,6 +241,19 @@ def _cmd_monitor(args: argparse.Namespace) -> dict[str, Any]:
     return run_monitor(args.root, deep=args.deep).model_dump(mode="json")
 
 
+def _cmd_startup_brief(args: argparse.Namespace) -> dict[str, Any]:
+    return startup_brief(
+        args.root,
+        description=args.description,
+        domain_scope=args.domain,
+        task_family=args.task_family,
+        max_directives=args.max_directives,
+        max_cards=args.max_cards,
+        max_evidence=args.max_evidence,
+        max_tokens=args.max_tokens,
+    ).model_dump(mode="json")
+
+
 def _cmd_dashboard(args: argparse.Namespace) -> dict[str, Any]:
     return dashboard_status(args.root)
 
@@ -234,7 +262,9 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
     if as_json:
         print(json.dumps(payload, indent=2))
         return
-    if "recommended_next_actions" in payload:
+    if "brief_id" in payload and "monitor_id" in payload:
+        _emit_startup_brief(payload)
+    elif "recommended_next_actions" in payload:
         _emit_brief(payload)
     elif "promoted_cards" in payload:
         _emit_remember(payload)
@@ -336,18 +366,65 @@ def _emit_migration(payload: dict[str, Any]) -> None:
 
 def _emit_monitor(payload: dict[str, Any]) -> None:
     print(f"monitor: {payload['status']} {payload['run_id']}")
+    scope = payload.get("scope")
+    phase = payload.get("phase")
+    if phase:
+        print(f"phase: {phase['current_phase']} ({phase['status']})")
+        print(f"next: {phase['next_step']}")
+    if scope:
+        print(
+            "scope: "
+            f"{scope['ams_card_count']} AMS cards, "
+            f"{scope['ams_atom_count']} AMS atoms, "
+            f"{scope['ams_directive_count']} AMS directives, "
+            f"{scope['global_behavior_directive_count']} global behavior directives, "
+            f"{scope['other_directive_count']} other directives"
+        )
     for check in payload["checks"]:
         print(f"- {check['status']}: {check['name']} :: {check['detail']}")
 
 
+def _emit_startup_brief(payload: dict[str, Any]) -> None:
+    print(f"startup_brief: {payload['status']} {payload['brief_id']}")
+    print(f"monitor: {payload['monitor_id']}")
+    print(f"phase: {payload['phase']['current_phase']} ({payload['phase']['status']})")
+    print(f"tokens: {payload['estimated_tokens']} / {payload['limits']['max_tokens']}")
+    if payload["block_reasons"]:
+        print("block_reasons:")
+        for reason in payload["block_reasons"]:
+            print(f"- {reason}")
+    print("required:")
+    for name, present in payload["required_directives"].items():
+        print(f"- {name}: {present}")
+    if payload["recommended_next_actions"]:
+        print("actions:")
+        for action in payload["recommended_next_actions"]:
+            print(f"- {action}")
+
+
 def _emit_dashboard(payload: dict[str, Any]) -> None:
     print(f"root: {payload['root']}")
+    phase = payload.get("phase")
+    if phase:
+        print(f"completed: {phase['completed_through']}")
+        print(f"phase: {phase['current_phase']} ({phase['status']})")
+        print(f"next: {phase['next_step']}")
     print(
         "counts: "
         f"{payload['card_count']} cards, "
         f"{payload['atom_count']} atoms, "
         f"{payload['directive_count']} directives"
     )
+    scope = payload.get("scope")
+    if scope:
+        print(
+            "ams_scope: "
+            f"{scope['ams_card_count']} cards, "
+            f"{scope['ams_atom_count']} atoms, "
+            f"{scope['ams_directive_count']} directives"
+        )
+        print(f"global_behavior: {scope['global_behavior_directive_count']} directives")
+        print(f"other_scope: {scope['other_directive_count']} directives")
     latest_monitor = payload.get("latest_monitor")
     latest_migration = payload.get("latest_migration")
     if latest_monitor:
@@ -359,3 +436,8 @@ def _emit_dashboard(payload: dict[str, Any]) -> None:
         print(f"latest_migration: {mode} {latest_migration['run_id']}")
     else:
         print("latest_migration: none")
+    latest_startup_brief = payload.get("latest_startup_brief")
+    if latest_startup_brief:
+        print(f"latest_startup_brief: {latest_startup_brief['status']} {latest_startup_brief['brief_id']}")
+    else:
+        print("latest_startup_brief: none")
