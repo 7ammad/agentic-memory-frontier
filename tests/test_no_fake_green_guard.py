@@ -3,10 +3,10 @@ from pathlib import Path
 
 OPERATIONS = Path("packages/cem-core/src/cem_core/operations.py")
 
-# Frozen tracked-debt allowlist: the known fake-green checks on the Correction
-# Capture track (spec section 12). Removing these from operations.py should also
-# shrink this set. Any NEW literal-bool _check outside this set fails the test.
-ALLOWLISTED_FAKE_GREEN = {"correction_controller_wired", "recent_corrections_recorded"}
+# Allowlist of known fake-green checks. The Correction Capture track's two
+# entries (correction_controller_wired, recent_corrections_recorded) were made
+# honest, so the set is now empty. Any literal-bool _check fails the test.
+ALLOWLISTED_FAKE_GREEN: set[str] = set()
 
 
 def _literal_bool_check_names(source: str) -> set[str]:
