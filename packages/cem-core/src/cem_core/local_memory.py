@@ -228,6 +228,10 @@ def bootstrap_codex(root: Path | None, *, workspace: Path) -> dict[str, Any]:
             "Treat the deterministic extractor and contradiction detector as V0 fixtures, not the final reasoning layer.",
             workspace / "README.md",
         ),
+        (
+            "Capture live user corrections immediately: stop the active lane, name the mistake, record affected files/actions, route the event to AMS/CEM/project ledger as appropriate, and require explicit resume before continuing.",
+            workspace / "README.md",
+        ),
     ]
     results = [
         pin_directive(

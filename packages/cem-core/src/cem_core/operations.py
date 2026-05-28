@@ -8,6 +8,10 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from .correction_capture import (
+    correction_controller_summary,
+    correction_rule_surfaces_in_brief,
+)
 from .kernel import CEM
 from .local_memory import (
     default_root,
@@ -226,6 +230,37 @@ def run_monitor(
     checks.append(_check("brief_has_waki_boundary", "waki" in actions, "Waki boundary present"))
     checks.append(_check("brief_has_verification_rule", "pytest" in actions and "synthetic" in actions, "verification rule present"))
     checks.append(_check("brief_has_todo_rule", "todo.md" in actions, "TODO continuation rule present"))
+    correction_summary = correction_controller_summary(root)
+    checks.append(_check("correction_controller_wired", True, correction_summary.event_log_path))
+    checks.append(
+        _check(
+            "correction_resume_gate_clear",
+            not correction_summary.active_gate,
+            (
+                "no active correction resume gate"
+                if not correction_summary.active_gate
+                else f"blocked by {correction_summary.active_event_id}"
+            ),
+        )
+    )
+    checks.append(
+        _check(
+            "recent_corrections_recorded",
+            True,
+            (
+                f"{correction_summary.event_count} correction events; latest={correction_summary.latest_event_id}"
+                if correction_summary.event_count
+                else "0 correction events recorded yet"
+            ),
+        )
+    )
+    checks.append(
+        _check(
+            "brief_has_correction_capture_rule",
+            correction_rule_surfaces_in_brief(root),
+            "correction capture directive surfaces in action brief",
+        )
+    )
 
     if deep:
         eval_result = run_eval(root)["result"]
@@ -346,13 +381,13 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
-        completed_through="AMS v1.1 Monitor-0: migration ledger, monitor ledger, and dashboard are live",
-        current_phase="AMS v1.2 Memory Use Controller",
+        completed_through="AMS v1.2 Memory Use Controller: startup brief and session-start gate are live",
+        current_phase="AMS v1.3 Correction Capture Controller",
         status="active",
-        next_step="verify global ams-memory MCP availability after Codex runtime restart",
+        next_step="wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface",
         ready_for_next_phase=True,
         open_followups=[
-            "verify global ams-memory MCP availability after Codex runtime restart",
+            "wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface",
             "attach startup brief ids to agent work records",
             "add latency budget enforcement to the startup controller",
         ],
