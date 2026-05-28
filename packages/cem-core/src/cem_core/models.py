@@ -135,6 +135,19 @@ class ExperienceCard(StrictModel):
     tested_by_probe_ids: list[str] = Field(default_factory=list)
     last_validated_at: datetime | None = None
     action_brief_template: str
+    promotion_status: Literal[
+        "candidate",
+        "verified",
+        "deprecated",
+        "superseded",
+        "quarantined",
+    ] = "candidate"
+    measured_lift: float | None = None
+    measured_lift_ci: ConfidenceInterval | None = None
+    verification_result_ids: list[str] = Field(default_factory=list)
+    deactivated_at: datetime | None = None
+    deactivated_reason: str | None = None
+    superseded_by_card_ids: list[str] = Field(default_factory=list)
 
 
 class TaskContext(StrictModel):
@@ -157,6 +170,11 @@ class ActionBrief(StrictModel):
     evidence_links: list[str]
     confidence_score: float
     expected_action_delta: float | None = None
+    brief_id: str = Field(default_factory=lambda: new_id("brief"))
+    influence_id: str | None = None
+    scorer_version: str | None = None
+    expected_action_delta_source: ExpectedActionDeltaSource = "none"
+    score_breakdown_by_card: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
 class TraceReceipt(StrictModel):

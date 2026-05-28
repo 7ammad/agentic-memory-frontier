@@ -63,3 +63,58 @@ def test_confidence_interval_rejects_extra_fields():
 
     with pytest.raises(ValidationError):
         ConfidenceInterval(low=0.0, high=1.0, mean=0.5)
+
+
+def test_action_brief_new_fields_default_safely():
+    from cem_core.models import ActionBrief
+
+    brief = ActionBrief(
+        applicable_card_ids=[],
+        why_applicable=[],
+        preconditions_to_check=[],
+        recommended_next_actions=[],
+        risks_and_failure_modes=[],
+        stale_or_contested_memory_ids_to_ignore=[],
+        evidence_links=[],
+        confidence_score=0.0,
+    )
+    assert brief.brief_id.startswith("brief_")
+    assert brief.influence_id is None
+    assert brief.scorer_version is None
+    assert brief.expected_action_delta_source == "none"
+    assert brief.score_breakdown_by_card == {}
+
+
+def test_experience_card_lifecycle_fields_default_to_candidate():
+    from cem_core.models import ExperienceCard
+
+    card = ExperienceCard(
+        title="t",
+        use_when="w",
+        evidence_atom_ids=["atom_1"],
+        confidence_score=0.5,
+        action_brief_template="do x",
+    )
+    assert card.promotion_status == "candidate"
+    assert card.measured_lift is None
+    assert card.measured_lift_ci is None
+    assert card.verification_result_ids == []
+    assert card.deactivated_at is None
+    assert card.deactivated_reason is None
+    assert card.superseded_by_card_ids == []
+
+
+def test_old_shape_card_json_loads_with_defaults():
+    # Backward-compat canary: a card persisted before Phase 0 (no new fields)
+    # must still load, defaulting to candidate.
+    from cem_core.models import ExperienceCard
+
+    legacy = (
+        '{"card_id":"card_legacy","title":"t","use_when":"w","do":[],"do_not":[],'
+        '"check_first":[],"evidence_atom_ids":["atom_1"],"confidence_score":0.5,'
+        '"known_exceptions":[],"valid_from":null,"valid_until":null,'
+        '"tested_by_probe_ids":[],"last_validated_at":null,"action_brief_template":"do x"}'
+    )
+    card = ExperienceCard.model_validate_json(legacy)
+    assert card.promotion_status == "candidate"
+    assert card.measured_lift is None
