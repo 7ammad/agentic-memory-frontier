@@ -18,6 +18,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Completed **Phase 1 (full vertical skeleton)**: a real end-to-end `trace -> atom -> validate -> candidate card -> action brief -> influence event` loop on persisted SQLite objects, no stubs. `retrieve_action_brief` now persists an `ActionBriefRecord` and emits a sourced `expected_action_delta` (`observational_unverified` when cards are selected, otherwise `none`); `close_influence` writes an observational `ActionInfluenceEvent` that never promotes a card or sets `measured_lift`.
 - Added `packages/cem-eval/src/cem_eval/vertical_loop.py` (`run_vertical_loop` + `VerticalLoopReport`) and `scripts/run_cem_vertical_loop.py` as a real CLI consumer. Report counts come from real store queries; the runner enforces the leakage guard. First loop: MMA 1.0, n=2, CI [1.0, 1.0] (toy skeleton smoke, not the Phase 4 exam). Scorer stays `lexical_overlap_v0` (the action-value scorer is Phase 3).
 - Added `docs/2026-05-29-cem-1-phase-1-vertical-skeleton-plan.md` (Phase 1 implementation plan).
+- Adopted the **minimal-PR + AI-review-loop workflow** (feature branch → PR → Greptile review-loop to 5/5 → `staging` → `main`). Added `docs/WORKFLOW.md` (the repo's contributor contract), created the `staging` branch, and confirmed Greptile as the live PR reviewer on PR #1. Global `/start-feature` and `/review-loop` commands plus a CLAUDE.md pointer make it the default for everyday feature work.
 
 ### Changed
 

@@ -256,6 +256,22 @@ Entry format:
 - Verification: `python -m pytest` -> 91 passed (9 new Phase 1 tests). Three failure canaries hand-verified break -> fail -> revert -> pass: untagged action-delta (`test_brief_never_presents_untagged_delta`), `close_influence` never verifies a card (`test_close_influence_never_verifies_a_card`), and vertical-loop leakage-bites (`test_vertical_loop_leakage_guard_bites`, self-proving via `pytest.raises`). Independent verifier subagent returned PHASE 1 VERIFIED across 6 checks: real-green (91/91, exit 0), script runs end-to-end (`brief_record_count=2`, `influence_event_count=2`, `card_count=2`), MMA computed not hardcoded (sensitivity check `[0.5,1.0]` vs `[0.0,0.0]` -> 0.75), canaries substantive, every new symbol has a real caller (no ghost code), and no Phase 2/3 scope leak (`scorer_version` uniformly `lexical_overlap_v0`; `probe_verified`/`heldout_eval` appear only as enum literals and a canary assertion). `python -m compileall`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1`, and `git diff --check` all clean.
 - Follow-up: Execute Phase 2 (grounded consolidation + the evidence-gated verification loop: probes -> results -> verified promotion), then Phases 3-5.
 
+## LEDGER-20260529-013 - Adopted minimal-PR + Greptile review-loop workflow
+
+- Date: 2026-05-29
+- Type: decision
+- Status: active
+- Source: User adopted Ras Mic's "agentic engineering workflow" (minimal PRs + AI-review-loop to 5/5 + staging discipline) after reviewing the source in the Vibing KB, and chose to adopt it globally — specifically the review loop. Reviewer is Greptile (GitHub App), confirmed live on PR #1.
+- Summary: Feature work now flows feature-branch -> PR -> Greptile review-loop to 5/5 (stop rule: ~5 turns or stalled at 4/5 -> human takeover) -> merge to `staging` -> periodic `staging -> main` PR. PRs kept minimal (<~800 lines); human verification (`python -m pytest` + the relevant smoke command) is required even at 5/5. Stood up the `staging` branch and opened PR #1 (`docs/WORKFLOW.md`). Global commands `/start-feature` and `/review-loop` (`~/.claude/commands/`) plus a "Review-Loop Workflow" section in global `~/.claude/CLAUDE.md` make it the default; gstack's deeper reviews remain for heavyweight/risky work.
+- Files:
+  - `docs/WORKFLOW.md`
+  - `CHANGELOG.md`
+  - `~/.claude/commands/start-feature.md` (global)
+  - `~/.claude/commands/review-loop.md` (global)
+  - `~/.claude/CLAUDE.md` (global, Review-Loop Workflow section)
+- Verification: Greptile reviewed PR #1 live (`greptile-apps[bot]`, ~100s, Confidence 4/5) and flagged this exact CHANGELOG/LEDGER gap per CLAUDE.md Rule 2 — caught and addressed inside the review loop (the loop's first real demonstration). Branch+PR backbone confirmed via `gh`: `origin/staging` pushed, PR #1 open into `staging`.
+- Follow-up: Drive PR #1 to 5/5 and merge to `staging`; then resume CEM Phase 2 under this workflow.
+
 ## Open Follow-Ups
 
 - Add latency budget enforcement to the startup controller.
