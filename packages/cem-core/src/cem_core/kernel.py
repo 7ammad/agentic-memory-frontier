@@ -12,6 +12,7 @@ from .models import (
     MemoryAudit,
     TaskContext,
     TraceReceipt,
+    VerificationResult,
     utc_now,
 )
 from .storage import CEMStore, SQLiteStore
@@ -81,7 +82,6 @@ class CEM:
                 existing.evidence_atom_ids.append(atom.atom_id)
             existing.confidence_score = max(existing.confidence_score, atom.confidence_score)
             existing.last_validated_at = utc_now()
-            atom.promotion_status = "verified"
             atom.support_count = len(existing.evidence_atom_ids)
             self.store.save_atom(atom)
             self.store.save_card(existing)
@@ -102,8 +102,20 @@ class CEM:
             last_validated_at=utc_now(),
             action_brief_template=atom.recommended_use or atom.content,
         )
-        atom.promotion_status = "verified"
         self.store.save_atom(atom)
+        self.store.save_card(card)
+        return card
+
+    def apply_verification_result(self, result: VerificationResult) -> ExperienceCard:
+        card = self.store.get_card(result.card_id)
+        self.store.save_verification_result(result)
+        if result.result_id not in card.verification_result_ids:
+            card.verification_result_ids.append(result.result_id)
+        if result.passed:
+            card.promotion_status = "verified"
+            card.measured_lift = result.measured_lift
+            card.measured_lift_ci = result.measured_lift_ci
+            card.last_validated_at = utc_now()
         self.store.save_card(card)
         return card
 
@@ -197,7 +209,7 @@ class CEM:
                 validation_check_names=sorted({result.check_name for result in validations}),
                 validation_results=validations,
                 validation_decision=decisions[0] if len(decisions) == 1 else None,
-                promotion_status="verified",
+                promotion_status=card.promotion_status,
                 quarantine_reason=None,
             )
 
