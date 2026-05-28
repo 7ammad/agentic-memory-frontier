@@ -18,9 +18,9 @@ feature branch  ->  PR  ->  staging  ->  (periodic PR)  ->  main
 
 1. **Minimal, focused PRs.** One review surface per PR. Big PRs (>~800-1000 lines) degrade
    AI review quality — split them into stacked PRs where later pieces depend on earlier ones.
-2. **AI review loop to 5/5.** Every PR is reviewed by the repo's AI reviewer, which scores
-   confidence out of 5. Address the comments, push, wait for re-review, repeat until **5/5 or
-   ~5 turns** — whichever comes first.
+2. **AI review loop to 5/5.** Every PR is reviewed by the repo's AI reviewer (**Greptile**),
+   which posts a confidence score out of 5. Address the comments, push, wait for re-review,
+   repeat until **5/5 or ~5 turns** — whichever comes first.
 3. **Know when to stop.** If the score cycles stuck at 4/5, or the loop hits its turn cap,
    stop the agent, review by hand, and merge deliberately. Don't let it keep editing — that's
    where it starts hallucinating.
