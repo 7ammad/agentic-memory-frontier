@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Literal, TypeAlias
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 JsonPrimitive: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonPrimitive | list[JsonPrimitive] | dict[str, JsonPrimitive]
@@ -157,6 +157,16 @@ class TaskContext(StrictModel):
     domain_scope: str | None = None
     task_family: str | None = None
     current_time: datetime = Field(default_factory=utc_now)
+
+    @field_validator("current_time")
+    @classmethod
+    def _ensure_utc_aware(cls, value: datetime) -> datetime:
+        # A client (MCP/CLI) may supply current_time as a tz-less ISO string,
+        # which parses offset-naive. Card validity bounds are offset-aware
+        # (utc_now), so coerce naive input to UTC to keep scope comparisons valid.
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class ActionBrief(StrictModel):

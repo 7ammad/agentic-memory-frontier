@@ -23,6 +23,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 - Fixed the asserted-promotion bug: `promote()` now creates/updates a **candidate** card only and no longer flips the atom or card to `verified`. Verification is a separate, evidence-gated step via `apply_verification_result()`. `audit()` now reports a card's real `promotion_status` instead of a hardcoded `"verified"`.
 
+### Fixed
+
+- Fixed a `TypeError` in action-brief retrieval when a client (MCP/CLI) supplies a timezone-naive `current_time`: `TaskContext` now coerces naive `current_time` to UTC, so scope comparisons against offset-aware card validity bounds no longer crash. Closes the standing `current_time` offset-naive/offset-aware follow-up.
+
 ### Verification
 
 - **Phase 0:** `python -m pytest` -> 82 passed (21 new Phase 0 tests, including failure canaries for the promotion bug, the audit status, the MMA success bar, the leakage guard, and the no-fake-green guard).
