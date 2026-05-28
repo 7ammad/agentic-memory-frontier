@@ -270,6 +270,28 @@ Entry format:
 - Verification: Two regression tests first reproduced the exact `TypeError` at `kernel.py:202` (client `current_time` and naive card bounds), then passed after the fix; `python -m pytest` -> 93 passed (2 new), full suite green (EXIT 0).
 - Follow-up: None for this bug; resume CEM Phase 2.
 
+## LEDGER-20260529-015 - Adversarial-audit remediation (fake-green gates, weak tests, ghost exports)
+
+- Date: 2026-05-29
+- Type: verification
+- Status: resolved
+- Source: Multi-agent adversarial audit (5 hunters + 3 verifiers) of the whole repo against its own quality bars. User then directed "fix everything" for the remaining findings (overriding the audit's read-only constraint).
+- Summary: Closed the remaining findings after the tz fix (014).
+  - **Fake-green gates (HIGH).** `run_monitor`'s `correction_controller_wired` and `recent_corrections_recorded` passed a hardcoded `True`, so they could never go RED while feeding the `startup_brief` blocking gate. Replaced `correction_controller_wired` with a real falsifiable predicate (`_correction_controller_wired`: controller's resume-gate record lives under the active memory root and `summary.root == root`); a controller bound to a different root now goes RED. Removed the tautological `recent_corrections_recorded` check entirely and folded its count into the wired check's informational detail (zero corrections on a fresh install is normal and must not block). Emptied the fake-green allowlist.
+  - **Existence-only / weak tests (LOW).** Pinned vertical-loop counts to exact measured values (n/trace/atom/card = 2; mma = 1.0) instead of `>= 1`; required `math.isfinite` on synthetic-eval p95 latency instead of the tautological `>= 0.0`; replaced the fragile try/except in the tampered-envelope test with `pytest.raises(ValueError, match=...)`.
+  - **Ghost exports (LOW).** Removed `trace_body_hash` and `verify_shared_trace_envelope` from the `cem_core` public surface (zero external callers — internal use plus barrel only). Kept them defined for internal use. Decided to KEEP `build_shared_trace_envelope` exported (borderline #4): it is the public envelope constructor paired with `import_shared_trace` and is consumed by the test suite, so it is not a ghost.
+- Files:
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_correction_controller_gate.py` (new failure canary)
+  - `tests/test_no_fake_green_guard.py`
+  - `tests/test_vertical_loop.py`
+  - `tests/test_synthetic_eval.py`
+  - `tests/test_multi_agent.py`
+  - `CHANGELOG.md`
+- Verification: TDD canary-first for the gate (RED `assert 'pass' == 'fail'` before the fix, GREEN after); the existing CLI monitor test still passes, proving the honest gate is GREEN on a healthy seeded root. `python -m pytest` -> 95 passed (2 new), full suite green (EXIT 0). Work done on branch `fix/audit-remaining-findings` off `ab7bd86` to avoid colliding with the concurrent `fix/naive-current-time` session.
+- Follow-up: None for these findings; the live-runtime correction-capture wiring (below) remains the one open implementation item.
+
 ## Open Follow-Ups
 
 - Add latency budget enforcement to the startup controller.
