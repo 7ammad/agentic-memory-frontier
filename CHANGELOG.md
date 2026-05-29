@@ -26,12 +26,14 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 ### Fixed
 
 - Fixed a `TypeError` in action-brief retrieval on timezone-naive datetimes: `TaskContext.current_time` and `ExperienceCard.valid_from`/`valid_until` now coerce naive values to UTC, so `_card_in_scope` comparisons no longer crash whether the naive value comes from a client-supplied `current_time` or naive card validity bounds (legacy storage / external writes). Closes the standing `current_time` offset-naive/offset-aware follow-up.
+- **Adversarial-audit remediation.** Made the two fake-green Correction Capture monitor gates honest: `correction_controller_wired` now evaluates a real falsifiable predicate (controller bound to the active memory root) with a failure canary proving it goes RED when unwired, and the tautological `recent_corrections_recorded` literal-True check was removed (its count folded into the wired check's informational detail). The fake-green allowlist is now empty. Strengthened weak/existence-only tests: vertical-loop counts pinned to exact values, synthetic-eval p95 latency now requires `math.isfinite`, and the tampered-envelope rejection uses `pytest.raises(..., match=...)`. Removed two ghost exports (`trace_body_hash`, `verify_shared_trace_envelope`) from the `cem_core` public surface (kept internal).
 
 ### Verification
 
 - **Phase 0:** `python -m pytest` -> 82 passed (21 new Phase 0 tests, including failure canaries for the promotion bug, the audit status, the MMA success bar, the leakage guard, and the no-fake-green guard).
 - **Phase 1:** `python -m pytest` -> 91 passed (9 new Phase 1 tests, including failure canaries for untagged action-delta, `close_influence` never verifying a card, and the vertical-loop leakage guard). An independent verifier subagent confirmed real-green, all three canaries bite (break -> fail -> revert -> pass), no ghost code (every new symbol has a real caller), and no Phase 2/3 scope leak (MMA computed not hardcoded; `scorer_version` uniformly `lexical_overlap_v0`).
 - `python -m compileall -q packages scripts tests`, `python scripts/run_cem_vertical_loop.py`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1`, and `git diff --check` all clean.
+- **Audit remediation:** `python -m pytest` -> 95 passed (2 new correction-controller-gate canaries). The new fake-green failure canary bites (gate goes RED when the controller is unwired); CLI monitor test still green proves the honest gate passes on a healthy seeded root.
 
 ## 2026-05-28
 

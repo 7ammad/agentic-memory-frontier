@@ -1,3 +1,5 @@
+import pytest
+
 from cem_core import (
     AgentTrace,
     CEM,
@@ -63,16 +65,12 @@ def test_shared_trace_hash_mismatch_is_rejected():
     )
     envelope.body_hash = "not-the-real-hash"
 
-    try:
+    with pytest.raises(ValueError, match="body_hash does not match"):
         import_shared_trace(
             cem,
             envelope,
             trust_policy=MultiAgentTrustPolicy(trusted_agent_ids=["agent-alpha"]),
         )
-    except ValueError as exc:
-        assert "body_hash does not match" in str(exc)
-    else:
-        raise AssertionError("Tampered shared trace envelope should be rejected.")
 
 
 def test_sender_trace_agent_mismatch_is_not_trusted():
