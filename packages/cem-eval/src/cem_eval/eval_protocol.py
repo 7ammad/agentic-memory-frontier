@@ -15,12 +15,13 @@ LEXICAL_MARGIN_PP: float = 5.0
 
 # Pre-registered, LOCKED retrieval-latency READINESS ceiling (ms), ratified by the
 # user (LEDGER-020). Smaller-is-better: the CEM read path (kernel.retrieve_action_brief)
-# is pure in-memory scoring over the corpus -- no network, embedding, or disk on the
-# hot path -- so observed p95 is sub-ms to low-single-digit ms. 50ms gives ~1-2 orders
-# of magnitude of headroom (will not flake) yet still trips a genuine algorithmic
-# regression (accidental O(n^2) rescan, per-call re-validation, a sync disk/embedding
-# call). This is a READINESS flag for the production-readiness gate, NOT a verdict gate:
-# it must never enter the Phase 4 MMA PASS/FAIL verdict.
+# traverses the SQLite store (list_cards / list_atoms) with no network/embedding call,
+# so observed p95 (worst-of-12) is ~11-13 ms on this box -- NOT sub-ms (the design
+# panel's original assumption was corrected against the measured number in LEDGER-020).
+# 50ms gives ~4x headroom: enough not to flake on a loaded box, yet still trips a genuine
+# algorithmic regression (accidental O(n^2) rescan, per-call re-validation, a sync
+# network/embedding call). This is a READINESS flag for the production-readiness gate,
+# NOT a verdict gate: it must never enter the Phase 4 MMA PASS/FAIL verdict.
 RETRIEVAL_LATENCY_BUDGET_MS: float = 50.0
 
 

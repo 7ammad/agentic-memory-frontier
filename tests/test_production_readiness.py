@@ -82,14 +82,13 @@ def test_readiness_latency_check_bites():
     assert _status(result, "within_latency_budget") == "fail"
 
 
-def test_readiness_composes_real_exam_report():
+def test_readiness_composes_real_exam_report(tmp_path_factory):
     # Integration: drive the gate from a REAL exam run (not hand-built bools), so a
     # genuine regression in any deterministic criterion would flip a real field.
     # Asserts the deterministic checks pass; does NOT hard-assert the timing-coupled
     # latency flag True (worst-of-12 wall-clock would flake on a loaded box).
-    import tempfile
-
-    report = run_phase4_exam(tempfile.mkdtemp())
+    # tmp_path_factory (not tempfile.mkdtemp) so pytest cleans up the exam SQLite store.
+    report = run_phase4_exam(tmp_path_factory.mktemp("readiness_exam"))
     result = production_readiness_report(report)
     for name in ("mma_passes", "beats_lexical_by_margin", "negative_control_suppression", "no_fake_green_ast_clean"):
         assert _status(result, name) == "pass", name
