@@ -13,6 +13,17 @@ from dataclasses import dataclass
 # causal-retrieval thesis is unproven.
 LEXICAL_MARGIN_PP: float = 5.0
 
+# Pre-registered, LOCKED retrieval-latency READINESS ceiling (ms), ratified by the
+# user (LEDGER-020). Smaller-is-better: the CEM read path (kernel.retrieve_action_brief)
+# traverses the SQLite store (list_cards / list_atoms) with no network/embedding call,
+# so observed p95 (worst-of-12) is ~11-13 ms on this box -- NOT sub-ms (the design
+# panel's original assumption was corrected against the measured number in LEDGER-020).
+# 50ms gives ~4x headroom: enough not to flake on a loaded box, yet still trips a genuine
+# algorithmic regression (accidental O(n^2) rescan, per-call re-validation, a sync
+# network/embedding call). This is a READINESS flag for the production-readiness gate,
+# NOT a verdict gate: it must never enter the Phase 4 MMA PASS/FAIL verdict.
+RETRIEVAL_LATENCY_BUDGET_MS: float = 50.0
+
 
 @dataclass(frozen=True)
 class Baseline:
@@ -75,3 +86,44 @@ def assert_no_leakage(*, memory_source_ids: set[str], held_out_answer_ids: set[s
     overlap = memory_source_ids & held_out_answer_ids
     if overlap:
         raise ValueError(f"Leakage: memory source overlaps held-out answers: {sorted(overlap)}")
+
+
+def lexical_margin_pp(cem_result: MMAResult, lexical_result: MMAResult) -> float:
+    """The measured CEM-over-lexical advantage in percentage points of task success.
+
+    Reported even on a miss so a near-miss (e.g. 4.9pp) is visible, never hidden.
+    """
+    return (cem_result.mma - lexical_result.mma) * 100.0
+
+
+def beats_lexical_by_margin(
+    cem_result: MMAResult,
+    lexical_result: MMAResult,
+    *,
+    margin_pp: float = LEXICAL_MARGIN_PP,
+) -> bool:
+    """Spec section 9 kill criterion: CEM must beat the lexical-overlap baseline by
+    >= ``margin_pp`` percentage points of held-out task success, else the
+    causal-retrieval (read-path) thesis is unproven.
+
+    The measured margin is rounded to 6 decimal places before the comparison so an
+    exact-boundary margin (e.g. 0.45 - 0.40 == 0.0499...9 in float) is not defeated
+    by floating-point noise; 1e-6 pp is far finer than any real n-task measurement.
+    """
+    return round(lexical_margin_pp(cem_result, lexical_result), 6) >= margin_pp
+
+
+def within_latency_budget(
+    measured_ms: float, *, budget_ms: float = RETRIEVAL_LATENCY_BUDGET_MS
+) -> bool:
+    """READINESS gate (NOT a verdict gate): the CEM retrieval read path's measured
+    latency must be <= ``budget_ms``.
+
+    Latency is smaller-is-better, so the operator is ``<=`` -- the OPPOSITE of
+    ``beats_lexical_by_margin`` (where bigger is better, hence ``>=``). The measured
+    value is rounded to 6 decimal places before the comparison so float noise at the
+    exact boundary (e.g. 50.0000004) is absorbed, identical to the margin gate's
+    rounding. This flag feeds the production-readiness gate; it must never enter the
+    Phase 4 MMA PASS/FAIL verdict.
+    """
+    return round(measured_ms, 6) <= budget_ms

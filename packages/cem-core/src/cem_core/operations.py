@@ -9,6 +9,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from .correction_capture import (
+    CorrectionControllerSummary,
     correction_controller_summary,
     correction_rule_surfaces_in_brief,
 )
@@ -196,6 +197,22 @@ def apply_codex_memory_migration(
     return applied
 
 
+def _correction_controller_wired(summary: CorrectionControllerSummary, root: Path) -> bool:
+    """True when the correction controller is bound to the active memory root.
+
+    Falsifiable: a controller resolved against a different root would capture
+    corrections that never surface in this root's briefs. The resume gate file is
+    the controller's persistent record anchor, materialized under root.
+
+    Caller contract: the gate file is created lazily by ``correction_gate_status``
+    (invoked inside ``correction_controller_summary``), so callers must have built
+    ``summary`` via ``correction_controller_summary`` before this predicate runs;
+    otherwise the existence check returns a spurious ``False`` on a healthy root.
+    """
+    gate_file = Path(summary.gate_path).resolve()
+    return summary.root == str(root) and gate_file.parent == root and gate_file.exists()
+
+
 def run_monitor(
     root: Path | None = None,
     *,
@@ -231,7 +248,16 @@ def run_monitor(
     checks.append(_check("brief_has_verification_rule", "pytest" in actions and "synthetic" in actions, "verification rule present"))
     checks.append(_check("brief_has_todo_rule", "todo.md" in actions, "TODO continuation rule present"))
     correction_summary = correction_controller_summary(root)
-    checks.append(_check("correction_controller_wired", True, correction_summary.event_log_path))
+    checks.append(
+        _check(
+            "correction_controller_wired",
+            _correction_controller_wired(correction_summary, root),
+            (
+                f"{correction_summary.event_count} correction events recorded; "
+                f"latest={correction_summary.latest_event_id}; gate={correction_summary.gate_path}"
+            ),
+        )
+    )
     checks.append(
         _check(
             "correction_resume_gate_clear",
@@ -240,17 +266,6 @@ def run_monitor(
                 "no active correction resume gate"
                 if not correction_summary.active_gate
                 else f"blocked by {correction_summary.active_event_id}"
-            ),
-        )
-    )
-    checks.append(
-        _check(
-            "recent_corrections_recorded",
-            True,
-            (
-                f"{correction_summary.event_count} correction events; latest={correction_summary.latest_event_id}"
-                if correction_summary.event_count
-                else "0 correction events recorded yet"
             ),
         )
     )

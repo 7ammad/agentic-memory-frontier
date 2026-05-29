@@ -1,3 +1,5 @@
+import math
+
 from cem_eval import (
     render_synthetic_eval_markdown,
     run_halumem_facsimile_eval,
@@ -150,7 +152,9 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.unvalidated_memory.metrics.evidence_consolidation_count == 0
     assert result.unvalidated_memory.metrics.max_evidence_support_count == 1
     assert result.unvalidated_memory.metrics.audit_completeness_rate == 0.0
+    assert math.isfinite(result.unvalidated_memory.metrics.p95_write_latency_ms)
     assert result.unvalidated_memory.metrics.p95_write_latency_ms >= 0.0
+    assert math.isfinite(result.unvalidated_memory.metrics.p95_retrieval_latency_ms)
     assert result.unvalidated_memory.metrics.p95_retrieval_latency_ms >= 0.0
     assert result.unvalidated_memory.metrics.tokens_per_write > 0.0
     assert result.unvalidated_memory.metrics.tokens_per_retrieval > 0.0
@@ -182,7 +186,9 @@ def test_synthetic_corruption_eval_exercises_write_path(tmp_path):
     assert result.cem0_validation.metrics.evidence_consolidation_count == 1
     assert result.cem0_validation.metrics.max_evidence_support_count == 2
     assert result.cem0_validation.metrics.audit_completeness_rate == 1.0
+    assert math.isfinite(result.cem0_validation.metrics.p95_write_latency_ms)
     assert result.cem0_validation.metrics.p95_write_latency_ms >= 0.0
+    assert math.isfinite(result.cem0_validation.metrics.p95_retrieval_latency_ms)
     assert result.cem0_validation.metrics.p95_retrieval_latency_ms >= 0.0
     assert result.cem0_validation.metrics.tokens_per_write > 0.0
     assert result.cem0_validation.metrics.tokens_per_retrieval > 0.0
