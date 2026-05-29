@@ -292,6 +292,27 @@ Entry format:
 - Verification: TDD canary-first for the gate (RED `assert 'pass' == 'fail'` before the fix, GREEN after); the existing CLI monitor test still passes, proving the honest gate is GREEN on a healthy seeded root. `python -m pytest` -> 95 passed (2 new), full suite green (EXIT 0). Work done on branch `fix/audit-remaining-findings` off `ab7bd86` to avoid colliding with the concurrent `fix/naive-current-time` session.
 - Follow-up: None for these findings; the live-runtime correction-capture wiring (below) remains the one open implementation item.
 
+## LEDGER-20260529-016 - CEM-1 Phase 2 grounded consolidation + verified lifecycle landed and verified
+
+- Date: 2026-05-29
+- Type: verification
+- Status: resolved
+- Source: Standing user directive to finish the full CEM-1 build (no MVP, no trimming) end-to-end with no ghost coding / no fake-green; Phase 2 per the round-2 phase sequencing (consolidation §4.4 + verification §4.2 land together, before the read-path advances in Phase 3).
+- Summary: Completed the two halves of Phase 2 as five atomic bricks.
+  - **Consolidation (§4.4).** Card-level **temporal supersession**: a newer contradicting atom (e.g. an `UPDATE:` invalidation event) now marks the stale card `promotion_status="superseded"` with `deactivated_at`/`deactivated_reason`/`superseded_by_card_ids`, and `_card_in_scope` excludes superseded/deprecated/deactivated cards so retrieval no longer serves them. Cross-scope **contradiction links**: two cards asserting the same claim key with different values in *different* operational scopes (different `domain_scope`) bypass the same-scope contradiction quarantine, both promote, and are bidirectionally cross-linked via `contradicts_card_ids` (real input for the Phase 3 §4.1 contradiction penalty); unrelated cards (different keys) stay unlinked.
+  - **Verified lifecycle (§4.2).** `schedule_probe` + `run_probe` execute a held-out replay probe whose measured lift is the memory arm's success (target card surfaced AND recommends the decisive action) minus a 0.0 no-memory control; only `apply_verification_result` promotes a card to `verified`, and only when lift ≥ threshold. A card whose decisive action the probe does not recommend stays `candidate` with `measured_lift` None. `inject_negative_control` plants a retrievable bad card (recommending the wrong action); `run_probe` deprecates it and removes it from retrieval. `negative_control_suppression_rate()` is a real gate with a leak canary that forces a control to `verified` and asserts the rate falls below 1.0.
+  - **Real caller (build contract §5).** `run_vertical_loop` now probes each seeded candidate to `verified` and injects+suppresses a negative control, reporting `verified_card_count` and `negative_control_suppression_rate`; `card_count` tallies active cards so the deactivated control does not inflate it. `scripts/run_cem_vertical_loop.py` exercises it as a real consumer. Scorer stays `lexical_overlap_v0` (action-value scorer is Phase 3).
+- Files:
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-eval/src/cem_eval/vertical_loop.py`
+  - `tests/test_consolidation.py`
+  - `tests/test_verification.py`
+  - `tests/test_vertical_loop.py`
+  - `TODO.md`, `CHANGELOG.md`
+- Verification: `python -m pytest` -> 107 passed (12 new tests, every gate paired with a failure canary). `python scripts/run_synthetic_eval.py` clean (false-memory resistance 1.0, contradiction precision/recall 1.0, false-quarantine rate 0.0); `python scripts/run_cem_vertical_loop.py` -> `verified_card_count` 2, `negative_control_suppression_rate` 1.0. Independent verifier subagent refuted all four Phase 2 claims as SUPPORTED: proved two canaries bite (break -> fail -> revert -> pass) on the grounding guard and the suppression-rate gate, grep-confirmed `apply_verification_result` (kernel.py:302) is the only card `verified` assignment and `scorer_version` stays `lexical_overlap_v0`, and confirmed the real caller chain (`run_vertical_loop` -> `schedule_probe`/`run_probe`; script -> loop). Tree left clean (`git status --short` empty). Commits: `8379ef4` (supersession), `3becd56` (contradiction links), `bea64b1` (probe runner), `1347593` (negative-control suppression), `9d1eb80` (vertical-loop wiring).
+- Follow-up: Phase 3 - action-value retrieval (advance `scorer_version` past `lexical_overlap_v0`, rank briefs by measured/expected action value, record influence events), then Phases 4-5.
+
 ## Open Follow-Ups
 
 - Add latency budget enforcement to the startup controller.
