@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Literal, TypeAlias
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 JsonPrimitive: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonPrimitive | list[JsonPrimitive] | dict[str, JsonPrimitive]
@@ -149,6 +149,15 @@ class ExperienceCard(StrictModel):
     deactivated_reason: str | None = None
     superseded_by_card_ids: list[str] = Field(default_factory=list)
 
+    @field_validator("valid_from", "valid_until")
+    @classmethod
+    def _ensure_utc_aware(cls, value: datetime | None) -> datetime | None:
+        # Coerce naive validity bounds (legacy storage / external writes) to UTC
+        # so _card_in_scope can compare them against an offset-aware current_time.
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
 
 class TaskContext(StrictModel):
     task_id: str | None = None
@@ -157,6 +166,16 @@ class TaskContext(StrictModel):
     domain_scope: str | None = None
     task_family: str | None = None
     current_time: datetime = Field(default_factory=utc_now)
+
+    @field_validator("current_time")
+    @classmethod
+    def _ensure_utc_aware(cls, value: datetime) -> datetime:
+        # A client (MCP/CLI) may supply current_time as a tz-less ISO string,
+        # which parses offset-naive. Card validity bounds are offset-aware
+        # (utc_now), so coerce naive input to UTC to keep scope comparisons valid.
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class ActionBrief(StrictModel):

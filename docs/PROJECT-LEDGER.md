@@ -256,9 +256,22 @@ Entry format:
 - Verification: `python -m pytest` -> 91 passed (9 new Phase 1 tests). Three failure canaries hand-verified break -> fail -> revert -> pass: untagged action-delta (`test_brief_never_presents_untagged_delta`), `close_influence` never verifies a card (`test_close_influence_never_verifies_a_card`), and vertical-loop leakage-bites (`test_vertical_loop_leakage_guard_bites`, self-proving via `pytest.raises`). Independent verifier subagent returned PHASE 1 VERIFIED across 6 checks: real-green (91/91, exit 0), script runs end-to-end (`brief_record_count=2`, `influence_event_count=2`, `card_count=2`), MMA computed not hardcoded (sensitivity check `[0.5,1.0]` vs `[0.0,0.0]` -> 0.75), canaries substantive, every new symbol has a real caller (no ghost code), and no Phase 2/3 scope leak (`scorer_version` uniformly `lexical_overlap_v0`; `probe_verified`/`heldout_eval` appear only as enum literals and a canary assertion). `python -m compileall`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1`, and `git diff --check` all clean.
 - Follow-up: Execute Phase 2 (grounded consolidation + the evidence-gated verification loop: probes -> results -> verified promotion), then Phases 3-5.
 
+## LEDGER-20260529-014 - Fixed offset-naive current_time crash in action-brief retrieval
+
+- Date: 2026-05-29
+- Type: verification
+- Status: resolved
+- Source: First real code commit run through the new Greptile review-loop workflow. Closes the standing Open Follow-Up (MCP `current_time` offset-naive/offset-aware comparison), originally observed live in LEDGER-20260528-009.
+- Summary: A client (MCP/CLI) supplying `current_time` as a timezone-less ISO string had it parsed offset-naive by Pydantic, while card `valid_from`/`valid_until` are offset-aware (`utc_now`). `_card_in_scope` then raised `TypeError: can't compare offset-naive and offset-aware datetimes` inside `retrieve_action_brief`. Fix: a `TaskContext.current_time` field validator coerces naive input to UTC. After Greptile's PR #2 review (4/5) flagged the symmetric gap, the same coercion was added to `ExperienceCard.valid_from`/`valid_until`, so naive card validity bounds (legacy storage / external writes) can't crash from the card side either. The UTC-aware invariant is now enforced at the model boundary on both sides.
+- Files:
+  - `packages/cem-core/src/cem_core/models.py`
+  - `tests/test_naive_current_time.py`
+  - `CHANGELOG.md`
+- Verification: Two regression tests first reproduced the exact `TypeError` at `kernel.py:202` (client `current_time` and naive card bounds), then passed after the fix; `python -m pytest` -> 93 passed (2 new), full suite green (EXIT 0).
+- Follow-up: None for this bug; resume CEM Phase 2.
+
 ## Open Follow-Ups
 
 - Add latency budget enforcement to the startup controller.
 - Record `brief_id`, `monitor_id`, and evidence ids for every governed agent run, not only session-start gate output.
 - Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface.
-- Fix MCP `current_time` offset-naive/offset-aware comparison in action-brief retrieval.
