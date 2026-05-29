@@ -177,3 +177,61 @@ def test_newer_atom_supersedes_stale_card_and_removes_it_from_retrieval(tmp_path
     )
     assert card_a.card_id not in brief.applicable_card_ids
     assert card_b.card_id in brief.applicable_card_ids
+
+
+def test_contradicting_cards_are_cross_linked_and_both_survive(tmp_path):
+    # Design 4.4 contradiction links (distinct from temporal supersession): two
+    # claims on the same key with different values that live in DIFFERENT
+    # operational scopes are not a temporal replacement -- neither supersedes the
+    # other, and same-scope quarantine does not fire (cross-scope). They must both
+    # promote AND be bidirectionally linked so 4.1's contradiction penalty (Phase
+    # 3) has real input. If linking is absent the contradicts_card_ids assertions
+    # bite.
+    cem = CEM(tmp_path)
+
+    light = _pref_trace("PREFERENCE:", "editor_theme=light", index=0, domain="team-a")
+    cem.ingest_trace(light)
+    light_atom = cem.propose_memories(light.trace_id)[0]
+    cem.validate(light_atom.atom_id)
+    card_light = cem.promote(light_atom.atom_id)
+    assert card_light is not None
+
+    dark = _pref_trace("PREFERENCE:", "editor_theme=dark", index=1, domain="team-b")
+    cem.ingest_trace(dark)
+    dark_atom = cem.propose_memories(dark.trace_id)[0]
+    # Cross-scope: validation must NOT quarantine the second claim.
+    decision = cem.validate(dark_atom.atom_id)
+    assert decision.decision == "candidate"
+    card_dark = cem.promote(dark_atom.atom_id)
+    assert card_dark is not None
+    assert card_dark.card_id != card_light.card_id
+
+    linked_light = cem.store.get_card(card_light.card_id)
+    linked_dark = cem.store.get_card(card_dark.card_id)
+    # Bidirectional contradiction link.
+    assert card_dark.card_id in linked_light.contradicts_card_ids
+    assert card_light.card_id in linked_dark.contradicts_card_ids
+    # Both remain active -- a contradiction link coexists, it does not supersede.
+    assert linked_light.promotion_status == "candidate"
+    assert linked_dark.promotion_status == "candidate"
+
+
+def test_unrelated_cards_are_not_contradiction_linked(tmp_path):
+    # Over-link canary: two cards whose claims share no key must stay unlinked.
+    # If the link predicate is too loose this gains a spurious link and bites.
+    cem = CEM(tmp_path)
+
+    theme = _pref_trace("PREFERENCE:", "editor_theme=light", index=0, domain="team-a")
+    cem.ingest_trace(theme)
+    theme_atom = cem.propose_memories(theme.trace_id)[0]
+    cem.validate(theme_atom.atom_id)
+    card_theme = cem.promote(theme_atom.atom_id)
+
+    font = _pref_trace("PREFERENCE:", "font_size=14", index=1, domain="team-b")
+    cem.ingest_trace(font)
+    font_atom = cem.propose_memories(font.trace_id)[0]
+    cem.validate(font_atom.atom_id)
+    card_font = cem.promote(font_atom.atom_id)
+
+    assert cem.store.get_card(card_theme.card_id).contradicts_card_ids == []
+    assert cem.store.get_card(card_font.card_id).contradicts_card_ids == []

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .contradiction import ContradictionDetector
+from .contradiction import ContradictionDetector, contradiction_pair
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .models import (
     ActionBrief,
@@ -98,6 +98,7 @@ class CEM:
             self.store.save_atom(atom)
             self.store.save_card(existing)
             self._supersede_stale_cards(atom, existing)
+            self._link_contradicting_cards(existing)
             return existing
 
         card = ExperienceCard(
@@ -118,7 +119,42 @@ class CEM:
         self.store.save_atom(atom)
         self.store.save_card(card)
         self._supersede_stale_cards(atom, card)
+        self._link_contradicting_cards(card)
         return card
+
+    def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
+        """Bidirectionally link active cards whose claims conflict without a
+        temporal supersession (design 4.4 contradiction links -> 4.1 penalty).
+
+        Same-scope contradictions are quarantined at validation; the survivors
+        reaching this point are cross-scope claims on the same key with different
+        values that must coexist but stay flagged. The link is informational here
+        -- Phase 3's scorer turns it into a contradiction penalty.
+        """
+        new_key, new_value = self._card_claim(new_card)
+        if new_key is None:
+            return
+        for card in self.store.list_cards():
+            if card.card_id == new_card.card_id:
+                continue
+            if card.promotion_status in {"superseded", "deprecated", "quarantined"} or card.deactivated_at is not None:
+                continue
+            other_key, other_value = self._card_claim(card)
+            if other_key != new_key or other_value == new_value:
+                continue
+            if card.card_id not in new_card.contradicts_card_ids:
+                new_card.contradicts_card_ids.append(card.card_id)
+            if new_card.card_id not in card.contradicts_card_ids:
+                card.contradicts_card_ids.append(new_card.card_id)
+                self.store.save_card(card)
+        self.store.save_card(new_card)
+
+    def _card_claim(self, card: ExperienceCard) -> tuple[str | None, str | None]:
+        for atom_id in card.evidence_atom_ids:
+            key, value = contradiction_pair(self.store.get_atom(atom_id).content)
+            if key is not None:
+                return key, value
+        return None, None
 
     def _supersede_stale_cards(self, new_atom: ExperienceAtom, new_card: ExperienceCard) -> None:
         """Deactivate cards whose evidence the new atom has just superseded.
