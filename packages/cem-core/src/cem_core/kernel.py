@@ -475,6 +475,8 @@ class CEM:
         atom_tokens = _content_tokens(atom.content)
         best: tuple[float, ExperienceCard] | None = None
         for card in self.store.list_cards():
+            if card.promotion_status in {"superseded", "deprecated", "quarantined"} or card.deactivated_at is not None:
+                continue
             if card.use_when != use_when:
                 continue
             if card.title == title:

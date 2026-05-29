@@ -5,6 +5,7 @@ preservation -> grounded abstraction -> temporal supersession -> contradiction
 links. Each behavior is driven test-first; failure canaries prove the gate bites.
 """
 from cem_core import AgentTrace, CEM, ExperienceAtom, SourceSpan, TaskContext, TraceTurn
+from cem_core.models import utc_now
 
 
 class _UngroundedAbstractionExtractor:
@@ -177,6 +178,50 @@ def test_newer_atom_supersedes_stale_card_and_removes_it_from_retrieval(tmp_path
     )
     assert card_a.card_id not in brief.applicable_card_ids
     assert card_b.card_id in brief.applicable_card_ids
+
+
+def test_reobserved_lesson_does_not_merge_into_inactive_card(tmp_path):
+    # Failure canary for silent data loss (design 4.4): _matching_card scans ALL
+    # cards, so a re-observed lesson whose title matches a superseded/deprecated
+    # card is merged back into that dead card. Because _card_in_scope drops inactive
+    # cards, the re-observed atom becomes permanently unretrievable -- a real harm.
+    # _matching_card must skip inactive cards (mirroring _link_contradicting_cards),
+    # so the re-observation forms a fresh live card instead.
+    cem = CEM(tmp_path)
+
+    trace = _skill_trace("pin the lockfile before running install")
+    cem.ingest_trace(trace)
+    atom = cem.propose_memories(trace.trace_id)[0]
+    cem.validate(atom.atom_id)
+    card_a = cem.promote(atom.atom_id)
+    assert card_a is not None
+
+    # card_a reaches an inactive state -- exactly the post-supersession state that
+    # _supersede_stale_cards sets (promotion_status="superseded" + deactivated_at).
+    card_a.promotion_status = "superseded"
+    card_a.deactivated_at = utc_now()
+    cem.store.save_card(card_a)
+
+    # The same lesson is re-observed in a later session.
+    again = _skill_trace("pin the lockfile before running install", session="s2")
+    cem.ingest_trace(again)
+    again_atom = cem.propose_memories(again.trace_id)[0]
+    cem.validate(again_atom.atom_id)
+    again_card = cem.promote(again_atom.atom_id)
+
+    assert again_card is not None
+    # A fresh live card, NOT the dead one resurrected with a buried atom.
+    assert again_card.card_id != card_a.card_id
+    assert again_card.promotion_status == "candidate"
+    assert again_atom.atom_id in again_card.evidence_atom_ids
+    # The dead card did not silently swallow the re-observed atom.
+    assert again_atom.atom_id not in cem.store.get_card(card_a.card_id).evidence_atom_ids
+    # And the re-observed lesson is retrievable again.
+    brief = cem.retrieve_action_brief(
+        TaskContext(session_id=None, description="pin the lockfile before running install")
+    )
+    assert again_card.card_id in brief.applicable_card_ids
+    assert card_a.card_id not in brief.applicable_card_ids
 
 
 def test_contradicting_cards_are_cross_linked_and_both_survive(tmp_path):
