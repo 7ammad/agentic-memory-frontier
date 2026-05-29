@@ -92,6 +92,7 @@ class Phase4ExamReport(BaseModel):
     cem_passes_success_bar: bool
     cem_beats_lexical: bool
     negative_control_suppression_rate: float
+    cem_verified_card_count: int  # decisive cards that earned verified lift (W_LIFT active)
     scorer_version: str
     locked_weights: dict[str, float]
     verdict: str  # "PASS" or "FAIL_REPORTED_HONESTLY"
@@ -257,6 +258,9 @@ def run_phase4_exam(root: str | Path) -> Phase4ExamReport:
     all_atom_contents = [atom.content for atom in atoms]
 
     cem, suppression_rate = _build_cem(root / "cem")
+    cem_verified_card_count = sum(
+        1 for card in cem.store.list_cards() if card.promotion_status == "verified"
+    )
     unverified = _build_unverified_store(root / "unverified")
 
     def recommend(name: str, task: Phase4Task) -> list[str]:
@@ -322,6 +326,7 @@ def run_phase4_exam(root: str | Path) -> Phase4ExamReport:
         cem_passes_success_bar=cem_passes,
         cem_beats_lexical=beats,
         negative_control_suppression_rate=suppression_rate,
+        cem_verified_card_count=cem_verified_card_count,
         scorer_version="action_value_v1",
         locked_weights=dict(LOCKED_WEIGHTS),
         verdict=verdict,

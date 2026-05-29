@@ -79,10 +79,18 @@ def test_weights_pinned_to_ledger_018(report):
     }
 
 
+def test_cem_rung_earns_verified_lift(report):
+    # Regression guard: the CEM rung must actually earn verified lift (W_LIFT=4.0
+    # active), not pass on trap-suppression alone. If _decisive_for_card_title
+    # drift silenced the probes, this drops to 0 and fails.
+    assert report.cem_verified_card_count >= 1
+
+
 def test_lexical_rung_surfaces_trap_cem_suppresses(report):
     # Isolation + validation value: on a pytest task the lexical_overlap rung
     # surfaces the poisoned 'skip pytest' trap (no validation), while CEM does not.
-    pytest_task = next(t for t in PHASE4_HELD_OUT if t.task_id == "pytest-before-done")
+    idx = next(i for i, t in enumerate(PHASE4_HELD_OUT) if t.task_id == "pytest-before-done")
+    pytest_task = PHASE4_HELD_OUT[idx]
     atoms = [
         atom
         for trace in phase4_memory_source_traces()
@@ -90,6 +98,14 @@ def test_lexical_rung_surfaces_trap_cem_suppresses(report):
     ]
     lexical = phase4_exam._lexical_overlap_recommend(atoms, pytest_task)
     assert PYTEST_TRAP in lexical  # word-overlap retrieval is fooled by the trap
+
+    # CEM-suppression side: at the same task the lexical rung FAILS (trap present)
+    # while the CEM rung SUCCEEDS (success requires the trap absent AND the decisive
+    # action present) -- the trap is genuinely suppressed by CEM, not surfaced.
+    lexical_rung = next(r for r in report.rungs if r.name == "lexical_overlap")
+    cem_rung = next(r for r in report.rungs if r.name == "cem")
+    assert lexical_rung.per_task_success[idx] == 0.0
+    assert cem_rung.per_task_success[idx] == 1.0
 
 
 def test_dataset_no_verbatim_task_statement_in_source():
