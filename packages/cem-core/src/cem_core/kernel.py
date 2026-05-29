@@ -14,6 +14,7 @@ from .models import (
     MemoryAudit,
     TaskContext,
     TraceReceipt,
+    VerificationProbe,
     VerificationResult,
     new_id,
     utc_now,
@@ -185,6 +186,66 @@ class CEM:
                 if new_card.card_id not in card.superseded_by_card_ids:
                     card.superseded_by_card_ids.append(new_card.card_id)
                 self.store.save_card(card)
+
+    def schedule_probe(self, probe: VerificationProbe) -> VerificationProbe:
+        self.store.save_probe(probe)
+        return probe
+
+    def run_probe(
+        self,
+        probe_id: str,
+        *,
+        task: TaskContext,
+        correct_action: str,
+    ) -> VerificationResult:
+        """Run a verification probe and write an evidence-gated result.
+
+        Lift is measured as a held-out replay: success of the memory agent (does
+        the brief surface the target card recommending ``correct_action``?) minus
+        a no-memory control, which by construction cannot recommend the decisive
+        action (success 0.0). A probe that clears its threshold verifies the card
+        via ``apply_verification_result``; a failed negative control is deprecated
+        so retrieval drops it (design 4.2 -- promotion is earned, not asserted).
+        """
+        probe = self.store.get_probe(probe_id)
+        if probe.target_card_id is None:
+            raise ValueError("verification probe has no target card")
+        brief = self.retrieve_action_brief(task)
+        memory_success = self._replay_success(brief, probe.target_card_id, correct_action)
+        control_success = 0.0
+        measured_lift = memory_success - control_success
+        result = VerificationResult(
+            probe_id=probe.probe_id,
+            card_id=probe.target_card_id,
+            measured_lift=measured_lift,
+            passed=measured_lift >= probe.threshold,
+            evidence_pointer=f"brief:{brief.brief_id}",
+        )
+        probe.status = "run"
+        self.store.save_probe(probe)
+        self.apply_verification_result(result)
+        if probe.kind == "negative_control" and not result.passed:
+            self._deprecate_negative_control(probe.target_card_id, probe.probe_id)
+        return result
+
+    def _replay_success(
+        self,
+        brief: ActionBrief,
+        target_card_id: str,
+        correct_action: str,
+    ) -> float:
+        if target_card_id not in brief.applicable_card_ids:
+            return 0.0
+        card = self.store.get_card(target_card_id)
+        recommended = " ".join(card.do + [card.action_brief_template]).lower()
+        return 1.0 if correct_action.lower() in recommended else 0.0
+
+    def _deprecate_negative_control(self, card_id: str, probe_id: str) -> None:
+        card = self.store.get_card(card_id)
+        card.promotion_status = "deprecated"
+        card.deactivated_at = utc_now()
+        card.deactivated_reason = f"negative control suppressed by probe {probe_id}"
+        self.store.save_card(card)
 
     def apply_verification_result(self, result: VerificationResult) -> ExperienceCard:
         card = self.store.get_card(result.card_id)
