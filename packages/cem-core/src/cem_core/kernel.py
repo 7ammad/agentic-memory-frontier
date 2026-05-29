@@ -247,6 +247,52 @@ class CEM:
         card.deactivated_reason = f"negative control suppressed by probe {probe_id}"
         self.store.save_card(card)
 
+    def inject_negative_control(
+        self,
+        *,
+        title: str,
+        bad_action: str,
+        control_definition: str,
+        use_when: str = "similar task context",
+        threshold: float = 0.5,
+        confidence_score: float = 0.9,
+    ) -> tuple[ExperienceCard, VerificationProbe]:
+        """Plant a known-bad card plus a negative-control probe targeting it.
+
+        The card is deliberately ungrounded (no evidence atoms) and recommends a
+        false action; a healthy probe run must deprecate it. Used by tests and the
+        operator surface to prove the suppression gate (design 4.2) actually bites.
+        """
+        card = ExperienceCard(
+            title=title,
+            use_when=use_when,
+            do=[bad_action],
+            evidence_atom_ids=[],
+            confidence_score=confidence_score,
+            action_brief_template=bad_action,
+        )
+        self.store.save_card(card)
+        probe = VerificationProbe(
+            kind="negative_control",
+            target_card_id=card.card_id,
+            control_definition=control_definition,
+            threshold=threshold,
+        )
+        self.store.save_probe(probe)
+        return card, probe
+
+    def negative_control_suppression_rate(self) -> float:
+        probes = [probe for probe in self.store.list_probes() if probe.kind == "negative_control"]
+        if not probes:
+            return 1.0
+        suppressed = sum(
+            1
+            for probe in probes
+            if probe.target_card_id is not None
+            and self.store.get_card(probe.target_card_id).promotion_status != "verified"
+        )
+        return suppressed / len(probes)
+
     def apply_verification_result(self, result: VerificationResult) -> ExperienceCard:
         card = self.store.get_card(result.card_id)
         self.store.save_verification_result(result)

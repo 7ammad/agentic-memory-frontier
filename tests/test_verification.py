@@ -90,3 +90,62 @@ def test_held_out_replay_probe_does_not_verify_card_without_lift(tmp_path):
     still_candidate = cem.store.get_card(card.card_id)
     assert still_candidate.promotion_status == "candidate"
     assert still_candidate.measured_lift is None
+
+
+def test_negative_control_is_suppressed_never_verified(tmp_path):
+    # Design 4.2 negative control: a planted false memory (plausible enough to be
+    # retrieved, but recommending the WRONG action) must be deprecated and removed
+    # from retrieval by its probe, never promoted. Suppression rate must be 100%.
+    cem = CEM(tmp_path)
+    bad_card, probe = cem.inject_negative_control(
+        title="incident assignment order",
+        bad_action="set assignee before assignment_group",
+        control_definition="planted false memory: inverted incident-form field order",
+        threshold=0.5,
+    )
+
+    # The false memory is retrievable before the probe runs.
+    pre = cem.retrieve_action_brief(_held_out_task("incident assignment order on the form"))
+    assert bad_card.card_id in pre.applicable_card_ids
+
+    result = cem.run_probe(
+        probe.probe_id,
+        task=_held_out_task("incident assignment order on the form"),
+        correct_action="set assignment_group before assignee",
+    )
+    assert not result.passed
+
+    suppressed = cem.store.get_card(bad_card.card_id)
+    assert suppressed.promotion_status == "deprecated"
+    assert suppressed.deactivated_at is not None
+    assert cem.negative_control_suppression_rate() == 1.0
+
+    # The suppressed control is gone from retrieval.
+    post = cem.retrieve_action_brief(_held_out_task("incident assignment order on the form"))
+    assert bad_card.card_id not in post.applicable_card_ids
+
+
+def test_suppression_rate_drops_when_negative_control_leaks_to_verified(tmp_path):
+    # Failure canary for the suppression metric: if a negative control ever reaches
+    # verified (the runner failed to catch it), the rate must fall below 1.0. A
+    # metric that always returns 1.0 is not a gate -- this proves it detects a leak.
+    cem = CEM(tmp_path)
+    bad_card, probe = cem.inject_negative_control(
+        title="incident assignment order",
+        bad_action="set assignee before assignment_group",
+        control_definition="planted false memory",
+        threshold=0.5,
+    )
+    assert cem.negative_control_suppression_rate() == 1.0
+
+    # Simulate a leak: a passing result slips through and verifies the bad card.
+    cem.apply_verification_result(
+        VerificationResult(
+            probe_id=probe.probe_id,
+            card_id=bad_card.card_id,
+            measured_lift=1.0,
+            passed=True,
+        )
+    )
+    assert cem.store.get_card(bad_card.card_id).promotion_status == "verified"
+    assert cem.negative_control_suppression_rate() < 1.0
