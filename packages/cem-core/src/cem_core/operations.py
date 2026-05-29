@@ -203,8 +203,13 @@ def _correction_controller_wired(summary: CorrectionControllerSummary, root: Pat
     Falsifiable: a controller resolved against a different root would capture
     corrections that never surface in this root's briefs. The resume gate file is
     the controller's persistent record anchor, materialized under root.
+
+    Caller contract: the gate file is created lazily by ``correction_gate_status``
+    (invoked inside ``correction_controller_summary``), so callers must have built
+    ``summary`` via ``correction_controller_summary`` before this predicate runs;
+    otherwise the existence check returns a spurious ``False`` on a healthy root.
     """
-    gate_file = Path(summary.gate_path)
+    gate_file = Path(summary.gate_path).resolve()
     return summary.root == str(root) and gate_file.parent == root and gate_file.exists()
 
 
