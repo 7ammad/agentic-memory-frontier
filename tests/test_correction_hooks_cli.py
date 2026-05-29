@@ -27,6 +27,26 @@ def _run(argv, stdin_text, monkeypatch):
     return cli.main(argv)
 
 
+class _BytesStdin:
+    """A stdin stub exposing a binary .buffer, like the real runtime stdin (and
+    unlike io.StringIO) -- so the strict utf-8-sig byte decode path is exercised."""
+
+    def __init__(self, data: bytes):
+        self.buffer = io.BytesIO(data)
+
+
+def test_hook_prompt_cli_rejects_invalid_utf8(tmp_path, monkeypatch, capsys):
+    # Garbled (invalid UTF-8) input must be cleanly REJECTED (exit 2), not silently
+    # mangled into an accepted correction via errors="replace". The 0xff byte inside
+    # the string would, under errors="replace", become U+FFFD and parse as a valid
+    # correction prompt (block, exit 10) -- a strict decode rejects it cleanly.
+    monkeypatch.setattr("sys.stdin", _BytesStdin(b'{"prompt_text": "we already said no\xff"}'))
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--root", str(tmp_path), "correction", "hook-prompt", "--json"])
+    assert exc.value.code == HOOK_EXIT_PARSE_ERROR
+    assert not _event_log_path(_root(tmp_path)).exists()
+
+
 def test_hook_prompt_cli_allows_with_unknown_runtime_keys(tmp_path, monkeypatch, capsys):
     payload = {
         "prompt_text": "list the kernel files",

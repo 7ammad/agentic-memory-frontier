@@ -364,12 +364,16 @@ def _read_hook_stdin() -> str:
     the console code page (decoding as text first would turn the BOM into cp1252
     mojibake ``ï»¿`` that a ``\\ufeff`` strip would miss). Falls back to text mode for
     test stubs (``io.StringIO``) that expose no ``.buffer``.
+
+    Decodes STRICTLY (no ``errors="replace"``): genuinely-malformed input raises
+    ``UnicodeDecodeError`` (a ``ValueError`` subclass) which ``main()`` maps to a clean
+    exit 2, rather than silently substituting U+FFFD and accepting mangled data.
     """
     import sys
 
     stream = sys.stdin
     if hasattr(stream, "buffer"):
-        return stream.buffer.read().decode("utf-8-sig", errors="replace").strip()
+        return stream.buffer.read().decode("utf-8-sig").strip()
     text = stream.read()
     for bom in ("﻿", "\xef\xbb\xbf"):  # decoded-as-utf-8 vs decoded-as-cp1252
         if text.startswith(bom):

@@ -62,16 +62,20 @@ def hook_on_user_prompt_submit(
 ) -> HookDecision:
     """Auto-capture a correction from a live user prompt and BLOCK; ALLOW otherwise.
 
-    Classifies FIRST and short-circuits a benign prompt to ALLOW with NO side effects
-    (no event written, no gate armed, no memory init) -- calling capture_correction
-    unconditionally would raise on an empty classification and wrongly block every prompt.
+    Classifies FIRST and short-circuits a benign prompt to ALLOW without capturing
+    (no event, no memory init) -- calling capture_correction unconditionally would
+    raise on an empty classification and wrongly block every prompt. The ALLOW still
+    reports the REAL gate state (read, not hardcoded): if a PRIOR correction left the
+    gate armed, the field must not falsely say "clear" to an integrator reading it.
     """
     if not classify_correction(prompt_text):
+        gate = correction_gate_status(root)
         return HookDecision(
             hook="user_prompt_submit",
             decision="allow",
             categories=[],
-            gate_status="clear",
+            gate_status=gate.status,
+            active_event_id=gate.active_event_id,
             hook_exit_code=HOOK_EXIT_ALLOW,
         )
     event = capture_correction(

@@ -52,6 +52,18 @@ def test_hook_user_prompt_blocks_records_event_and_arms_gate(tmp_path):
     assert gate.active_event_id == decision.event_id
 
 
+def test_benign_prompt_reports_real_gate_status_when_armed(tmp_path):
+    # Honesty (Greptile PR#8): a benign prompt is ALLOW (no NEW correction this turn),
+    # but if a PRIOR correction left the gate armed, the reported gate_status must
+    # reflect reality, not a hardcoded "clear" -- an integrator may read this field
+    # off the prompt-hook JSON instead of running the separate gate hook.
+    event = capture_correction(tmp_path, BLOCKING_PROMPT)  # arm the gate first
+    decision = hook_on_user_prompt_submit(tmp_path, BENIGN_PROMPT)
+    assert decision.decision == "allow"  # the benign prompt itself carries no correction
+    assert decision.gate_status == "blocked"  # but the unresolved prior block is surfaced
+    assert decision.active_event_id == event.event_id
+
+
 def test_hook_user_prompt_benign_allows_with_no_event_and_clear_gate(tmp_path):
     # The single most important canary: a benign prompt must classify-FIRST and
     # short-circuit to ALLOW with ZERO side effects. Calling capture_correction
