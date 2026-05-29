@@ -286,15 +286,44 @@ class CEM:
     def _matching_card(self, atom: ExperienceAtom) -> ExperienceCard | None:
         title = _title(atom.content)
         use_when = atom.domain_scope or atom.task_family or "similar task context"
+        atom_tokens = _content_tokens(atom.content)
+        best: tuple[float, ExperienceCard] | None = None
         for card in self.store.list_cards():
-            if card.title == title and card.use_when == use_when:
+            if card.use_when != use_when:
+                continue
+            if card.title == title:
                 return card
-        return None
+            similarity = _jaccard(atom_tokens, _content_tokens(card.title))
+            if similarity >= NEAR_DUPLICATE_THRESHOLD and (best is None or similarity > best[0]):
+                best = (similarity, card)
+        return best[1] if best is not None else None
 
 
 def _title(content: str) -> str:
     cleaned = " ".join(content.split())
     return cleaned[:80]
+
+
+# Consolidation merges atoms whose normalized content tokens overlap at or above
+# this Jaccard threshold within the same use_when scope. Tuned conservatively so
+# distinct lessons that share a stray token (e.g. "before") stay separate cards.
+NEAR_DUPLICATE_THRESHOLD = 0.5
+
+
+def _content_tokens(text: str) -> frozenset[str]:
+    return frozenset(
+        term.strip(".,:;!?()[]\"'")
+        for term in text.lower().split()
+        if len(term.strip(".,:;!?()[]\"'")) > 3
+    )
+
+
+def _jaccard(left: frozenset[str], right: frozenset[str]) -> float:
+    if not left or not right:
+        return 0.0
+    intersection = len(left & right)
+    union = len(left | right)
+    return intersection / union if union else 0.0
 
 
 SCORER_VERSION = "lexical_overlap_v0"
