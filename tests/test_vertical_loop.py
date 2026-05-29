@@ -23,3 +23,14 @@ def test_vertical_loop_leakage_guard_bites(tmp_path):
     # the runner's leakage guard must raise (not silently score).
     with pytest.raises(ValueError):
         run_vertical_loop(tmp_path, inject_leakage=True)
+
+
+def test_vertical_loop_verifies_cards_and_suppresses_negative_control(tmp_path):
+    # Phase 2b real caller: the loop must drive the verification machinery, not
+    # just leave it for the test suite. Each seeded candidate is probed against
+    # its decisive action on a held-out replay, so both earn verified. A planted
+    # negative control is injected and probed; it must be suppressed, leaving the
+    # suppression rate at a clean 1.0.
+    report = run_vertical_loop(tmp_path)
+    assert report.verified_card_count == 2
+    assert report.negative_control_suppression_rate == 1.0

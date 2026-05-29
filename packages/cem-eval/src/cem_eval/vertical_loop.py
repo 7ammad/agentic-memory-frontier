@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from cem_core import CEM, AgentTrace, TaskContext, TraceTurn
+from cem_core import CEM, AgentTrace, TaskContext, TraceTurn, VerificationProbe
 from cem_eval.eval_protocol import assert_no_leakage, marginal_memory_advantage
 
 SCORER_VERSION = "lexical_overlap_v0"
@@ -35,6 +35,8 @@ class VerticalLoopReport(BaseModel):
     trace_count: int
     atom_count: int
     card_count: int
+    verified_card_count: int
+    negative_control_suppression_rate: float
     brief_record_count: int
     influence_event_count: int
     scorer_version: str
@@ -45,6 +47,7 @@ def run_vertical_loop(root: str | Path, *, inject_leakage: bool = False) -> Vert
     memory_source_ids: set[str] = set()
 
     # 1-4: ingest -> propose atoms -> validate -> promote to candidate card.
+    seeded_cards: dict[str, str] = {}  # card_id -> decisive action it encodes
     for i, decisive in enumerate(HELD_OUT):
         trace = AgentTrace(
             session_id=f"seed-{i}",
@@ -56,7 +59,40 @@ def run_vertical_loop(root: str | Path, *, inject_leakage: bool = False) -> Vert
         memory_source_ids.add(trace.trace_id)
         for atom in cem.propose_memories(trace.trace_id):
             cem.validate(atom.atom_id)
-            cem.promote(atom.atom_id)
+            card = cem.promote(atom.atom_id)
+            if card is not None:
+                seeded_cards[card.card_id] = decisive
+
+    # 5-6: evidence-gated verification. Each candidate is probed on a held-out
+    # replay against its own decisive action; passing earns verified (the only
+    # path to verified per design 4.2). A planted negative control is injected
+    # and probed; recommending the wrong action, it fails and is suppressed.
+    for card_id, decisive in seeded_cards.items():
+        probe = cem.schedule_probe(
+            VerificationProbe(
+                kind="held_out_replay",
+                target_card_id=card_id,
+                control_definition="no-memory control cannot recommend the decisive action",
+                threshold=0.5,
+            )
+        )
+        cem.run_probe(
+            probe.probe_id,
+            task=TaskContext(session_id=None, description=decisive),
+            correct_action=decisive,
+        )
+
+    bad_card, neg_probe = cem.inject_negative_control(
+        title="incident assignment order",
+        bad_action="set assignee before assignment_group",
+        control_definition="planted false memory: inverted incident-form field order",
+        threshold=0.5,
+    )
+    cem.run_probe(
+        neg_probe.probe_id,
+        task=TaskContext(session_id=None, description="incident assignment order on the form"),
+        correct_action="set assignment_group before assignee",
+    )
 
     # Leakage guard (spec section 10): memory sources and held-out answer ids
     # must be disjoint. inject_leakage is the negative control.
@@ -86,7 +122,12 @@ def run_vertical_loop(root: str | Path, *, inject_leakage: bool = False) -> Vert
         )
 
     mma = marginal_memory_advantage(memory_success, no_memory_success)
-    # Counts come from real persisted state, not loop counters.
+    # Counts come from real persisted state, not loop counters. card_count is
+    # active cards only -- the suppressed negative control is deactivated and
+    # must not inflate the seeded-card tally.
+    all_cards = cem.store.list_cards()
+    active_card_count = sum(1 for card in all_cards if card.deactivated_at is None)
+    verified_card_count = sum(1 for card in all_cards if card.promotion_status == "verified")
     brief_record_count = sum(1 for brief_id in brief_ids if _record_persisted(cem, brief_id))
     influence_event_count = sum(
         len(cem.store.list_action_influence_events(influence_id))
@@ -99,7 +140,9 @@ def run_vertical_loop(root: str | Path, *, inject_leakage: bool = False) -> Vert
         ci_high=mma.ci_high,
         trace_count=len(memory_source_ids),
         atom_count=len(cem.store.list_atoms()),
-        card_count=len(cem.store.list_cards()),
+        card_count=active_card_count,
+        verified_card_count=verified_card_count,
+        negative_control_suppression_rate=cem.negative_control_suppression_rate(),
         brief_record_count=brief_record_count,
         influence_event_count=influence_event_count,
         scorer_version=SCORER_VERSION,
