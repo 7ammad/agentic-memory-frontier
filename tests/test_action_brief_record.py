@@ -29,7 +29,7 @@ def test_brief_is_enriched_and_delta_is_sourced(tmp_path):
     )
     assert brief.applicable_card_ids, "expected the seeded card to be selected"
     assert brief.influence_id is not None
-    assert brief.scorer_version == "lexical_overlap_v0"
+    assert brief.scorer_version == "action_value_v1"
     assert brief.expected_action_delta_source == "observational_unverified"
     assert brief.expected_action_delta is not None
     assert set(brief.score_breakdown_by_card) == set(brief.applicable_card_ids)
@@ -73,5 +73,5 @@ def test_retrieval_persists_action_brief_record(tmp_path):
     assert record.influence_id == brief.influence_id
     assert record.selected_card_ids == brief.applicable_card_ids
     assert set(record.candidate_card_ids) >= set(record.selected_card_ids)
-    assert record.scorer_version == "lexical_overlap_v0"
+    assert record.scorer_version == "action_value_v1"
     assert record.expected_action_delta_source == brief.expected_action_delta_source

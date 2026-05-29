@@ -15,7 +15,7 @@ def test_vertical_loop_runs_end_to_end_on_real_objects(tmp_path):
     # control scores 0, so the marginal advantage is a clean 1.0.
     assert report.mma == 1.0
     assert report.ci_low <= report.mma <= report.ci_high
-    assert report.scorer_version == "lexical_overlap_v0"
+    assert report.scorer_version == "action_value_v1"
 
 
 def test_vertical_loop_leakage_guard_bites(tmp_path):

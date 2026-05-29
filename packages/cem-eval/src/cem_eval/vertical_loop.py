@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from cem_core import CEM, AgentTrace, TaskContext, TraceTurn, VerificationProbe
 from cem_eval.eval_protocol import assert_no_leakage, marginal_memory_advantage
 
-SCORER_VERSION = "lexical_overlap_v0"
+SCORER_VERSION = "action_value_v1"
 
 # Held-out decisive actions double as the seeded skill content. The toy agent
 # "succeeds" on a task iff the retrieved brief recommends its decisive action;
