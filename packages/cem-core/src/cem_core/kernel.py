@@ -289,9 +289,16 @@ class CEM:
             1
             for probe in probes
             if probe.target_card_id is not None
-            and self.store.get_card(probe.target_card_id).promotion_status != "verified"
+            and self._card_is_inactive(self.store.get_card(probe.target_card_id))
         )
         return suppressed / len(probes)
+
+    @staticmethod
+    def _card_is_inactive(card: ExperienceCard) -> bool:
+        return (
+            card.promotion_status in {"deprecated", "superseded", "quarantined"}
+            or card.deactivated_at is not None
+        )
 
     def apply_verification_result(self, result: VerificationResult) -> ExperienceCard:
         card = self.store.get_card(result.card_id)
@@ -475,7 +482,7 @@ class CEM:
         atom_tokens = _content_tokens(atom.content)
         best: tuple[float, ExperienceCard] | None = None
         for card in self.store.list_cards():
-            if card.promotion_status in {"superseded", "deprecated", "quarantined"} or card.deactivated_at is not None:
+            if self._card_is_inactive(card):
                 continue
             if card.use_when != use_when:
                 continue

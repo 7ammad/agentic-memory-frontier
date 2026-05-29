@@ -126,26 +126,67 @@ def test_negative_control_is_suppressed_never_verified(tmp_path):
 
 
 def test_suppression_rate_drops_when_negative_control_leaks_to_verified(tmp_path):
-    # Failure canary for the suppression metric: if a negative control ever reaches
-    # verified (the runner failed to catch it), the rate must fall below 1.0. A
-    # metric that always returns 1.0 is not a gate -- this proves it detects a leak.
+    # Failure canary for the suppression metric: when every negative control is
+    # genuinely suppressed the rate is 1.0, but if one leaks to verified (the runner
+    # failed to catch it) the rate must fall below 1.0. A metric that always returns
+    # 1.0 is not a gate -- this proves it detects a leak. The 1.0 baseline here comes
+    # from an ACTUALLY suppressed control (probe run -> deprecated), never from an
+    # unrun control still live in retrieval.
     cem = CEM(tmp_path)
-    bad_card, probe = cem.inject_negative_control(
+
+    good, good_probe = cem.inject_negative_control(
         title="incident assignment order",
         bad_action="set assignee before assignment_group",
-        control_definition="planted false memory",
+        control_definition="planted false memory: caught by its probe",
         threshold=0.5,
     )
+    # Its probe runs and correctly refuses to verify -> deprecated -> suppressed.
+    cem.run_probe(
+        good_probe.probe_id,
+        task=_held_out_task("incident assignment order on the form"),
+        correct_action="set assignment_group before assignee",
+    )
+    assert cem.store.get_card(good.card_id).promotion_status == "deprecated"
     assert cem.negative_control_suppression_rate() == 1.0
 
-    # Simulate a leak: a passing result slips through and verifies the bad card.
+    # A second control leaks: a passing result slips through and verifies it.
+    leaked, leaked_probe = cem.inject_negative_control(
+        title="change approval order",
+        bad_action="deploy before change approval",
+        control_definition="planted false memory: leaked to verified",
+        threshold=0.5,
+    )
     cem.apply_verification_result(
         VerificationResult(
-            probe_id=probe.probe_id,
-            card_id=bad_card.card_id,
+            probe_id=leaked_probe.probe_id,
+            card_id=leaked.card_id,
             measured_lift=1.0,
             passed=True,
         )
     )
-    assert cem.store.get_card(bad_card.card_id).promotion_status == "verified"
+    assert cem.store.get_card(leaked.card_id).promotion_status == "verified"
+    # One of two controls suppressed -> rate strictly below 1.0.
     assert cem.negative_control_suppression_rate() < 1.0
+
+
+def test_suppression_rate_excludes_unrun_negative_control(tmp_path):
+    # Failure canary for metric honesty (design 4.2): a freshly planted negative
+    # control whose probe has NOT run is still candidate -- live and retrievable, an
+    # un-suppressed hazard. Counting it as suppressed (status != "verified") reports a
+    # false 1.0 that hides the planted memory. Suppression must mean the card is
+    # actually inactive, so an unrun control drives the rate below 1.0.
+    cem = CEM(tmp_path)
+    bad_card, _ = cem.inject_negative_control(
+        title="incident assignment order",
+        bad_action="set assignee before assignment_group",
+        control_definition="planted false memory: probe not yet run",
+        threshold=0.5,
+    )
+
+    # The planted control is live in retrieval -- it has NOT been suppressed.
+    brief = cem.retrieve_action_brief(_held_out_task("incident assignment order on the form"))
+    assert bad_card.card_id in brief.applicable_card_ids
+    assert cem.store.get_card(bad_card.card_id).promotion_status == "candidate"
+
+    # An un-suppressed hazard must not be reported as suppressed.
+    assert cem.negative_control_suppression_rate() == 0.0
