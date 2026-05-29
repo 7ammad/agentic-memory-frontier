@@ -653,7 +653,10 @@ def _staleness_penalty(card: ExperienceCard, task: TaskContext) -> float:
     if days_to_expiry >= STALE_WINDOW_DAYS:
         return 0.0
     if days_to_expiry <= 0:
-        return 1.0  # defensive; _card_in_scope already hard-drops expired cards
+        # Reachable at valid_until == current_time: _card_in_scope drops a card only
+        # when valid_until < current_time (strict), so a card expiring exactly now is
+        # still in scope and takes the full staleness penalty.
+        return 1.0
     return 1.0 - days_to_expiry / STALE_WINDOW_DAYS
 
 
@@ -665,11 +668,14 @@ def score_card(
 ) -> tuple[float, dict[str, float]]:
     """Transparent additive feature ranker (action_value_v1).
 
-    Returns ``(total, breakdown)``. Each sub-feature is bounded to [0, 1] before
-    weighting and the breakdown's ``weighted_*`` terms sum exactly to ``total`` --
-    every ranking is auditable per card. ``max_raw_lexical`` is the candidate-set
-    max used to normalize the lexical floor into [0, 1]; the raw count is preserved
-    separately under ``lexical_overlap`` for hand-verification and the baseline diff.
+    Returns ``(total, breakdown)``. Each ranking sub-feature is bounded to [0, 1]
+    before weighting (the lexical floor via ``lexical_overlap_norm``) and the
+    breakdown's ``weighted_*`` terms sum exactly to ``total`` -- every ranking is
+    auditable per card. ``max_raw_lexical`` is the candidate-set max used to
+    normalize the lexical floor into [0, 1]; both the normalized value
+    (``lexical_overlap_norm``, from which ``weighted_lexical`` is re-derivable) and
+    the raw unbounded count (``lexical_overlap``, for hand-verification and the
+    Phase 4 baseline diff) are persisted.
     """
     precondition_match = _precondition_match(card, task)
     raw_lexical = _raw_lexical_overlap(card, task)
@@ -696,6 +702,7 @@ def score_card(
     breakdown = {
         "precondition_match": precondition_match,
         "lexical_overlap": float(raw_lexical),
+        "lexical_overlap_norm": lexical_norm,
         "verified_lift_prior": verified_lift,
         "recency_temporal": recency,
         "contradiction_penalty": contradiction,

@@ -12,11 +12,13 @@ card A is given a fresh ``valid_from`` so its recency matches the verified card 
 (which gets ``last_validated_at`` from verification), leaving the measured lift as
 the only thing that can flip the ranking.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from math import exp
 
 import pytest
 
 from cem_core import CEM, TaskContext
+from cem_core.kernel import W_CON, W_LEX, W_LIFT, W_PRE, W_REC, W_STALE
 from cem_core.models import ExperienceCard, VerificationResult, utc_now
 
 # Task whose haystack the cards overlap to varying degrees.
@@ -88,7 +90,11 @@ def test_unverified_only_has_zero_lift_and_observational_source(tmp_path):
     assert brief.expected_action_delta == pytest.approx(0.7)  # max confidence of selected
 
 
-def test_breakdown_weighted_terms_sum_to_total(tmp_path):
+def test_breakdown_terms_are_weight_times_feature_and_total_recomputes(tmp_path):
+    # Auditability invariant, NON-tautologically: each weighted_* term must equal
+    # its weight times the (reconstructable) raw feature, penalties carry the right
+    # sign, and total must recompute from the RAW features -- not by re-summing the
+    # stored weighted_* values (that would only prove addition is commutative).
     cem = CEM(tmp_path)
     verified = _make_card(cem, title="deploy rollback safely", template="deploy rollback safely")
     _verify(cem, verified, 0.5)
@@ -103,18 +109,35 @@ def test_breakdown_weighted_terms_sum_to_total(tmp_path):
 
     assert brief.score_breakdown_by_card, "expected a mixed set to be selected"
     for feats in brief.score_breakdown_by_card.values():
-        weighted_sum = (
-            feats["weighted_precondition"]
-            + feats["weighted_lexical"]
-            + feats["weighted_verified_lift"]
-            + feats["weighted_recency"]
-            + feats["weighted_contradiction"]
-            + feats["weighted_staleness"]
+        # Sign discipline: penalties never positive, bonuses never negative.
+        assert feats["weighted_precondition"] >= 0.0
+        assert feats["weighted_lexical"] >= 0.0
+        assert feats["weighted_verified_lift"] >= 0.0
+        assert feats["weighted_recency"] >= 0.0
+        assert feats["weighted_contradiction"] <= 0.0
+        assert feats["weighted_staleness"] <= 0.0
+        # Each weighted term == weight x the raw feature it claims to weight (catches
+        # a term fed the wrong feature, or a flipped penalty sign).
+        assert feats["weighted_precondition"] == pytest.approx(W_PRE * feats["precondition_match"])
+        assert feats["weighted_lexical"] == pytest.approx(W_LEX * feats["lexical_overlap_norm"])
+        assert feats["weighted_verified_lift"] == pytest.approx(W_LIFT * feats["verified_lift_prior"])
+        assert feats["weighted_recency"] == pytest.approx(W_REC * feats["recency_temporal"])
+        assert feats["weighted_contradiction"] == pytest.approx(-W_CON * feats["contradiction_penalty"])
+        assert feats["weighted_staleness"] == pytest.approx(-W_STALE * feats["staleness_penalty"])
+        # total recomputed independently from the raw features.
+        expected_total = (
+            W_PRE * feats["precondition_match"]
+            + W_LEX * feats["lexical_overlap_norm"]
+            + W_LIFT * feats["verified_lift_prior"]
+            + W_REC * feats["recency_temporal"]
+            - W_CON * feats["contradiction_penalty"]
+            - W_STALE * feats["staleness_penalty"]
         )
-        assert weighted_sum == pytest.approx(feats["total"])
+        assert feats["total"] == pytest.approx(expected_total)
         for key in (
             "precondition_match",
             "lexical_overlap",
+            "lexical_overlap_norm",
             "verified_lift_prior",
             "recency_temporal",
             "contradiction_penalty",
@@ -122,6 +145,10 @@ def test_breakdown_weighted_terms_sum_to_total(tmp_path):
             "total",
         ):
             assert key in feats
+
+    # Lock the pre-registered W_LIFT value numerically: measured_lift=0.5 must
+    # contribute exactly 4.0 * 0.5 = 2.0 (bites if W_LIFT is retuned off 4.0).
+    assert brief.score_breakdown_by_card[verified.card_id]["weighted_verified_lift"] == pytest.approx(2.0)
 
 
 def test_contradicted_verified_card_survives_single_conflict(tmp_path):
@@ -145,13 +172,32 @@ def test_contradicted_verified_card_survives_single_conflict(tmp_path):
     assert ids.index(verified.card_id) < ids.index(peer.card_id)  # lift still wins
 
 
-def test_naive_anchor_does_not_raise(tmp_path):
+def test_naive_anchor_does_not_raise_and_recency_is_exact(tmp_path):
     cem = CEM(tmp_path)
     card = _make_card(cem, title="deploy rollback safely", template="deploy rollback safely")
     card.last_validated_at = datetime(2026, 1, 1, 0, 0, 0)  # tz-naive legacy value, no validator
     cem.store.save_card(card)
 
-    brief = cem.retrieve_action_brief(TaskContext(description=TASK))  # must not raise TypeError
+    # Fixed offset-aware current_time exactly one half-life (30 days) after the anchor.
+    task = TaskContext(description=TASK, current_time=datetime(2026, 1, 31, 0, 0, 0, tzinfo=timezone.utc))
+    brief = cem.retrieve_action_brief(task)  # must not raise on naive-vs-aware subtraction
 
     feats = brief.score_breakdown_by_card[card.card_id]
-    assert 0.0 <= feats["recency_temporal"] <= 1.0
+    # The naive anchor is coerced to UTC; age == 30d == one HALF_LIFE_DAYS -> exp(-1).
+    assert feats["recency_temporal"] == pytest.approx(exp(-1))
+
+
+def test_staleness_penalty_full_at_exact_expiry_boundary(tmp_path):
+    # Characterization of the reachable boundary the review flagged: at
+    # valid_until == current_time, _card_in_scope keeps the card (strict <) and the
+    # staleness branch assigns the full 1.0 penalty.
+    cem = CEM(tmp_path)
+    now = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+    card = _make_card(cem, title="deploy rollback safely", template="deploy rollback safely")
+    card.valid_until = now
+    cem.store.save_card(card)
+
+    brief = cem.retrieve_action_brief(TaskContext(description=TASK, current_time=now))
+
+    assert card.card_id in brief.applicable_card_ids  # still in scope at the boundary
+    assert brief.score_breakdown_by_card[card.card_id]["staleness_penalty"] == pytest.approx(1.0)
