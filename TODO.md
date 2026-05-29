@@ -182,7 +182,7 @@ Do not start these until CEM-0 proof items above and the external benchmark runn
 - [x] Add `correction capture`, `correction gate`, `correction list`, and `correction resume` CLI commands.
 - [x] Add Monitor-0 checks for correction controller wiring, resume gate state, recorded corrections, and correction directive surfacing in action briefs.
 - [x] Add subprocess tests for plan-first violation, repeated drift, routing, resume gate, and action-brief retrieval.
-- [ ] Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface.
+- [x] Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface. Runtime-agnostic `correction_hooks.py` core (`hook_on_user_prompt_submit` classify-first/zero-side-effect-on-benign + `hook_on_pre_tool_use_gate` fail-closed deny; `HookDecision` + named exit codes); `correction hook-prompt`/`hook-gate` CLI subcommands (untyped stdin + UTF-8-BOM tolerant; `main()` maps the decision to the exit code); two PowerShell wrappers mirroring `session-start-gate.ps1`. Monitor-0 single-source-of-truth bridge test; human-approval-only resume preserved (no agent self-resume). **169 pytest green (+15); both gate canaries bit; PS wrappers smoke-verified end-to-end (caught a real PS UTF-8-BOM stdin bug pytest missed).** Open: a live runtime smoke of the wrappers' [UNVERIFIED] payload field projection.
 
 ### 13. CEM-1 Full Kernel Build
 

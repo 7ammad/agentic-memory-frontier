@@ -12,6 +12,7 @@ from .correction_capture import (
     list_corrections,
     resume_correction,
 )
+from .correction_hooks import hook_on_pre_tool_use_gate, hook_on_user_prompt_submit
 from .local_memory import (
     audit_memory,
     bootstrap_codex,
@@ -39,8 +40,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         payload = args.handler(args)
     except (KeyError, ValueError) as exc:
+        # json.JSONDecodeError (malformed hook stdin) is a ValueError -> exit 2 before
+        # any capture, so a parse error never writes an event or prints to stdout.
         parser.exit(2, f"ams: {exc}\n")
     _emit(payload, as_json=args.json)
+    # §12 hook decisions carry the process exit code (0 allow / 10 block / 11 gate);
+    # every other command returns 0 (no hook_exit_code key).
+    if isinstance(payload, dict) and "hook_exit_code" in payload:
+        return int(payload["hook_exit_code"])
     return 0
 
 
@@ -204,6 +211,24 @@ def build_parser() -> argparse.ArgumentParser:
     correction_resume_parser.add_argument("--note", help="Resume note.")
     correction_resume_parser.set_defaults(handler=_cmd_correction_resume)
 
+    # §12 live runtime hooks (UserPromptSubmit / PreToolUse). Read a hook payload from
+    # stdin (hook-prompt) or no input (hook-gate); the exit code carries the decision
+    # (0 allow, 10 prompt-block, 11 gate-blocked, 2 parse/Waki error). No hook-resume
+    # subcommand exists: the gate clears ONLY via `correction resume` (human-approved).
+    correction_hook_prompt_parser = correction_subparsers.add_parser(
+        "hook-prompt",
+        parents=[json_parent],
+        help="UserPromptSubmit hook: classify a prompt (read from stdin), capture + block on a correction.",
+    )
+    correction_hook_prompt_parser.set_defaults(handler=_cmd_correction_hook_prompt)
+
+    correction_hook_gate_parser = correction_subparsers.add_parser(
+        "hook-gate",
+        parents=[json_parent],
+        help="PreToolUse hook: deny continuation while the resume gate is armed.",
+    )
+    correction_hook_gate_parser.set_defaults(handler=_cmd_correction_hook_gate)
+
     dashboard_parser = subparsers.add_parser("dashboard", parents=[json_parent], help="Show latest AMS operator status.")
     dashboard_parser.set_defaults(handler=_cmd_dashboard)
 
@@ -331,6 +356,46 @@ def _cmd_correction_resume(args: argparse.Namespace) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
+def _read_hook_stdin() -> str:
+    """Read a hook payload from stdin, tolerating a leading UTF-8 BOM.
+
+    Windows PowerShell 5.1 prepends a UTF-8 BOM when piping a string to a native
+    command. Reading the raw bytes and decoding ``utf-8-sig`` strips it regardless of
+    the console code page (decoding as text first would turn the BOM into cp1252
+    mojibake ``ï»¿`` that a ``\\ufeff`` strip would miss). Falls back to text mode for
+    test stubs (``io.StringIO``) that expose no ``.buffer``.
+    """
+    import sys
+
+    stream = sys.stdin
+    if hasattr(stream, "buffer"):
+        return stream.buffer.read().decode("utf-8-sig", errors="replace").strip()
+    text = stream.read()
+    for bom in ("﻿", "\xef\xbb\xbf"):  # decoded-as-utf-8 vs decoded-as-cp1252
+        if text.startswith(bom):
+            text = text[len(bom):]
+    return text.strip()
+
+
+def _cmd_correction_hook_prompt(args: argparse.Namespace) -> dict[str, Any]:
+    # Parse stdin as an UNTYPED dict (never a StrictModel), so unknown runtime keys
+    # (transcript_path, cwd, hook_event_name, ...) are tolerated. A malformed payload
+    # raises json.JSONDecodeError (a ValueError subclass) -> main() maps it to exit 2,
+    # before any capture, so no event is written.
+    payload = json.loads(_read_hook_stdin() or "{}")
+    decision = hook_on_user_prompt_submit(
+        args.root,
+        payload.get("prompt_text", ""),
+        session_id=payload.get("session_id"),
+        affected_files=payload.get("affected_files") or [],
+    )
+    return decision.model_dump(mode="json")
+
+
+def _cmd_correction_hook_gate(args: argparse.Namespace) -> dict[str, Any]:
+    return hook_on_pre_tool_use_gate(args.root).model_dump(mode="json")
+
+
 def _cmd_dashboard(args: argparse.Namespace) -> dict[str, Any]:
     return dashboard_status(args.root)
 
@@ -339,7 +404,12 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
     if as_json:
         print(json.dumps(payload, indent=2))
         return
-    if "brief_id" in payload and "monitor_id" in payload:
+    # Hook decisions FIRST: the unique 'hook'+'hook_exit_code' discriminator keeps a
+    # HookDecision (which carries event_id/active_event_id) from misrouting through the
+    # correction-event or gate emitters below.
+    if "hook" in payload and "hook_exit_code" in payload:
+        _emit_correction_hook(payload)
+    elif "brief_id" in payload and "monitor_id" in payload:
         _emit_startup_brief(payload)
     elif "event_id" in payload and "route_targets" in payload:
         _emit_correction_event(payload)
@@ -485,6 +555,13 @@ def _emit_startup_brief(payload: dict[str, Any]) -> None:
         print("actions:")
         for action in payload["recommended_next_actions"]:
             print(f"- {action}")
+
+
+def _emit_correction_hook(payload: dict[str, Any]) -> None:
+    print(f"hook: {payload['hook']} {payload['decision']} (exit {payload['hook_exit_code']})")
+    if payload.get("event_id"):
+        print(f"event: {payload['event_id']}")
+    print(f"gate: {payload['gate_status']}")
 
 
 def _emit_correction_event(payload: dict[str, Any]) -> None:
