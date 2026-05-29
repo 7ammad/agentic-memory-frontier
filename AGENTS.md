@@ -24,6 +24,8 @@ This is the project root. **Never write or read files under `C:\Dev\Builds\Waki`
 
 ## Critical rules (locked from prior session)
 
+**HARDGATE — autonomous build loop (CEM-1 Phases 3-5, mirrors `CLAUDE.md`):** Finish the CEM-1 build as ONE self-paced session (not a manual multi-session fan-out): next unchecked `TODO.md` item -> full build (no MVP/distillation/stubs; TDD + a failure canary that bites) -> `python -m pytest` green -> commit -> continue. Each slice ships as a minimal single-surface PR to `staging` and runs the Greptile review-loop to 5/5 (stop rule: ~5 turns / stuck at 4/5 -> human). Self-pace external review waits with the `/loop` dynamic engine (`ScheduleWakeup`). **Stop before merge — merging is the user's call.** Full contract: `docs/WORKFLOW.md`. (Note: the rest of this file is stale 2026-05-26 A/B/C/D context; the live rail is `TODO.md` + `CLAUDE.md`.)
+
 1. **Mandatory verification between sub-projects.** After every deliverable: dispatch codex strict-review (Step 6 of the `dual-counsel` skill). Loop until READY. Never accept PATCH-FIRST as done.
 2. **Sub-projects in strict sequence**: B → C → D, one at a time.
 3. **Working directory rule**: research → `research/`, specs → `specs/`, session handoffs → `sessions/`, codex counsels → `research/codex-counsel-*.md`. NEVER touch Waki.

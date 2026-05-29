@@ -41,6 +41,8 @@ research/ specs/ sessions/        plan + spec + handoffs (incl. historical A/B/C
 
 ## Workflow rules
 
+**HARDGATE — autonomous build loop (CEM-1 Phases 3-5):** Finish the CEM-1 build as ONE self-paced session, not a manual multi-session fan-out. Take the next unchecked `TODO.md` item -> build it (full: no MVP/distillation/stubs; TDD + a failure canary that bites) -> verify (`python -m pytest` green) -> commit -> continue. Ship each slice as a minimal single-surface PR to `staging` and run the Greptile review-loop to 5/5 (stop rule: ~5 turns or stuck at 4/5 -> hand to human). Self-pace across external review waits with the `/loop` dynamic engine (`ScheduleWakeup`). **The agent stops before merge — merging is the user's call.** Full contract: `docs/WORKFLOW.md`.
+
 1. Run `scripts/session-start-gate.ps1` before any implementation, patch, or status claim. If it fails, fix memory wiring first.
 2. Record changes: `CHANGELOG.md` (timeline) + `docs/PROJECT-LEDGER.md` (decisions/gaps/mistakes/verification) — before or alongside the change.
 3. Follow `TODO.md`: after a verified item, run checks → commit → update TODO → continue to the next unchecked item unless blocked/redirected.
