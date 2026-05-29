@@ -165,6 +165,11 @@ class CEM:
         evidence is stale: it is marked ``superseded``, deactivated, and pointed at
         the new card so retrieval drops it (design 4.4 -- not merely a link).
         """
+        # superseded_by is only ever populated by an invalidation_event atom
+        # (validator._supersede_conflicts), so no other atom can supersede a card --
+        # skip the full atom scan for the common case.
+        if new_atom.epistemic_type != "invalidation_event":
+            return
         newly_superseded = {
             atom.atom_id
             for atom in self.store.list_atoms()
