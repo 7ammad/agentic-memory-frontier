@@ -313,6 +313,24 @@ Entry format:
 - Verification: `python -m pytest` -> 107 passed (12 new tests, every gate paired with a failure canary). `python scripts/run_synthetic_eval.py` clean (false-memory resistance 1.0, contradiction precision/recall 1.0, false-quarantine rate 0.0); `python scripts/run_cem_vertical_loop.py` -> `verified_card_count` 2, `negative_control_suppression_rate` 1.0. Independent verifier subagent refuted all four Phase 2 claims as SUPPORTED: proved two canaries bite (break -> fail -> revert -> pass) on the grounding guard and the suppression-rate gate, grep-confirmed `apply_verification_result` (kernel.py:302) is the only card `verified` assignment and `scorer_version` stays `lexical_overlap_v0`, and confirmed the real caller chain (`run_vertical_loop` -> `schedule_probe`/`run_probe`; script -> loop). Tree left clean (`git status --short` empty). Commits: `8379ef4` (supersession), `3becd56` (contradiction links), `bea64b1` (probe runner), `1347593` (negative-control suppression), `9d1eb80` (vertical-loop wiring).
 - Follow-up: Phase 3 - action-value retrieval (advance `scorer_version` past `lexical_overlap_v0`, rank briefs by measured/expected action value, record influence events), then Phases 4-5.
 
+## LEDGER-20260529-017 - PR#4 Phase 2 Greptile review round driven to fixes (3/5 -> re-review)
+
+- Date: 2026-05-29
+- Type: verification
+- Status: resolved
+- Source: Greptile review of PR#4 (`feat/cem1-phase2-consolidation-verification`) returned Confidence 3/5 with three findings. Per the codified review-loop hardgate (every slice rides the Greptile PR loop to 5/5), the findings were fixed test-first before re-review.
+- Summary: Three atomic TDD fixes, each with a failure canary proven to bite.
+  - **Issue 1 - silent atom loss (correctness).** `_matching_card` scanned all cards without filtering inactive ones, so a re-observed lesson whose title matched a superseded/deprecated card was merged into that dead card; because `_card_in_scope` drops inactive cards, the re-observed atom became permanently unretrievable. Added a status guard mirroring `_link_contradicting_cards`. RED canary `test_reobserved_lesson_does_not_merge_into_inactive_card` confirmed the merge-into-dead-card bug (same `card_id`) before the fix. Commit `4ed433b`.
+  - **Issue 2 - dishonest suppression metric (metric integrity).** `negative_control_suppression_rate()` counted any card with `promotion_status != "verified"` as suppressed, so a freshly planted negative control whose probe had not run -- still `candidate` and live in retrieval -- was reported as suppressed (false 1.0 hiding a live hazard). Rejected Greptile's literal suggestion (filter denominator to run probes) because it would vacuously return 1.0 with zero run probes AND break the existing leak canary (which simulates the leak via `apply_verification_result`, leaving `probe.status` unset). Instead the numerator now counts only actually-inactive cards via a shared `_card_is_inactive` predicate (also adopted by `_matching_card`). RED canary `test_suppression_rate_excludes_unrun_negative_control` asserted `1.0 == 0.0` before the fix; the leak canary was rewritten to baseline 1.0 from a genuinely suppressed control. Commit `ba9efff`.
+  - **Issue 3 - redundant scan on the hot path (perf).** `_supersede_stale_cards` ran a full `list_atoms()` scan on every promote, though `superseded_by` is only ever populated by an `invalidation_event` atom (validator `_supersede_conflicts`, the sole writer -- grep-confirmed across the codebase). Added an early-exit for non-invalidation atoms. Behavior-preserving (no new test; both branches already covered by the existing supersession test and the Issue-1 re-observation canary). Commit `d8a5bec`.
+- Files:
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `tests/test_consolidation.py`
+  - `tests/test_verification.py`
+  - `CHANGELOG.md`
+- Verification: `python -m pytest` -> 109 passed (1 net-new test; +2 from the Phase 2 baseline of 107). Each fix RED-first: Issue 1 watched `assert card_id != card_id` fail; Issue 2 watched `assert 1.0 == 0.0` fail; Issue 3's early-exit kept both the invalidation branch (`test_newer_atom_supersedes_stale_card_and_removes_it_from_retrieval`, whose `superseded_by_card_ids == [card_b]` assertion can only pass if the body ran) and the non-invalidation branch green. Grep confirmed validator.py:154 is the only writer of `superseded_by` and extractor.py:14 maps `UPDATE:` -> `invalidation_event`.
+- Follow-up: Push branch, post the Issue-2 design-choice reply to Greptile, run the re-review loop to 5/5, then stop before merge (merge is the user's call). Phase 3 (action-value retrieval) stacks on this branch once PR#4 is 5/5.
+
 ## Open Follow-Ups
 
 - Add latency budget enforcement to the startup controller.
