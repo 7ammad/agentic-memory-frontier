@@ -13,6 +13,16 @@ from dataclasses import dataclass
 # causal-retrieval thesis is unproven.
 LEXICAL_MARGIN_PP: float = 5.0
 
+# Pre-registered, LOCKED retrieval-latency READINESS ceiling (ms), ratified by the
+# user (LEDGER-020). Smaller-is-better: the CEM read path (kernel.retrieve_action_brief)
+# is pure in-memory scoring over the corpus -- no network, embedding, or disk on the
+# hot path -- so observed p95 is sub-ms to low-single-digit ms. 50ms gives ~1-2 orders
+# of magnitude of headroom (will not flake) yet still trips a genuine algorithmic
+# regression (accidental O(n^2) rescan, per-call re-validation, a sync disk/embedding
+# call). This is a READINESS flag for the production-readiness gate, NOT a verdict gate:
+# it must never enter the Phase 4 MMA PASS/FAIL verdict.
+RETRIEVAL_LATENCY_BUDGET_MS: float = 50.0
+
 
 @dataclass(frozen=True)
 class Baseline:
@@ -100,3 +110,19 @@ def beats_lexical_by_margin(
     by floating-point noise; 1e-6 pp is far finer than any real n-task measurement.
     """
     return round(lexical_margin_pp(cem_result, lexical_result), 6) >= margin_pp
+
+
+def within_latency_budget(
+    measured_ms: float, *, budget_ms: float = RETRIEVAL_LATENCY_BUDGET_MS
+) -> bool:
+    """READINESS gate (NOT a verdict gate): the CEM retrieval read path's measured
+    latency must be <= ``budget_ms``.
+
+    Latency is smaller-is-better, so the operator is ``<=`` -- the OPPOSITE of
+    ``beats_lexical_by_margin`` (where bigger is better, hence ``>=``). The measured
+    value is rounded to 6 decimal places before the comparison so float noise at the
+    exact boundary (e.g. 50.0000004) is absorbed, identical to the margin gate's
+    rounding. This flag feeds the production-readiness gate; it must never enter the
+    Phase 4 MMA PASS/FAIL verdict.
+    """
+    return round(measured_ms, 6) <= budget_ms

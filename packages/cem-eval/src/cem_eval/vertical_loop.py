@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from cem_core import CEM, AgentTrace, TaskContext, TraceTurn, VerificationProbe
+from cem_core import CEM, AgentTrace, TaskContext, TraceTurn, VerificationProbe, card_is_inactive
 from cem_eval.eval_protocol import assert_no_leakage, marginal_memory_advantage
 
 SCORER_VERSION = "action_value_v1"
@@ -126,7 +126,10 @@ def run_vertical_loop(root: str | Path, *, inject_leakage: bool = False) -> Vert
     # active cards only -- the suppressed negative control is deactivated and
     # must not inflate the seeded-card tally.
     all_cards = cem.store.list_cards()
-    active_card_count = sum(1 for card in all_cards if card.deactivated_at is None)
+    # Active = not inactive on the shared axis (status OR deactivation), so this
+    # count cannot diverge from verified_card_count / retrieval on a card that is
+    # e.g. quarantined-but-not-deactivated.
+    active_card_count = sum(1 for card in all_cards if not card_is_inactive(card))
     verified_card_count = sum(1 for card in all_cards if card.promotion_status == "verified")
     brief_record_count = sum(1 for brief_id in brief_ids if _record_persisted(cem, brief_id))
     influence_event_count = sum(

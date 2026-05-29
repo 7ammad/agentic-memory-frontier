@@ -24,6 +24,19 @@ from .models import (
 from .storage import CEMStore, SQLiteStore
 from .validator import MemoryValidator
 
+_INACTIVE_STATUSES = frozenset({"deprecated", "superseded", "quarantined"})
+
+
+def card_is_inactive(card: ExperienceCard) -> bool:
+    """A card is inactive (retrieval must drop it) when its lifecycle status is a
+    terminal/dead state OR it has been explicitly deactivated.
+
+    Single source of truth for inactivity, so every consumer -- retrieval,
+    ``_matching_card``, ``negative_control_suppression_rate``, ``_supersede_stale_cards``,
+    and the eval vertical loop's active-card count -- classifies on the SAME axis.
+    """
+    return card.promotion_status in _INACTIVE_STATUSES or card.deactivated_at is not None
+
 
 class CEM:
     def __init__(
@@ -180,7 +193,7 @@ class CEM:
         if not newly_superseded:
             return
         for card in self.store.list_cards():
-            if card.card_id == new_card.card_id or card.promotion_status == "superseded":
+            if card.card_id == new_card.card_id or card_is_inactive(card):
                 continue
             evidence = set(card.evidence_atom_ids)
             if not evidence & newly_superseded:
@@ -302,10 +315,7 @@ class CEM:
 
     @staticmethod
     def _card_is_inactive(card: ExperienceCard) -> bool:
-        return (
-            card.promotion_status in {"deprecated", "superseded", "quarantined"}
-            or card.deactivated_at is not None
-        )
+        return card_is_inactive(card)
 
     def apply_verification_result(self, result: VerificationResult) -> ExperienceCard:
         card = self.store.get_card(result.card_id)

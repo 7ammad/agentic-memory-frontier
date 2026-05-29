@@ -16,16 +16,24 @@ validating/verifying away the traps that lexical similarity surfaces.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timedelta
 
 from pydantic import BaseModel, ConfigDict
 
 from cem_core import AgentTrace, TaskContext
+from cem_core.models import utc_now
 from cem_eval.synthetic_corruption import build_synthetic_corruption_fixture
 
-# Fixed, offset-aware evaluation instant (deterministic; defense-in-depth against
-# the offset-naive/aware comparison the kernel already coerces at the model layer).
-EVAL_NOW = datetime(2026, 5, 29, 12, 0, 0, tzinfo=timezone.utc)
+# Offset-aware evaluation instant. It MUST sit at/after the wall-clock moment the
+# exam builds memory: the kernel stamps each card's valid_from with utc_now() at
+# promote time, so a fixed calendar instant the wall clock has already passed
+# future-dates every card out of scope (empty briefs -> MMA collapses to 0). A
+# small margin past "now" guarantees exam-built cards (created milliseconds later)
+# are in scope. The exam stays deterministic in OUTCOME because every score
+# feature is a RELATIVE delta (recency age, days-to-expiry) that is stable to
+# within the import->build gap; the absolute instant does not enter any score.
+# Anchored once at import so the dataset tasks and the build/probe path share it.
+EVAL_NOW = utc_now() + timedelta(hours=1)
 
 # Decisive lessons the source teaches, and their lexically-attractive traps.
 ASSIGNMENT = "set assignment_group before assignee"

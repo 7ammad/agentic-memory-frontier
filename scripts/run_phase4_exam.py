@@ -34,7 +34,12 @@ def main() -> int:
         print(f"  {rung.name:22} {rung.mma:6.3f}  [{rung.ci_low:6.3f}, {rung.ci_high:6.3f}]{flag}")
     print()
     print(report.headline)
-    # Exit code reflects the single-shot verdict (PASS=0, honest miss=1).
+    print(
+        f"LATENCY READINESS: retrieval p95 = {report.p95_retrieval_latency_ms:.2f}ms / "
+        f"budget {report.retrieval_latency_budget_ms:.0f}ms -> within_budget = {report.within_latency_budget}"
+    )
+    # Exit code reflects the single-shot verdict ONLY (PASS=0, honest miss=1).
+    # Latency is a readiness flag and must not change the exit code.
     return 0 if report.verdict == "PASS" else 1
 
 
