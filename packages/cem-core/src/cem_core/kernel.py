@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from math import exp
 from pathlib import Path
 
 from .contradiction import ContradictionDetector, contradiction_pair
@@ -320,23 +322,52 @@ class CEM:
 
     def retrieve_action_brief(self, task: TaskContext, *, max_cards: int = 5) -> ActionBrief:
         in_scope = [card for card in self.store.list_cards() if self._card_in_scope(card, task)]
-        scored = sorted(
-            ((score_card(card, task), card) for card in in_scope),
-            key=lambda item: item[0],
-            reverse=True,
+        in_scope_ids = frozenset(card.card_id for card in in_scope)
+        max_raw_lexical = max((_raw_lexical_overlap(card, task) for card in in_scope), default=0)
+        scored = [
+            (score_card(card, task, in_scope_ids, max_raw_lexical), card) for card in in_scope
+        ]
+        # Relevance-keyed selection (NOT net-total): a card is a candidate iff it is
+        # actually relevant -- precondition match, lexical overlap, or earned lift --
+        # so a penalty never silently drops a relevant card and pure recency noise
+        # is excluded. Among the relevant, rank by total action value with a fully
+        # deterministic tie-break (lift, then precondition, then raw similarity, then id).
+        relevant = [
+            (total, breakdown, card)
+            for (total, breakdown), card in scored
+            if breakdown["precondition_match"] > 0.0
+            or breakdown["lexical_overlap"] > 0.0
+            or breakdown["verified_lift_prior"] > 0.0
+        ]
+        relevant.sort(
+            key=lambda item: (
+                -item[0],
+                -item[1]["verified_lift_prior"],
+                -item[1]["precondition_match"],
+                -item[1]["lexical_overlap"],
+                item[2].card_id,
+            )
         )
-        selected = [(score, card) for score, card in scored if score > 0][:max_cards]
-        selected_cards = [card for _, card in selected]
+        selected = relevant[:max_cards]
+        selected_cards = [card for _, _, card in selected]
         confidence = max((card.confidence_score for card in selected_cards), default=0.0)
-        score_breakdown = {
-            card.card_id: {"lexical_overlap": float(score)} for score, card in selected
-        }
+        score_breakdown = {card.card_id: breakdown for _, breakdown, card in selected}
+        # expected_action_delta is sourced, never invented: realized causal lift of
+        # the strongest verified selected card (probe_verified), else the non-causal
+        # confidence proxy (observational_unverified), else none. heldout_eval is
+        # reserved for the Phase 4 MMA harness and never synthesized here.
+        expected_delta: float | None = None
+        delta_source = "none"
         if selected_cards:
-            expected_delta: float | None = confidence
-            delta_source = "observational_unverified"
-        else:
-            expected_delta = None
-            delta_source = "none"
+            verified_lifts = [
+                card.measured_lift
+                for card in selected_cards
+                if card.measured_lift is not None and card.promotion_status == "verified"
+            ]
+            if verified_lifts:
+                expected_delta, delta_source = max(verified_lifts), "probe_verified"
+            else:
+                expected_delta, delta_source = confidence, "observational_unverified"
         influence_id = new_id("influence")
         brief = ActionBrief(
             task_id=task.task_id,
@@ -543,10 +574,138 @@ def _abstraction_grounded(atom: ExperienceAtom) -> bool:
     return claim_tokens <= span_tokens
 
 
-SCORER_VERSION = "lexical_overlap_v0"
+SCORER_VERSION = "action_value_v1"
+
+# --- action_value_v1 transparent feature ranker (design 4.1) -----------------
+# Pre-registered weight set: the SINGLE locked candidate. Per spec section 10
+# these constants may only be tuned on the dev split, with the held-out MMA
+# evaluated once per locked set (max 5 iterations). Every term is auditable --
+# no learned weights, no softmax/sigmoid; combination is division-by-named-constant.
+W_PRE = 1.0  # precondition_match (bonus)
+W_LEX = 1.0  # lexical_overlap_norm (similarity floor + the >=5pp baseline diff)
+W_LIFT = 4.0  # verified_lift_prior (the deliberate dominant separator once earned)
+W_REC = 1.0  # recency_temporal (bonus)
+W_CON = 2.0  # contradiction_penalty (subtracted)
+W_STALE = 1.5  # staleness_penalty (subtracted)
+HALF_LIFE_DAYS = 30.0  # recency exponential-decay half-life
+STALE_WINDOW_DAYS = 14.0  # staleness ramp window before valid_until
+CONTRA_SATURATION = 2.0  # contradiction count at which the penalty saturates
 
 
-def score_card(card: ExperienceCard, task: TaskContext) -> int:
+def _as_utc(value: datetime) -> datetime:
+    # last_validated_at has no model-level UTC validator (unlike valid_from/until),
+    # so coerce naive anchors here to dodge the offset-naive vs -aware comparison bug.
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _raw_lexical_overlap(card: ExperienceCard, task: TaskContext) -> int:
+    # Verbatim legacy lexical_overlap_v0 body, kept as the similarity floor and the
+    # >=5pp-over-lexical baseline-diff signal (Phase 4).
     haystack = " ".join([task.description, task.domain_scope or "", task.task_family or ""]).lower()
     needles = " ".join([card.title, card.use_when, card.action_brief_template]).lower().split()
     return sum(1 for term in set(needles) if len(term) > 3 and term.strip(".,:;") in haystack)
+
+
+def _precondition_match(card: ExperienceCard, task: TaskContext) -> float:
+    # Fraction of the card's check_first preconditions whose >3-char tokens appear
+    # in the task context. 0.0 when the card states no preconditions.
+    if not card.check_first:
+        return 0.0
+    haystack = " ".join([task.description, task.domain_scope or "", task.task_family or ""]).lower()
+    matched = sum(
+        1
+        for precondition in card.check_first
+        if any(
+            len(token) > 3 and token in haystack
+            for token in (t.strip(".,:;") for t in precondition.lower().split())
+        )
+    )
+    return matched / len(card.check_first)
+
+
+def _verified_lift_prior(card: ExperienceCard) -> float:
+    # HARD GATE (design 4.1): 0.0 until a passed probe sets measured_lift AND the
+    # card is verified. Never derive a prior from confidence/atom count/CI.
+    if card.measured_lift is None or card.promotion_status != "verified":
+        return 0.0
+    return min(max(card.measured_lift, 0.0), 1.0)
+
+
+def _recency_temporal(card: ExperienceCard, task: TaskContext) -> float:
+    anchor = card.last_validated_at or card.valid_from
+    if anchor is None:
+        return 0.0
+    age_days = max((task.current_time - _as_utc(anchor)).total_seconds() / 86400.0, 0.0)
+    return exp(-age_days / HALF_LIFE_DAYS)
+
+
+def _contradiction_penalty(card: ExperienceCard, scope_ids: frozenset[str]) -> float:
+    # Only contradictions with cards in THIS retrieval's candidate set count; a
+    # contradiction with an already out-of-scope card is moot.
+    live = sum(1 for cid in card.contradicts_card_ids if cid in scope_ids)
+    return min(live, CONTRA_SATURATION) / CONTRA_SATURATION
+
+
+def _staleness_penalty(card: ExperienceCard, task: TaskContext) -> float:
+    if card.valid_until is None:
+        return 0.0
+    days_to_expiry = (_as_utc(card.valid_until) - task.current_time).total_seconds() / 86400.0
+    if days_to_expiry >= STALE_WINDOW_DAYS:
+        return 0.0
+    if days_to_expiry <= 0:
+        return 1.0  # defensive; _card_in_scope already hard-drops expired cards
+    return 1.0 - days_to_expiry / STALE_WINDOW_DAYS
+
+
+def score_card(
+    card: ExperienceCard,
+    task: TaskContext,
+    scope_ids: frozenset[str] = frozenset(),
+    max_raw_lexical: int = 0,
+) -> tuple[float, dict[str, float]]:
+    """Transparent additive feature ranker (action_value_v1).
+
+    Returns ``(total, breakdown)``. Each sub-feature is bounded to [0, 1] before
+    weighting and the breakdown's ``weighted_*`` terms sum exactly to ``total`` --
+    every ranking is auditable per card. ``max_raw_lexical`` is the candidate-set
+    max used to normalize the lexical floor into [0, 1]; the raw count is preserved
+    separately under ``lexical_overlap`` for hand-verification and the baseline diff.
+    """
+    precondition_match = _precondition_match(card, task)
+    raw_lexical = _raw_lexical_overlap(card, task)
+    lexical_norm = raw_lexical / max_raw_lexical if max_raw_lexical else 0.0
+    verified_lift = _verified_lift_prior(card)
+    recency = _recency_temporal(card, task)
+    contradiction = _contradiction_penalty(card, scope_ids)
+    staleness = _staleness_penalty(card, task)
+
+    weighted_precondition = W_PRE * precondition_match
+    weighted_lexical = W_LEX * lexical_norm
+    weighted_verified_lift = W_LIFT * verified_lift
+    weighted_recency = W_REC * recency
+    weighted_contradiction = -W_CON * contradiction
+    weighted_staleness = -W_STALE * staleness
+    total = (
+        weighted_precondition
+        + weighted_lexical
+        + weighted_verified_lift
+        + weighted_recency
+        + weighted_contradiction
+        + weighted_staleness
+    )
+    breakdown = {
+        "precondition_match": precondition_match,
+        "lexical_overlap": float(raw_lexical),
+        "verified_lift_prior": verified_lift,
+        "recency_temporal": recency,
+        "contradiction_penalty": contradiction,
+        "staleness_penalty": staleness,
+        "weighted_precondition": weighted_precondition,
+        "weighted_lexical": weighted_lexical,
+        "weighted_verified_lift": weighted_verified_lift,
+        "weighted_recency": weighted_recency,
+        "weighted_contradiction": weighted_contradiction,
+        "weighted_staleness": weighted_staleness,
+        "total": total,
+    }
+    return total, breakdown
