@@ -97,6 +97,7 @@ class CEM:
             atom.support_count = len(existing.evidence_atom_ids)
             self.store.save_atom(atom)
             self.store.save_card(existing)
+            self._supersede_stale_cards(atom, existing)
             return existing
 
         card = ExperienceCard(
@@ -116,7 +117,38 @@ class CEM:
         )
         self.store.save_atom(atom)
         self.store.save_card(card)
+        self._supersede_stale_cards(atom, card)
         return card
+
+    def _supersede_stale_cards(self, new_atom: ExperienceAtom, new_card: ExperienceCard) -> None:
+        """Deactivate cards whose evidence the new atom has just superseded.
+
+        Validation deprecates older atoms contradicted by an invalidation event
+        (sets their ``superseded_by``). A card resting entirely on such deprecated
+        evidence is stale: it is marked ``superseded``, deactivated, and pointed at
+        the new card so retrieval drops it (design 4.4 -- not merely a link).
+        """
+        newly_superseded = {
+            atom.atom_id
+            for atom in self.store.list_atoms()
+            if new_atom.atom_id in atom.superseded_by
+        }
+        if not newly_superseded:
+            return
+        for card in self.store.list_cards():
+            if card.card_id == new_card.card_id or card.promotion_status == "superseded":
+                continue
+            evidence = set(card.evidence_atom_ids)
+            if not evidence & newly_superseded:
+                continue
+            statuses = {self.store.get_atom(atom_id).promotion_status for atom_id in evidence}
+            if statuses <= {"deprecated"}:
+                card.promotion_status = "superseded"
+                card.deactivated_at = utc_now()
+                card.deactivated_reason = f"superseded by card {new_card.card_id}"
+                if new_card.card_id not in card.superseded_by_card_ids:
+                    card.superseded_by_card_ids.append(new_card.card_id)
+                self.store.save_card(card)
 
     def apply_verification_result(self, result: VerificationResult) -> ExperienceCard:
         card = self.store.get_card(result.card_id)
@@ -208,6 +240,8 @@ class CEM:
         return event
 
     def _card_in_scope(self, card: ExperienceCard, task: TaskContext) -> bool:
+        if card.promotion_status in {"superseded", "deprecated", "quarantined"} or card.deactivated_at is not None:
+            return False
         if card.valid_from is not None and card.valid_from > task.current_time:
             return False
         if card.valid_until is not None and card.valid_until < task.current_time:

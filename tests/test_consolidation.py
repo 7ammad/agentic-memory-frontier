@@ -126,3 +126,54 @@ def test_grounded_abstraction_still_promotes(tmp_path):
     card = cem.promote(atom.atom_id)
     assert card is not None
     assert len(cem.store.list_cards()) == 1
+
+
+def _pref_trace(marker: str, key_value: str, *, index: int, domain: str) -> AgentTrace:
+    return AgentTrace(
+        session_id="s1",
+        agent_id="codex",
+        task_id="ide-config",
+        turns=[TraceTurn(index=index, role="user", content=f"{marker} {key_value}")],
+        environment={"domain": domain},
+    )
+
+
+def test_newer_atom_supersedes_stale_card_and_removes_it_from_retrieval(tmp_path):
+    # Design 4.4 temporal supersession: a contradicting newer atom must set the
+    # stale card's superseded_by/deactivated fields AND remove it from retrieval
+    # -- not merely a link. Atom-level supersession already exists; this drives
+    # the card-level half.
+    cem = CEM(tmp_path)
+
+    old = _pref_trace("PREFERENCE:", "editor_theme=light", index=0, domain="ide-settings")
+    cem.ingest_trace(old)
+    old_atom = cem.propose_memories(old.trace_id)[0]
+    cem.validate(old_atom.atom_id)
+    card_a = cem.promote(old_atom.atom_id)
+    assert card_a is not None
+
+    new = _pref_trace("UPDATE:", "editor_theme=dark", index=1, domain="ide-settings")
+    cem.ingest_trace(new)
+    new_atom = cem.propose_memories(new.trace_id)[0]
+    cem.validate(new_atom.atom_id)
+    card_b = cem.promote(new_atom.atom_id)
+    assert card_b is not None
+    assert card_b.card_id != card_a.card_id
+
+    # Card-level supersession fields are set on the stale card.
+    stale = cem.store.get_card(card_a.card_id)
+    assert stale.promotion_status == "superseded"
+    assert stale.deactivated_at is not None
+    assert stale.deactivated_reason is not None
+    assert stale.superseded_by_card_ids == [card_b.card_id]
+
+    # The stale card is gone from retrieval; the current card is still served.
+    brief = cem.retrieve_action_brief(
+        TaskContext(
+            session_id="s2",
+            description="configure editor_theme preference",
+            domain_scope="ide-settings",
+        )
+    )
+    assert card_a.card_id not in brief.applicable_card_ids
+    assert card_b.card_id in brief.applicable_card_ids
