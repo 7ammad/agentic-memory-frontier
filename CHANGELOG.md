@@ -19,6 +19,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added `packages/cem-eval/src/cem_eval/vertical_loop.py` (`run_vertical_loop` + `VerticalLoopReport`) and `scripts/run_cem_vertical_loop.py` as a real CLI consumer. Report counts come from real store queries; the runner enforces the leakage guard. First loop: MMA 1.0, n=2, CI [1.0, 1.0] (toy skeleton smoke, not the Phase 4 exam). Scorer stays `lexical_overlap_v0` (the action-value scorer is Phase 3).
 - Added `docs/2026-05-29-cem-1-phase-1-vertical-skeleton-plan.md` (Phase 1 implementation plan).
 - Adopted the **minimal-PR + AI-review-loop workflow** (feature branch → PR → Greptile review-loop to 5/5 → `staging` → `main`). Added `docs/WORKFLOW.md` (the repo's contributor contract), created the `staging` branch, and confirmed Greptile as the live PR reviewer on PR #1. Global `/start-feature` and `/review-loop` commands plus a CLAUDE.md pointer make it the default for everyday feature work.
+- Codified the **autonomous build-loop HARDGATE** in `CLAUDE.md` + `docs/WORKFLOW.md` (mirrored to `AGENTS.md`): the remaining CEM-1 build (TODO Phases 3-5) runs as one self-paced `/loop` session (next-unchecked-item continuation; `ScheduleWakeup` to self-pace across external review waits; no manual multi-session fan-out), full build (no MVP/distillation/stubs; TDD + failure canaries), every slice through the Greptile PR loop to 5/5, and the agent stops before merge (merge is the user's call).
 
 ### Changed
 

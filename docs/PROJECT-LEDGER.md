@@ -270,7 +270,8 @@ Entry format:
   - `~/.claude/commands/review-loop.md` (global)
   - `~/.claude/CLAUDE.md` (global, Review-Loop Workflow section)
 - Verification: Greptile reviewed PR #1 live (`greptile-apps[bot]`, ~100s, Confidence 4/5) and flagged this exact CHANGELOG/LEDGER gap per CLAUDE.md Rule 2 — caught and addressed inside the review loop (the loop's first real demonstration). Branch+PR backbone confirmed via `gh`: `origin/staging` pushed, PR #1 open into `staging`.
-- Follow-up: Drive PR #1 to 5/5 and merge to `staging`; then resume CEM Phase 2 under this workflow.
+- Update (2026-05-29): Strengthened from "adopted" to a binding **HARDGATE** — added to `CLAUDE.md` Workflow rules and a new `docs/WORKFLOW.md` "autonomous build loop" section, mirrored to `AGENTS.md`. The hardgate binds the remaining CEM-1 build (TODO Phases 3-5) to: one self-paced `/loop` session via `ScheduleWakeup` (no manual multi-session fan-out), full build (no MVP/distillation/stubs; TDD + canaries), every slice through the Greptile 5/5 loop, and agent-stops-before-merge. Folded into PR #1 to keep all workflow docs on one review surface rather than spawning a new PR.
+- Follow-up: Drive PR #1 to 5/5 and hand off for merge to `staging`; then drive CEM-1 Phases 3-5 under this hardgate (Phase 2 already landed on the stacked feature branch).
 
 ## Open Follow-Ups
 
