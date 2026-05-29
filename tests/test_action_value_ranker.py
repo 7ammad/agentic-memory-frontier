@@ -18,7 +18,7 @@ from math import exp
 import pytest
 
 from cem_core import CEM, TaskContext
-from cem_core.kernel import W_CON, W_LEX, W_LIFT, W_PRE, W_REC, W_STALE
+from cem_core.kernel import W_CON, W_LEX, W_LIFT, W_PRE, W_REC, W_STALE, score_card
 from cem_core.models import ExperienceCard, VerificationResult, utc_now
 
 # Task whose haystack the cards overlap to varying degrees.
@@ -185,6 +185,23 @@ def test_naive_anchor_does_not_raise_and_recency_is_exact(tmp_path):
     feats = brief.score_breakdown_by_card[card.card_id]
     # The naive anchor is coerced to UTC; age == 30d == one HALF_LIFE_DAYS -> exp(-1).
     assert feats["recency_temporal"] == pytest.approx(exp(-1))
+
+
+def test_score_card_standalone_defaults_are_context_free():
+    # Documented contract (Greptile PR#5 review): called with defaults — no
+    # candidate-set context — score_card zeros the normalized lexical floor and the
+    # contradiction penalty. Only retrieve_action_brief supplies the real context.
+    card = ExperienceCard(
+        title="deploy rollback safely",
+        use_when="deploy",
+        action_brief_template="deploy rollback safely",
+        evidence_atom_ids=[],
+        confidence_score=0.5,
+    )
+    _total, feats = score_card(card, TaskContext(description=TASK))
+    assert feats["lexical_overlap"] > 0.0  # the raw count is still computed
+    assert feats["weighted_lexical"] == 0.0  # but the normalized floor needs max_raw_lexical
+    assert feats["contradiction_penalty"] == 0.0  # and the penalty needs scope_ids
 
 
 def test_staleness_penalty_full_at_exact_expiry_boundary(tmp_path):

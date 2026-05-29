@@ -323,9 +323,16 @@ class CEM:
     def retrieve_action_brief(self, task: TaskContext, *, max_cards: int = 5) -> ActionBrief:
         in_scope = [card for card in self.store.list_cards() if self._card_in_scope(card, task)]
         in_scope_ids = frozenset(card.card_id for card in in_scope)
-        max_raw_lexical = max((_raw_lexical_overlap(card, task) for card in in_scope), default=0)
+        # Each card's raw lexical overlap is computed once -- reused for the
+        # candidate-set max AND passed into score_card (not recomputed there).
+        raw_lexical_scores = {card.card_id: _raw_lexical_overlap(card, task) for card in in_scope}
+        max_raw_lexical = max(raw_lexical_scores.values(), default=0)
         scored = [
-            (score_card(card, task, in_scope_ids, max_raw_lexical), card) for card in in_scope
+            (
+                score_card(card, task, in_scope_ids, max_raw_lexical, raw_lexical_scores[card.card_id]),
+                card,
+            )
+            for card in in_scope
         ]
         # Relevance-keyed selection (NOT net-total): a card is a candidate iff it is
         # actually relevant -- precondition match, lexical overlap, or earned lift --
@@ -665,6 +672,7 @@ def score_card(
     task: TaskContext,
     scope_ids: frozenset[str] = frozenset(),
     max_raw_lexical: int = 0,
+    raw_lexical: int | None = None,
 ) -> tuple[float, dict[str, float]]:
     """Transparent additive feature ranker (action_value_v1).
 
@@ -675,10 +683,21 @@ def score_card(
     normalize the lexical floor into [0, 1]; both the normalized value
     (``lexical_overlap_norm``, from which ``weighted_lexical`` is re-derivable) and
     the raw unbounded count (``lexical_overlap``, for hand-verification and the
-    Phase 4 baseline diff) are persisted.
+    Phase 4 baseline diff) are persisted. ``raw_lexical`` is this card's raw overlap;
+    when ``None`` it is computed here, but ``retrieve_action_brief`` passes the value
+    it already computed for ``max_raw_lexical`` so the overlap is counted once per
+    card, not twice.
+
+    Note:
+        The defaults ``scope_ids=frozenset()`` and ``max_raw_lexical=0`` are for
+        isolated unit use only -- both suppress context-dependent features
+        (an empty ``scope_ids`` zeros the contradiction penalty; ``max_raw_lexical=0``
+        zeros the lexical floor). Always call via ``retrieve_action_brief`` (which
+        supplies both) for scores consistent with actual retrieval ranking.
     """
     precondition_match = _precondition_match(card, task)
-    raw_lexical = _raw_lexical_overlap(card, task)
+    if raw_lexical is None:
+        raw_lexical = _raw_lexical_overlap(card, task)
     lexical_norm = raw_lexical / max_raw_lexical if max_raw_lexical else 0.0
     verified_lift = _verified_lift_prior(card)
     recency = _recency_temporal(card, task)
