@@ -5,6 +5,8 @@ from cem_eval.eval_protocol import (
     LEXICAL_MARGIN_PP,
     MMAResult,
     assert_no_leakage,
+    beats_lexical_by_margin,
+    lexical_margin_pp,
     marginal_memory_advantage,
     mma_passes,
 )
@@ -61,3 +63,22 @@ def test_mma_passes_requires_positive_lower_ci():
     straddles_zero = MMAResult(mma=0.3, n=10, ci_low=-0.05, ci_high=0.65)
     assert mma_passes(clean) is True
     assert mma_passes(straddles_zero) is False
+
+
+def test_beats_lexical_by_margin_boundary():
+    # The >=5pp gate (spec section 9): CEM must beat the lexical-overlap baseline by
+    # at least LEXICAL_MARGIN_PP percentage points of held-out task success. Lock the
+    # >= comparison and the *100 pp unit conversion at the exact boundary.
+    lexical = MMAResult(mma=0.40, n=20, ci_low=0.30, ci_high=0.50)
+
+    def cem_at(delta_pp: float) -> MMAResult:
+        mma = lexical.mma + delta_pp / 100.0
+        return MMAResult(mma=mma, n=20, ci_low=mma - 0.1, ci_high=mma + 0.1)
+
+    assert beats_lexical_by_margin(cem_at(0.0), lexical) is False  # 0pp
+    assert beats_lexical_by_margin(cem_at(4.9), lexical) is False  # below the bar
+    assert beats_lexical_by_margin(cem_at(5.0), lexical) is True  # exact boundary passes
+    assert beats_lexical_by_margin(cem_at(5.1), lexical) is True
+    # the companion reporter returns the measured gap in pp (so a near-miss is visible)
+    assert lexical_margin_pp(cem_at(4.9), lexical) == pytest.approx(4.9)
+    assert lexical_margin_pp(cem_at(0.0), lexical) == pytest.approx(0.0)

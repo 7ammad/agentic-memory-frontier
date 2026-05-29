@@ -75,3 +75,28 @@ def assert_no_leakage(*, memory_source_ids: set[str], held_out_answer_ids: set[s
     overlap = memory_source_ids & held_out_answer_ids
     if overlap:
         raise ValueError(f"Leakage: memory source overlaps held-out answers: {sorted(overlap)}")
+
+
+def lexical_margin_pp(cem_result: MMAResult, lexical_result: MMAResult) -> float:
+    """The measured CEM-over-lexical advantage in percentage points of task success.
+
+    Reported even on a miss so a near-miss (e.g. 4.9pp) is visible, never hidden.
+    """
+    return (cem_result.mma - lexical_result.mma) * 100.0
+
+
+def beats_lexical_by_margin(
+    cem_result: MMAResult,
+    lexical_result: MMAResult,
+    *,
+    margin_pp: float = LEXICAL_MARGIN_PP,
+) -> bool:
+    """Spec section 9 kill criterion: CEM must beat the lexical-overlap baseline by
+    >= ``margin_pp`` percentage points of held-out task success, else the
+    causal-retrieval (read-path) thesis is unproven.
+
+    The measured margin is rounded to 6 decimal places before the comparison so an
+    exact-boundary margin (e.g. 0.45 - 0.40 == 0.0499...9 in float) is not defeated
+    by floating-point noise; 1e-6 pp is far finer than any real n-task measurement.
+    """
+    return round(lexical_margin_pp(cem_result, lexical_result), 6) >= margin_pp
