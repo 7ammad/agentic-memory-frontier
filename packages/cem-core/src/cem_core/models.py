@@ -148,6 +148,7 @@ class ExperienceCard(StrictModel):
     deactivated_at: datetime | None = None
     deactivated_reason: str | None = None
     superseded_by_card_ids: list[str] = Field(default_factory=list)
+    contradicts_card_ids: list[str] = Field(default_factory=list)
 
     @field_validator("valid_from", "valid_until")
     @classmethod

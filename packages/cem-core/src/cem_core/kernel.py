@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .contradiction import ContradictionDetector
+from .contradiction import ContradictionDetector, contradiction_pair
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .models import (
     ActionBrief,
@@ -14,6 +14,7 @@ from .models import (
     MemoryAudit,
     TaskContext,
     TraceReceipt,
+    VerificationProbe,
     VerificationResult,
     new_id,
     utc_now,
@@ -79,6 +80,15 @@ class CEM:
         if atom.promotion_status not in {"candidate", "verified"}:
             return None
 
+        if not _abstraction_grounded(atom):
+            atom.promotion_status = "quarantined"
+            atom.quarantine_reason = (
+                "ungrounded abstraction: action_or_strategy claims tokens not traceable "
+                "to source spans"
+            )
+            self.store.save_atom(atom)
+            return None
+
         existing = self._matching_card(atom)
         if existing is not None:
             if atom.atom_id not in existing.evidence_atom_ids:
@@ -88,6 +98,8 @@ class CEM:
             atom.support_count = len(existing.evidence_atom_ids)
             self.store.save_atom(atom)
             self.store.save_card(existing)
+            self._supersede_stale_cards(atom, existing)
+            self._link_contradicting_cards(existing)
             return existing
 
         card = ExperienceCard(
@@ -107,7 +119,191 @@ class CEM:
         )
         self.store.save_atom(atom)
         self.store.save_card(card)
+        self._supersede_stale_cards(atom, card)
+        self._link_contradicting_cards(card)
         return card
+
+    def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
+        """Bidirectionally link active cards whose claims conflict without a
+        temporal supersession (design 4.4 contradiction links -> 4.1 penalty).
+
+        Same-scope contradictions are quarantined at validation; the survivors
+        reaching this point are cross-scope claims on the same key with different
+        values that must coexist but stay flagged. The link is informational here
+        -- Phase 3's scorer turns it into a contradiction penalty.
+        """
+        new_key, new_value = self._card_claim(new_card)
+        if new_key is None:
+            return
+        for card in self.store.list_cards():
+            if card.card_id == new_card.card_id:
+                continue
+            if card.promotion_status in {"superseded", "deprecated", "quarantined"} or card.deactivated_at is not None:
+                continue
+            other_key, other_value = self._card_claim(card)
+            if other_key != new_key or other_value == new_value:
+                continue
+            if card.card_id not in new_card.contradicts_card_ids:
+                new_card.contradicts_card_ids.append(card.card_id)
+            if new_card.card_id not in card.contradicts_card_ids:
+                card.contradicts_card_ids.append(new_card.card_id)
+                self.store.save_card(card)
+        self.store.save_card(new_card)
+
+    def _card_claim(self, card: ExperienceCard) -> tuple[str | None, str | None]:
+        for atom_id in card.evidence_atom_ids:
+            key, value = contradiction_pair(self.store.get_atom(atom_id).content)
+            if key is not None:
+                return key, value
+        return None, None
+
+    def _supersede_stale_cards(self, new_atom: ExperienceAtom, new_card: ExperienceCard) -> None:
+        """Deactivate cards whose evidence the new atom has just superseded.
+
+        Validation deprecates older atoms contradicted by an invalidation event
+        (sets their ``superseded_by``). A card resting entirely on such deprecated
+        evidence is stale: it is marked ``superseded``, deactivated, and pointed at
+        the new card so retrieval drops it (design 4.4 -- not merely a link).
+        """
+        # superseded_by is only ever populated by an invalidation_event atom
+        # (validator._supersede_conflicts), so no other atom can supersede a card --
+        # skip the full atom scan for the common case.
+        if new_atom.epistemic_type != "invalidation_event":
+            return
+        newly_superseded = {
+            atom.atom_id
+            for atom in self.store.list_atoms()
+            if new_atom.atom_id in atom.superseded_by
+        }
+        if not newly_superseded:
+            return
+        for card in self.store.list_cards():
+            if card.card_id == new_card.card_id or card.promotion_status == "superseded":
+                continue
+            evidence = set(card.evidence_atom_ids)
+            if not evidence & newly_superseded:
+                continue
+            statuses = {self.store.get_atom(atom_id).promotion_status for atom_id in evidence}
+            if statuses <= {"deprecated"}:
+                card.promotion_status = "superseded"
+                card.deactivated_at = utc_now()
+                card.deactivated_reason = f"superseded by card {new_card.card_id}"
+                if new_card.card_id not in card.superseded_by_card_ids:
+                    card.superseded_by_card_ids.append(new_card.card_id)
+                self.store.save_card(card)
+
+    def schedule_probe(self, probe: VerificationProbe) -> VerificationProbe:
+        self.store.save_probe(probe)
+        return probe
+
+    def run_probe(
+        self,
+        probe_id: str,
+        *,
+        task: TaskContext,
+        correct_action: str,
+    ) -> VerificationResult:
+        """Run a verification probe and write an evidence-gated result.
+
+        Lift is measured as a held-out replay: success of the memory agent (does
+        the brief surface the target card recommending ``correct_action``?) minus
+        a no-memory control, which by construction cannot recommend the decisive
+        action (success 0.0). A probe that clears its threshold verifies the card
+        via ``apply_verification_result``; a failed negative control is deprecated
+        so retrieval drops it (design 4.2 -- promotion is earned, not asserted).
+        """
+        probe = self.store.get_probe(probe_id)
+        if probe.target_card_id is None:
+            raise ValueError("verification probe has no target card")
+        brief = self.retrieve_action_brief(task)
+        memory_success = self._replay_success(brief, probe.target_card_id, correct_action)
+        control_success = 0.0
+        measured_lift = memory_success - control_success
+        result = VerificationResult(
+            probe_id=probe.probe_id,
+            card_id=probe.target_card_id,
+            measured_lift=measured_lift,
+            passed=measured_lift >= probe.threshold,
+            evidence_pointer=f"brief:{brief.brief_id}",
+        )
+        probe.status = "run"
+        self.store.save_probe(probe)
+        self.apply_verification_result(result)
+        if probe.kind == "negative_control" and not result.passed:
+            self._deprecate_negative_control(probe.target_card_id, probe.probe_id)
+        return result
+
+    def _replay_success(
+        self,
+        brief: ActionBrief,
+        target_card_id: str,
+        correct_action: str,
+    ) -> float:
+        if target_card_id not in brief.applicable_card_ids:
+            return 0.0
+        card = self.store.get_card(target_card_id)
+        recommended = " ".join(card.do + [card.action_brief_template]).lower()
+        return 1.0 if correct_action.lower() in recommended else 0.0
+
+    def _deprecate_negative_control(self, card_id: str, probe_id: str) -> None:
+        card = self.store.get_card(card_id)
+        card.promotion_status = "deprecated"
+        card.deactivated_at = utc_now()
+        card.deactivated_reason = f"negative control suppressed by probe {probe_id}"
+        self.store.save_card(card)
+
+    def inject_negative_control(
+        self,
+        *,
+        title: str,
+        bad_action: str,
+        control_definition: str,
+        use_when: str = "similar task context",
+        threshold: float = 0.5,
+        confidence_score: float = 0.9,
+    ) -> tuple[ExperienceCard, VerificationProbe]:
+        """Plant a known-bad card plus a negative-control probe targeting it.
+
+        The card is deliberately ungrounded (no evidence atoms) and recommends a
+        false action; a healthy probe run must deprecate it. Used by tests and the
+        operator surface to prove the suppression gate (design 4.2) actually bites.
+        """
+        card = ExperienceCard(
+            title=title,
+            use_when=use_when,
+            do=[bad_action],
+            evidence_atom_ids=[],
+            confidence_score=confidence_score,
+            action_brief_template=bad_action,
+        )
+        self.store.save_card(card)
+        probe = VerificationProbe(
+            kind="negative_control",
+            target_card_id=card.card_id,
+            control_definition=control_definition,
+            threshold=threshold,
+        )
+        self.store.save_probe(probe)
+        return card, probe
+
+    def negative_control_suppression_rate(self) -> float:
+        probes = [probe for probe in self.store.list_probes() if probe.kind == "negative_control"]
+        if not probes:
+            return 1.0
+        suppressed = sum(
+            1
+            for probe in probes
+            if probe.target_card_id is not None
+            and self._card_is_inactive(self.store.get_card(probe.target_card_id))
+        )
+        return suppressed / len(probes)
+
+    @staticmethod
+    def _card_is_inactive(card: ExperienceCard) -> bool:
+        return (
+            card.promotion_status in {"deprecated", "superseded", "quarantined"}
+            or card.deactivated_at is not None
+        )
 
     def apply_verification_result(self, result: VerificationResult) -> ExperienceCard:
         card = self.store.get_card(result.card_id)
@@ -199,6 +395,8 @@ class CEM:
         return event
 
     def _card_in_scope(self, card: ExperienceCard, task: TaskContext) -> bool:
+        if card.promotion_status in {"superseded", "deprecated", "quarantined"} or card.deactivated_at is not None:
+            return False
         if card.valid_from is not None and card.valid_from > task.current_time:
             return False
         if card.valid_until is not None and card.valid_until < task.current_time:
@@ -286,15 +484,63 @@ class CEM:
     def _matching_card(self, atom: ExperienceAtom) -> ExperienceCard | None:
         title = _title(atom.content)
         use_when = atom.domain_scope or atom.task_family or "similar task context"
+        atom_tokens = _content_tokens(atom.content)
+        best: tuple[float, ExperienceCard] | None = None
         for card in self.store.list_cards():
-            if card.title == title and card.use_when == use_when:
+            if self._card_is_inactive(card):
+                continue
+            if card.use_when != use_when:
+                continue
+            if card.title == title:
                 return card
-        return None
+            similarity = _jaccard(atom_tokens, _content_tokens(card.title))
+            if similarity >= NEAR_DUPLICATE_THRESHOLD and (best is None or similarity > best[0]):
+                best = (similarity, card)
+        return best[1] if best is not None else None
 
 
 def _title(content: str) -> str:
     cleaned = " ".join(content.split())
     return cleaned[:80]
+
+
+# Consolidation merges atoms whose normalized content tokens overlap at or above
+# this Jaccard threshold within the same use_when scope. Tuned conservatively so
+# distinct lessons that share a stray token (e.g. "before") stay separate cards.
+NEAR_DUPLICATE_THRESHOLD = 0.5
+
+
+def _content_tokens(text: str) -> frozenset[str]:
+    return frozenset(
+        term.strip(".,:;!?()[]\"'")
+        for term in text.lower().split()
+        if len(term.strip(".,:;!?()[]\"'")) > 3
+    )
+
+
+def _jaccard(left: frozenset[str], right: frozenset[str]) -> float:
+    if not left or not right:
+        return 0.0
+    intersection = len(left & right)
+    union = len(left | right)
+    return intersection / union if union else 0.0
+
+
+def _abstraction_grounded(atom: ExperienceAtom) -> bool:
+    """True when the atom's abstracted action traces to its source spans.
+
+    The card's ``do`` is built from ``action_or_strategy``; a generalized claim
+    that introduces significant tokens absent from the cited spans is an
+    ungrounded abstraction (design 4.4 / dead-end #2) and must not become a card.
+    Atoms without an abstracted action carry no generalized claim to ground.
+    """
+    if not atom.action_or_strategy:
+        return True
+    claim_tokens = _content_tokens(atom.action_or_strategy)
+    if not claim_tokens:
+        return True
+    span_tokens = _content_tokens(" ".join(span.text for span in atom.source_spans))
+    return claim_tokens <= span_tokens
 
 
 SCORER_VERSION = "lexical_overlap_v0"
