@@ -79,6 +79,15 @@ class CEM:
         if atom.promotion_status not in {"candidate", "verified"}:
             return None
 
+        if not _abstraction_grounded(atom):
+            atom.promotion_status = "quarantined"
+            atom.quarantine_reason = (
+                "ungrounded abstraction: action_or_strategy claims tokens not traceable "
+                "to source spans"
+            )
+            self.store.save_atom(atom)
+            return None
+
         existing = self._matching_card(atom)
         if existing is not None:
             if atom.atom_id not in existing.evidence_atom_ids:
@@ -324,6 +333,23 @@ def _jaccard(left: frozenset[str], right: frozenset[str]) -> float:
     intersection = len(left & right)
     union = len(left | right)
     return intersection / union if union else 0.0
+
+
+def _abstraction_grounded(atom: ExperienceAtom) -> bool:
+    """True when the atom's abstracted action traces to its source spans.
+
+    The card's ``do`` is built from ``action_or_strategy``; a generalized claim
+    that introduces significant tokens absent from the cited spans is an
+    ungrounded abstraction (design 4.4 / dead-end #2) and must not become a card.
+    Atoms without an abstracted action carry no generalized claim to ground.
+    """
+    if not atom.action_or_strategy:
+        return True
+    claim_tokens = _content_tokens(atom.action_or_strategy)
+    if not claim_tokens:
+        return True
+    span_tokens = _content_tokens(" ".join(span.text for span in atom.source_spans))
+    return claim_tokens <= span_tokens
 
 
 SCORER_VERSION = "lexical_overlap_v0"

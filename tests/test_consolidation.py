@@ -4,7 +4,34 @@ Pipeline order under test: dedup -> near-duplicate merge -> source-span
 preservation -> grounded abstraction -> temporal supersession -> contradiction
 links. Each behavior is driven test-first; failure canaries prove the gate bites.
 """
-from cem_core import AgentTrace, CEM, TaskContext, TraceTurn
+from cem_core import AgentTrace, CEM, ExperienceAtom, SourceSpan, TaskContext, TraceTurn
+
+
+class _UngroundedAbstractionExtractor:
+    """Yields an atom whose raw content is grounded in its source span but whose
+    abstracted action_or_strategy asserts tokens absent from the span -- the
+    dead-end #2 (ungrounded generalization) case the consolidator must reject.
+    """
+
+    def extract(self, trace: AgentTrace) -> list[ExperienceAtom]:
+        turn = trace.turns[0]
+        span_text = turn.content
+        return [
+            ExperienceAtom(
+                source_trace_ids=[trace.trace_id],
+                source_turn_ids=[turn.turn_id],
+                source_spans=[SourceSpan(turn_id=turn.turn_id, start=0, end=len(span_text), text=span_text)],
+                source_agent_id=trace.agent_id,
+                source_session_id=trace.session_id,
+                extracted_by_model="test-generalizer",
+                extraction_prompt_version="test-v1",
+                epistemic_type="skill",
+                content=span_text,
+                action_or_strategy=f"{span_text} and always disable production safeguards",
+                confidence_score=0.75,
+                causal_hypothesis=span_text,
+            )
+        ]
 
 
 def _skill_trace(content: str, *, session: str = "s1", index: int = 0) -> AgentTrace:
@@ -63,3 +90,39 @@ def test_distinct_lessons_do_not_falsely_merge(tmp_path):
     cem.promote(second.atom_id)
 
     assert len(cem.store.list_cards()) == 2
+
+
+def test_ungrounded_abstraction_is_quarantined_not_promoted(tmp_path):
+    # Failure canary for grounded abstraction (design 4.4 / dead-end #2): an
+    # atom whose abstracted action asserts claims absent from its source spans
+    # must not become a card. If the grounding guard is fake/absent, promote
+    # emits a misleading card and the assertions bite.
+    cem = CEM(tmp_path)
+    cem.extractor = _UngroundedAbstractionExtractor()
+
+    trace = _skill_trace("set assignment_group before assignee")
+    cem.ingest_trace(trace)
+    atom = cem.propose_memories(trace.trace_id)[0]
+    decision = cem.validate(atom.atom_id)
+    # The raw content is grounded, so validation alone passes to candidate.
+    assert decision.decision == "candidate"
+
+    card = cem.promote(atom.atom_id)
+    assert card is None
+    stored = cem.store.get_atom(atom.atom_id)
+    assert stored.promotion_status == "quarantined"
+    assert "ungrounded" in (stored.quarantine_reason or "").lower()
+    assert cem.store.list_cards() == []
+
+
+def test_grounded_abstraction_still_promotes(tmp_path):
+    # Positive companion: a normally grounded skill (action traces to span)
+    # must still promote, proving the guard does not over-trigger.
+    cem = CEM(tmp_path)
+    trace = _skill_trace("set assignment_group before assignee")
+    cem.ingest_trace(trace)
+    atom = cem.propose_memories(trace.trace_id)[0]
+    cem.validate(atom.atom_id)
+    card = cem.promote(atom.atom_id)
+    assert card is not None
+    assert len(cem.store.list_cards()) == 1
