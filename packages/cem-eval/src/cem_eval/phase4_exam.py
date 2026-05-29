@@ -22,12 +22,14 @@ from cem_core import CEM, ExperienceAtom, TaskContext
 from cem_core.models import VerificationProbe
 from cem_eval.eval_protocol import (
     BASELINE_LADDER,
+    RETRIEVAL_LATENCY_BUDGET_MS,
     MMAResult,
     assert_no_leakage,
     beats_lexical_by_margin,
     lexical_margin_pp,
     marginal_memory_advantage,
     mma_passes,
+    within_latency_budget,
 )
 from cem_eval.phase4_dataset import (
     ASSIGNMENT,
@@ -47,6 +49,8 @@ from cem_eval.synthetic_corruption import (
     SyntheticCorruptionExtractor,
     _card_from_atom,
     _key_value_key,
+    _measure_ms,
+    _p95,
     lexical_vector_score,
 )
 
@@ -93,6 +97,10 @@ class Phase4ExamReport(BaseModel):
     cem_beats_lexical: bool
     negative_control_suppression_rate: float
     cem_verified_card_count: int  # decisive cards that earned verified lift (W_LIFT active)
+    # worst-of-n over the held-out CEM rung; with n<20 this is the max, not a smoothed percentile
+    p95_retrieval_latency_ms: float
+    retrieval_latency_budget_ms: float
+    within_latency_budget: bool  # READINESS flag only -- never enters the verdict
     scorer_version: str
     locked_weights: dict[str, float]
     verdict: str  # "PASS" or "FAIL_REPORTED_HONESTLY"
@@ -104,6 +112,8 @@ class Phase4ExamReport(BaseModel):
             f"(95% CI [{self.cem_ci_low:.3f}, {self.cem_ci_high:.3f}], n={self.n}); "
             f"lexical MMA = {self.lexical_mma:.3f}; "
             f"margin = {self.measured_lexical_margin_pp:.1f}pp; verdict = {self.verdict}"
+            f"; retrieval p95 = {self.p95_retrieval_latency_ms:.1f}ms "
+            f"(budget {self.retrieval_latency_budget_ms:.0f}ms, within: {self.within_latency_budget})"
         )
 
 
@@ -246,6 +256,21 @@ def _task_success(task: Phase4Task, recommended: list[str]) -> float:
     return 1.0
 
 
+def _measure_cem_retrieval_latency(cem: CEM, tasks: list[Phase4Task]) -> list[float]:
+    """Time the CEM retrieval read path once per held-out task (the cem rung ONLY --
+    the other rungs use in-process scorers, not retrieve_action_brief). A dedicated
+    pass keeps the measurement isolated from the success scoring and trivially
+    fail-closed-testable; the extra in-memory retrievals are negligible.
+    """
+    samples: list[float] = []
+    for task in tasks:
+        _, elapsed_ms = _measure_ms(
+            lambda t=task: cem.retrieve_action_brief(t.task, max_cards=20)
+        )
+        samples.append(elapsed_ms)
+    return samples
+
+
 def run_phase4_exam(root: str | Path) -> Phase4ExamReport:
     # Fail closed BEFORE any rung runs (spec section 10).
     assert_no_leakage(
@@ -313,7 +338,18 @@ def run_phase4_exam(root: str | Path) -> Phase4ExamReport:
     lexical_result = results["lexical_overlap"]
     cem_passes = mma_passes(cem_result)
     beats = beats_lexical_by_margin(cem_result, lexical_result)
+    # Verdict is the LOCKED MMA gate ONLY -- latency is a separate readiness flag and
+    # must NEVER enter this expression (pinned by test_latency_flag_does_not_flip_verdict).
     verdict = "PASS" if (cem_passes and beats) else "FAIL_REPORTED_HONESTLY"
+
+    # Retrieval-latency readiness (Phase 5). Fail closed: an empty accumulator would
+    # make _p95([])==0.0 fake-green within_budget=True, so require one sample per task.
+    retrieval_latency_samples = _measure_cem_retrieval_latency(cem, tasks)
+    assert len(retrieval_latency_samples) == len(tasks), (
+        f"expected {len(tasks)} cem-rung latency samples, got {len(retrieval_latency_samples)}"
+    )
+    p95_retrieval_latency = _p95(retrieval_latency_samples)
+    latency_within_budget = within_latency_budget(p95_retrieval_latency)
 
     return Phase4ExamReport(
         rungs=rungs,
@@ -327,6 +363,9 @@ def run_phase4_exam(root: str | Path) -> Phase4ExamReport:
         cem_beats_lexical=beats,
         negative_control_suppression_rate=suppression_rate,
         cem_verified_card_count=cem_verified_card_count,
+        p95_retrieval_latency_ms=p95_retrieval_latency,
+        retrieval_latency_budget_ms=RETRIEVAL_LATENCY_BUDGET_MS,
+        within_latency_budget=latency_within_budget,
         scorer_version="action_value_v1",
         locked_weights=dict(LOCKED_WEIGHTS),
         verdict=verdict,

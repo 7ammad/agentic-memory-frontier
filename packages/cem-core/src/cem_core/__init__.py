@@ -4,7 +4,7 @@ from .contradiction import (
     KeyValueContradictionDetector,
 )
 from .extractor import DeterministicExtractor, MemoryExtractor
-from .kernel import CEM
+from .kernel import CEM, card_is_inactive
 from .models import (
     ActionBrief,
     ActionBriefRecord,
@@ -65,5 +65,6 @@ __all__ = [
     "VerificationProbe",
     "VerificationResult",
     "build_shared_trace_envelope",
+    "card_is_inactive",
     "import_shared_trace",
 ]

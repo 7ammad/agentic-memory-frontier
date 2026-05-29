@@ -3,12 +3,14 @@ import pytest
 from cem_eval.eval_protocol import (
     BASELINE_LADDER,
     LEXICAL_MARGIN_PP,
+    RETRIEVAL_LATENCY_BUDGET_MS,
     MMAResult,
     assert_no_leakage,
     beats_lexical_by_margin,
     lexical_margin_pp,
     marginal_memory_advantage,
     mma_passes,
+    within_latency_budget,
 )
 
 
@@ -82,3 +84,33 @@ def test_beats_lexical_by_margin_boundary():
     # the companion reporter returns the measured gap in pp (so a near-miss is visible)
     assert lexical_margin_pp(cem_at(4.9), lexical) == pytest.approx(4.9)
     assert lexical_margin_pp(cem_at(0.0), lexical) == pytest.approx(0.0)
+
+
+def test_retrieval_latency_budget_is_locked():
+    # A LOCKED, pre-registered constant with no equality-pin test is silently
+    # tunable (mirrors `assert LEXICAL_MARGIN_PP == 5.0`). Ratified value: 50ms.
+    assert RETRIEVAL_LATENCY_BUDGET_MS == 50.0
+
+
+def test_within_latency_budget_boundary():
+    # Latency is smaller-is-better, so the operator is <= (NOT the >= the margin
+    # gate uses). Lock the exact boundary + the 6dp rounding.
+    assert within_latency_budget(0.0) is True
+    assert within_latency_budget(50.0) is True  # exact boundary passes (load-bearing equality)
+    assert within_latency_budget(49.999999) is True
+    assert within_latency_budget(50.000001) is False
+
+
+def test_within_latency_budget_rejects_overbudget():
+    # Highest-value canary against an inverted-operator clone of the margin gate:
+    # a 10x-over-budget latency must NOT be "within budget". A happy-path-only test
+    # would pass under BOTH <= and >= because real in-memory retrieval is fast.
+    assert within_latency_budget(RETRIEVAL_LATENCY_BUDGET_MS * 10.0) is False
+    assert within_latency_budget(1.0) is True
+
+
+def test_within_latency_budget_6dp_rounding():
+    # Sub-1e-6 float dust rounds to the boundary and passes; a real >=1e-3 overage
+    # is NOT absorbed (proves the round(...,6) is load-bearing, like the margin gate).
+    assert within_latency_budget(50.0000004) is True
+    assert within_latency_budget(50.001) is False

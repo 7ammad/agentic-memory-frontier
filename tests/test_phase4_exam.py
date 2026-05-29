@@ -3,8 +3,13 @@ import pytest
 
 from cem_core import kernel
 from cem_eval import phase4_exam
-from cem_eval.eval_protocol import MMAResult, beats_lexical_by_margin
+from cem_eval.eval_protocol import (
+    RETRIEVAL_LATENCY_BUDGET_MS,
+    MMAResult,
+    beats_lexical_by_margin,
+)
 from cem_eval.phase4_dataset import (
+    EVAL_NOW,
     PHASE4_HELD_OUT,
     PYTEST_TRAP,
     phase4_memory_source_traces,
@@ -15,6 +20,23 @@ from cem_eval.phase4_exam import LOCKED_WEIGHTS, run_phase4_exam
 @pytest.fixture(scope="module")
 def report(tmp_path_factory):
     return run_phase4_exam(tmp_path_factory.mktemp("phase4"))
+
+
+def test_exam_eval_clock_is_not_behind_the_wall_clock_build_time(tmp_path):
+    # Determinism regression (Phase 5 hardening): the exam pins every task's
+    # current_time to EVAL_NOW, but the kernel stamps each card's valid_from with
+    # the wall-clock utc_now() at promote time. If EVAL_NOW is a fixed instant that
+    # the wall clock has passed, every exam-built card is future-dated relative to
+    # EVAL_NOW, dropped from scope, and the brief is empty -> MMA collapses to 0.
+    # The exam clock must therefore sit at/after the build clock. Wall-clock-robust:
+    # it bites whenever now > a stale EVAL_NOW, not only on one calendar day.
+    cem, _ = phase4_exam._build_cem(tmp_path / "cem")
+    future_dated = [
+        card.title
+        for card in cem.store.list_cards()
+        if card.valid_from is not None and card.valid_from > EVAL_NOW
+    ]
+    assert not future_dated, f"cards future-dated past EVAL_NOW (dropped from scope): {future_dated}"
 
 
 def test_exam_passes_with_honest_margin(report):
@@ -133,4 +155,61 @@ def test_leakage_gate_aborts_before_any_rung(tmp_path, monkeypatch):
     monkeypatch.setattr(phase4_exam, "memory_source_ids", lambda: {"dup-id"})
     monkeypatch.setattr(phase4_exam, "held_out_answer_ids", lambda: {"dup-id"})
     with pytest.raises(ValueError):
+        run_phase4_exam(tmp_path)
+
+
+def test_latency_fields_present_and_budget_echoed(report):
+    # The report must carry the measured p95 + the LOCKED budget echo. Does NOT
+    # assert within_latency_budget against live wall-clock timing (would flake) --
+    # only field existence/type and that the report cannot advertise a budget
+    # different from the locked constant.
+    assert isinstance(report.p95_retrieval_latency_ms, float)
+    assert report.p95_retrieval_latency_ms >= 0.0
+    assert report.retrieval_latency_budget_ms == RETRIEVAL_LATENCY_BUDGET_MS
+    assert isinstance(report.within_latency_budget, bool)
+
+
+def test_latency_flag_does_not_flip_verdict(tmp_path, monkeypatch):
+    # Verdict immutability: force the measured p95 over budget via the _p95 sentinel
+    # (avoids the bound-default-arg pitfall of patching the constant), and assert the
+    # LOCKED MMA verdict is untouched -- latency is a readiness flag, never a gate.
+    monkeypatch.setattr(phase4_exam, "_p95", lambda samples: 999.0)
+    report = run_phase4_exam(tmp_path)
+    assert report.within_latency_budget is False
+    assert report.verdict == "PASS"
+    assert report.cem_passes_success_bar is True
+    assert report.cem_beats_lexical is True
+
+
+def test_p95_is_plumbed_not_hardcoded(tmp_path, monkeypatch):
+    # Anti-fake-green: the report field must be fed by the measured-samples
+    # aggregation, not a hardcoded 0.0. A sentinel p95 must propagate.
+    monkeypatch.setattr(phase4_exam, "_p95", lambda samples: 999.0)
+    report = run_phase4_exam(tmp_path)
+    assert report.p95_retrieval_latency_ms == 999.0
+    assert report.within_latency_budget is False
+
+
+def test_latency_samples_collected_per_held_out_task(tmp_path, monkeypatch):
+    # Per-task measurement over the cem rung ONLY (not measure-once). The dedicated
+    # measurement pass calls _measure_ms exactly len(PHASE4_HELD_OUT) == 12 times.
+    real_measure = phase4_exam._measure_ms
+    calls = {"n": 0}
+
+    def counting_measure(operation):
+        calls["n"] += 1
+        return real_measure(operation)
+
+    monkeypatch.setattr(phase4_exam, "_measure_ms", counting_measure)
+    run_phase4_exam(tmp_path)
+    assert calls["n"] == len(PHASE4_HELD_OUT)
+
+
+def test_empty_latency_samples_fail_closed(tmp_path, monkeypatch):
+    # _p95([]) == 0.0 and 0.0 <= 50.0 is True -> a silently-empty accumulator would
+    # fake-green within_budget=True off zero measurements (same failure shape as the
+    # EVAL_NOW collapse this session). The exam must fail CLOSED. Force zero samples
+    # by stubbing the measurement pass to [], and assert run_phase4_exam raises.
+    monkeypatch.setattr(phase4_exam, "_measure_cem_retrieval_latency", lambda cem, tasks: [])
+    with pytest.raises(AssertionError):
         run_phase4_exam(tmp_path)
