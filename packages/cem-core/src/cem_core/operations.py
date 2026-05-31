@@ -1037,16 +1037,13 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS product lock: kernel, MCP bridge, startup gate, hook wrappers, memory surface reconciliation, governed-run close/finalize, automatic runtime trace intake, and aging/maintenance review are live"
+            "AMS v1 product lock: kernel, MCP bridge, startup gate, guarded Codex runtime, memory surface reconciliation, governed-run close/finalize, automatic runtime trace intake, aging/maintenance review, fresh operator proof, and frontier eval rerun are complete"
         ),
-        current_phase="AMS Primary Runtime Adoption",
-        status="active",
-        next_step="package the local operator path",
-        ready_for_next_phase=False,
-        open_followups=[
-            "package the local operator path",
-            "run fresh operator setup proof",
-        ],
+        current_phase="AMS v1 Accepted",
+        status="complete",
+        next_step="none - AMS v1 terminal acceptance contract is complete",
+        ready_for_next_phase=True,
+        open_followups=[],
     )
 
 

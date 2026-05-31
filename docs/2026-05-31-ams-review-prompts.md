@@ -71,7 +71,7 @@ Scope:
 
 Review for:
 - product acceptance criteria that are too vague or fake-greenable;
-- places where AMS is claimed complete despite trace intake, aging, or fresh-operator proof still being partial;
+- places where AMS is claimed complete without the terminal operator proof, frontier eval rerun, or A1-A9 evidence remaining intact;
 - active docs that still split the product identity;
 - mismatch between `PRODUCT-LOCK.md`, `TODO.md`, dashboard phase status, and `PROJECT-LEDGER.md`;
 - false claims that Codex command hooks enforce blocking after the live smoke showed they are advisory in Codex CLI 0.128.0;

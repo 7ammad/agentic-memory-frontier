@@ -7,12 +7,12 @@ Canonical idea source of truth: `IDEA.md`.
 
 Thesis: *Memory is not storage. Memory is verified experience that improves future action.* The deliverable is **AMS**: ingest agent traces -> extract typed candidate memories -> validate -> quarantine bad ones -> promote verified Experience Cards -> return task-scoped **action briefs**, not raw memory dumps.
 
-## State (as of 2026-05-30)
+## State (as of 2026-06-01)
 
-AMS kernel, synthetic eval, baselines, external adapters (HaluMem / MemoryArena / LongMemEval-V2), AMS v1/v1.1, the Memory Use Controller (`startup-brief` gate), the Correction Capture Controller, and the §12 live-hook wrappers are implemented and tested.
+AMS v1 is accepted against `PRODUCT-LOCK.md`. The terminal proof is `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final`: it passes fresh-root setup, primary AMS memory surface reconciliation, startup brief, maintenance review, Monitor-0 deep, audit, governed-run close, and Phase 4 frontier eval.
 
 - **Product acceptance source = `PRODUCT-LOCK.md`**. **Idea source of truth = `IDEA.md`**. **Execution source of truth = `TODO.md`** (ordered continuation rail — work the first unchecked item) and **`docs/PROJECT-LEDGER.md`** (decisions/gaps/mistakes/verification).
-- **Current open track:** AMS Primary Runtime Adoption: live Codex hook-payload smoke, governed-run brief/monitor/evidence ids, and reconciliation of legacy Codex memories / `codex-memory` / `ams-memory` into an AMS-primary startup path.
+- **Current open track:** none for AMS v1. Future work must be opened as a named post-v1 phase or a regression fix from a failing acceptance check.
 - A/B/C/D (SuperClaude-memory review, SC v0.3 spec, Codex-memory design, ACS protocol) are **historical design context** — specs live in `specs/`, not the active rail.
 
 ## Commands
@@ -25,6 +25,7 @@ python scripts/ams.py remember "<lesson>" --kind skill --outcome success --domai
 python scripts/ams.py monitor --deep              # Monitor-0
 python scripts/ams.py dashboard                   # phase + next step + record layers
 python scripts/run_synthetic_eval.py              # AMS V0 corruption eval smoke
+python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final  # terminal v1 acceptance proof
 powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1   # mandatory before implementation/status claims
 ```
 

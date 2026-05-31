@@ -2,6 +2,7 @@
 
 Date: 2026-05-31
 Source: `PRODUCT-LOCK.md`
+Status: complete as of 2026-06-01
 
 ## Rule
 
@@ -11,7 +12,7 @@ not redefine scope.
 ## Planning Target
 
 Move AMS from a working memory engine plus callable tools into the primary
-memory operating path for Codex.
+memory operating path for Codex. This target is complete for AMS v1.
 
 ## Current Planning Read
 
@@ -25,13 +26,15 @@ Accepted as built:
 - correction capture core and hook wrappers;
 - default Codex entrypoint wrapping through AMS runtime control;
 - legacy memory surface reconciliation: `ams-memory` primary, `codex-memory` secondary, native Codex memory applied as secondary import source;
-- governed-run close/finalize records with observed outcomes and observational influence events.
+- governed-run close/finalize records with observed outcomes and observational influence events;
+- continuous trace intake from ordinary Codex work;
+- aging and maintenance product surface;
+- fresh operator setup proof;
+- Phase 4 frontier eval rerun after operator packaging.
 
 Not accepted yet:
 
-- continuous trace intake from ordinary Codex work;
-- aging and maintenance product surface;
-- fresh operator setup proof.
+- Nothing for AMS v1.
 
 ## Execution Order
 

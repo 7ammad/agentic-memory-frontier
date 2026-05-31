@@ -1,7 +1,7 @@
 # AMS Product Lock
 
 Date locked: 2026-05-31
-Status: canonical product acceptance lock
+Status: canonical product acceptance lock; AMS v1 accepted on 2026-06-01
 
 ## Product Line
 
@@ -27,9 +27,9 @@ memory before trust, retrieves bounded action guidance before work, records
 whether the guidance changed the outcome, and uses that evidence to improve the
 next run.
 
-AMS is not complete because it has a kernel, an MCP tool, a monitor, or an eval
-score. AMS is complete only when Codex actually operates through it as the
-primary memory path.
+AMS is not complete merely because it has a kernel, an MCP tool, a monitor, or
+an eval score. AMS v1 is accepted only when Codex operates through it as the
+primary memory path and the fresh local operator path passes.
 
 ## Frontier Bottlenecks AMS Attacks
 
@@ -72,7 +72,7 @@ Those can come later only after the local primary-memory product is real.
 
 ## Product Acceptance Criteria
 
-AMS is not accepted until all criteria below have evidence in the repo.
+AMS v1 is accepted because all criteria below have evidence in the repo.
 
 ### A1. Primary Runtime Lock
 
@@ -192,10 +192,13 @@ Built and verified:
 - automatic runtime trace intake from ordinary guarded Codex work;
 - automatic governed-run closure for guarded work outcomes;
 - aging and maintenance review for expired, stale, inactive, contradicted, and pending records.
+- fresh operator proof from an isolated local AMS root;
+- Phase 4 frontier eval rerun after operator packaging.
 
-Not yet accepted:
+Remaining AMS v1 gaps:
 
-- external operator install/run proof.
+- Nothing for AMS v1. Post-v1 work must be opened as a new named phase, not as a
+  surprise continuation of this acceptance lock.
 
 ## Planning Order
 
@@ -211,10 +214,23 @@ Work proceeds in this order. Do not skip ahead to platform features.
 8. Package the local operator path.
 9. Re-run frontier evals against the accepted product path.
 
+All nine planning-order items are complete for AMS v1.
+
 ## Completion Rule
 
-AMS is complete only when the acceptance criteria pass against the real product
+AMS v1 is complete because the acceptance criteria pass against the real product
 path, not a detached demo path.
 
 If a test, dashboard, or report says AMS is complete while Codex can still ignore
 AMS during normal work, that report is wrong.
+
+Terminal proof command:
+
+```powershell
+python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final
+```
+
+Terminal proof result: fresh root setup passed, `ams-memory` reconciled as
+primary, startup brief allowed, Monitor-0 deep passed, maintenance had zero
+items, a real card audit passed, the governed run closed with outcome success,
+and the Phase 4 frontier eval returned `PASS` with a 75.0pp lexical margin.

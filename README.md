@@ -12,13 +12,9 @@ The core thesis:
 
 AMS ingests agent traces, extracts typed candidate memories, validates them before storage, quarantines bad memories, promotes verified experience cards, and returns action briefs instead of raw memory dumps.
 
-Current build focus:
-
-- write-path quality;
-- source-grounded Experience Atoms;
-- contradiction and stale-memory quarantine;
-- auditability and provenance;
-- evals that compare against unvalidated memory baselines.
+AMS v1 acceptance status: complete as of the terminal operator proof on
+2026-06-01. Post-v1 work should be named as a new phase, not appended as another
+hidden "one more thing" to the v1 TODO.
 
 The default extractor and contradiction detector are deterministic strategies for reproducible AMS V0 fixtures. They are replaceable kernel interfaces, not the final reasoning layer.
 
@@ -110,6 +106,14 @@ correction-events.jsonl
 correction-latest.json
 correction-resume-gate.json
 correction-resume-runs.jsonl
+governed-run-runs.jsonl
+governed-run-latest.json
+runtime-trace-runs.jsonl
+runtime-trace-latest.json
+runtime-trace-latest.md
+maintenance-runs.jsonl
+maintenance-latest.json
+maintenance-latest.md
 ```
 
 `memory-surfaces` reports the active memory topology: `ams-memory` must be primary for the active AMS root, while `codex-memory` and native Codex memory are only accepted as secondary inputs after the legacy registry has an applied AMS migration.
@@ -364,6 +368,27 @@ Run tests:
 
 ```powershell
 python -m pytest
+```
+
+## Terminal Operator Proof
+
+Run the complete local operator proof from a fresh AMS root:
+
+```powershell
+python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final
+```
+
+This one command initializes a fresh root, bootstraps documented AMS directives,
+seeds one learned operator lesson, applies the legacy-memory migration, verifies
+`ams-memory` as the primary memory surface, retrieves a bounded startup brief,
+runs maintenance review, runs Monitor-0 deep checks, audits a real card, closes
+the governed run with outcome `success`, and reruns the Phase 4 frontier eval.
+
+Expected terminal signal:
+
+```text
+AMS_OPERATOR_PROOF_PASS
+frontier_eval=PASS margin=75.0pp
 ```
 
 ## HaluMem Adapter Smoke

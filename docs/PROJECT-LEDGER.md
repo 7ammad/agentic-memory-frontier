@@ -665,7 +665,30 @@ Entry format:
   - `docs/2026-05-31-ams-product-lock-audit.md`
   - `docs/PROJECT-LEDGER.md`
 - Verification: Focused maintenance review suite -> **4 passed**. Codex-review remediation canaries -> **4 passed** for the second pass, plus the prior **6 passed** adoption-gate canaries. Third Codex review loop -> **1 P2** guarded-launch trace gap; fixed with a canary. Focused guarded-command canaries -> **4 passed**. Fourth Codex review loop -> **1 P2** stale-backup installer gap; fixed with a reinstall/upgrade canary. Focused installer canaries -> **3 passed**. Fifth Codex review loop -> **2 P2** guarded-persistence gaps; fixed with quiet-trace-failure and governed-run-auto-close canaries. Focused guarded-command persistence canaries -> **5 passed**. Sixth Codex review loop -> **2 P2** monitor-surface gaps; fixed with MCP-root and unknown-freshness-anchor canaries. Focused monitor-surface canaries -> **4 passed**. Surrounding AMS CLI/runtime/entrypoint suite -> **57 passed**. Full `python -m pytest` -> **202 passed**. Final Codex review loop -> **no discrete actionable regressions**, diff inspected against the merge base, and full `python -m pytest -q` passed inside the review. Live `powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1` -> **pass** (`brief_b9422ecd489343bbab353850312db302`, monitor `monitor_da9f21a012de4c3eb1b056270e4b6ef5`). Live `python scripts/ams.py maintenance review` -> **pass** (`maintenance_cbdf5de418994987b92783f872dc84d4`) with 8 active cards, 0 inactive, 0 expired active, 0 stale active, 0 contradicted active, and no review items. Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_3d8026c8efd2428b8d36102d3caad845`), including `memory_surfaces_reconciled`, maintenance checks with zero blocking risks, and deep synthetic eval. Live dashboard -> next step `package the local operator path`, latest monitor `monitor_3d8026c8efd2428b8d36102d3caad845`, latest maintenance `maintenance_d23ab68f98d3446995673ae38ff2e76a items=0`. Credential marker scan -> no secret matches. `git diff --check` -> clean aside from Windows CRLF warnings.
-- Follow-up: Package the local operator path.
+- Follow-up: Resolved by LEDGER-20260601-001.
+
+## LEDGER-20260601-001 - AMS v1 terminal acceptance freeze
+
+- Date: 2026-06-01
+- Type: status / verification / plan-update
+- Status: resolved
+- Source: User correction: stop inventing new tasks after each completed slice; list the full remaining scope once and finish the build.
+- Summary: Froze AMS v1 acceptance as a closed A1-A9 contract in `TODO.md` and finished the remaining two partials: A8 frontier eval rerun and A9 fresh operator proof. Added `scripts/run_ams_operator_proof.py` as the one-command terminal proof. The proof creates a fresh local AMS root, writes isolated Codex memory/config inputs, runs init/bootstrap/remember/migrate, proves `ams-memory` as primary and legacy memory as secondary, retrieves a bounded startup brief, runs maintenance review, runs Monitor-0 deep checks, audits a real card, closes the governed run with outcome success, and reruns the Phase 4 frontier eval. Dashboard/monitor phase status now reports `AMS v1 Accepted`, `ready_for_next_phase=True`, and no open follow-ups. No AMS v1 TODO items remain.
+- Files:
+  - `scripts/run_ams_operator_proof.py`
+  - `tests/test_ams_operator_proof.py`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `CHANGELOG.md`
+  - `docs/2026-05-31-ams-product-lock-audit.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final` -> **pass** (`AMS_OPERATOR_PROOF_PASS`), startup `brief_f3a88b2624454ddd886505de39e407f6`, monitor `monitor_17adf0c7bc9f4d84a906210bce318d0f`, maintenance `items=0`, audit `card_264bed74b7a346dfbb0d3898aef1c8f8`, governed run `run_946ba867b16947438ac0a50919b66619 outcome=success`, frontier eval `PASS margin=75.0pp`. Focused operator proof/status canaries -> **3 passed**. Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_f62d9107b19941959a79caceda35c264`) with phase `AMS v1 Accepted` and next `none - AMS v1 terminal acceptance contract is complete`. Full `python -m pytest` -> **203 passed**.
+- Follow-up: None for AMS v1. Future work must be a named post-v1 phase or a regression fix from a failing acceptance check.
 
 ## LEDGER-CORRECTION-20260530-ee8e14de - scope trimming
 
@@ -707,7 +730,7 @@ Entry format:
 - ~~Add governed-run close/finalize records for outcomes and influence.~~ **RESOLVED (LEDGER-030):** `ams governed-run close` finalizes the receipt, writes an observational influence event, and refuses old/dangling receipts without action-brief links.
 - ~~Add automatic real trace intake from ordinary Codex work.~~ **RESOLVED (LEDGER-031):** guarded Codex work now writes real runtime traces and source-span candidates without polluting quiet command output.
 - ~~Add aging and maintenance checks as a product surface.~~ **RESOLVED (LEDGER-032):** `ams maintenance review` persists aging reports, monitor names blocking maintenance risks, dashboard exposes `latest_maintenance`, and tests prove expired records do not leak into action briefs.
-- Package the local operator path.
+- ~~Package the local operator path.~~ **RESOLVED (LEDGER-20260601-001):** `scripts/run_ams_operator_proof.py` proves fresh-root setup, startup brief, maintenance, Monitor-0 deep, audit, governed-run close, and Phase 4 frontier eval in one command.
 - ~~Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface.~~ **RESOLVED (LEDGER-021):** runtime-agnostic `correction_hooks.py` core + `correction hook-prompt`/`hook-gate` CLI + two PowerShell wrappers; Monitor-0 single-source-of-truth bridge test; human-approval-only resume preserved.
 - ~~Add latency budget enforcement to the startup controller.~~ **RESOLVED (LEDGER-020):** `within_latency_budget` + the pre-registered `RETRIEVAL_LATENCY_BUDGET_MS` now enforce a p95 budget on the CEM retrieval read path (the exact hot path the startup brief shares via `retrieve_brief` -> `retrieve_action_brief`), gated in CI through the Phase 4 exam report and the composite readiness gate.
 - ~~**Phase 5 hardening — two latent defensive consistency nits surfaced by PR#4's 5/5 re-review:**~~ **RESOLVED (LEDGER-020):** both `_supersede_stale_cards` (was: skip only `"superseded"`) and `vertical_loop` `active_card_count` (was: `deactivated_at is None`) now use the shared module-level `card_is_inactive` predicate; a predicate unit test covers all five states and a behavioural canary proves the supersession nit would have clobbered an already-inactive card.

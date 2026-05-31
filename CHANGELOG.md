@@ -4,6 +4,27 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-06-01
+
+### Added
+
+- Added `scripts/run_ams_operator_proof.py`, the terminal AMS v1 operator proof. It creates a fresh local AMS root, seeds only documented inputs, reconciles `ams-memory` as primary, retrieves a startup brief, runs maintenance and Monitor-0 deep checks, audits a real card, closes the governed run with outcome success, and reruns the Phase 4 frontier eval.
+- Added `tests/test_ams_operator_proof.py` so the fresh-root operator path cannot silently become documentation-only.
+
+### Changed
+
+- Froze the AMS v1 terminal scope in `TODO.md`: A1-A9 are listed once, all checked, and no new TODO item may be added to redefine AMS v1 as "really done." Future work must be post-v1 or a regression fix.
+- Updated dashboard/monitor phase status to `AMS v1 Accepted`, `ready_for_next_phase=True`, and no open follow-ups.
+- Updated `PRODUCT-LOCK.md`, `README.md`, `AGENTS.md`, `CLAUDE.md`, and the product-lock audit to reflect AMS v1 acceptance.
+
+### Verified
+
+- `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final` -> `AMS_OPERATOR_PROOF_PASS`; startup `brief_f3a88b2624454ddd886505de39e407f6`; monitor `monitor_17adf0c7bc9f4d84a906210bce318d0f`; maintenance items `0`; audit `card_264bed74b7a346dfbb0d3898aef1c8f8`; governed run `run_946ba867b16947438ac0a50919b66619 outcome=success`; frontier eval `PASS margin=75.0pp`.
+- `python -m pytest tests/test_ams_operator_proof.py -q` -> `1 passed`.
+- Focused operator proof/status canaries -> `3 passed`.
+- `python scripts/ams.py monitor --deep` -> pass (`monitor_f62d9107b19941959a79caceda35c264`) with phase `AMS v1 Accepted`, next `none - AMS v1 terminal acceptance contract is complete`.
+- `python -m pytest` -> `203 passed`.
+
 ## 2026-05-31
 
 ### Added

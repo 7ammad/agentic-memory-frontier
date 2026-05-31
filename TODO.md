@@ -2,6 +2,29 @@
 
 This is the continuation rail for AMS. It is ordered. Work from the first unchecked item downward.
 
+## Terminal Scope Freeze
+
+As of 2026-06-01, the AMS v1 product-completion list is closed. Do not add a
+new TODO item to define AMS v1 as "really done" after this list. New work after
+this point is allowed only as a regression fix from a failing acceptance check
+or as a separately named post-v1 product phase.
+
+AMS v1 terminal acceptance list:
+
+- [x] A1. Primary runtime lock.
+- [x] A2. Real trace intake.
+- [x] A3. Trust before retrieval.
+- [x] A4. Action briefs govern work.
+- [x] A5. Outcome influence loop.
+- [x] A6. Correction capture.
+- [x] A7. Aging and maintenance.
+- [x] A8. Frontier eval rerun against the accepted path.
+- [x] A9. Operator product proof from a fresh local root.
+- [x] Final status freeze: dashboard/monitor report no remaining v1 follow-ups.
+
+Completion evidence is `scripts/run_ams_operator_proof.py`, `python -m pytest`,
+`python scripts/ams.py monitor --deep`, and `python scripts/ams.py dashboard`.
+
 ## Continuation Rule
 
 After finishing any checked item:
@@ -199,7 +222,7 @@ Full AMS kernel program (Approach C, eval-first), per `docs/2026-05-28-causal-ex
 
 ### 14. Primary Runtime Adoption
 
-The kernel, MCP bridge, startup gate, hook wrappers, default Codex entrypoint wrapping, and memory-surface reconciliation are live. The remaining work is adoption: close governed runs with outcomes/influence, ingest traces from ordinary Codex work, and keep AMS the primary governed startup source.
+The kernel, MCP bridge, startup gate, hook wrappers, default Codex entrypoint wrapping, memory-surface reconciliation, governed-run close/finalize, automatic runtime trace intake, aging/maintenance review, fresh operator proof, and frontier eval rerun are complete.
 
 - [x] Lock `PRODUCT-LOCK.md` as the canonical product acceptance source.
 - [x] Start the execution plan from the product lock (`docs/2026-05-31-ams-product-lock-execution-plan.md`).
@@ -213,7 +236,7 @@ The kernel, MCP bridge, startup gate, hook wrappers, default Codex entrypoint wr
 - [x] Add governed-run close/finalize records for outcomes and influence. `ams governed-run close` finalizes receipts with observed outcome, links back to the startup/action brief, writes the observational influence event, refuses to fake-close receipts missing action-brief/influence ids, and the guarded launcher now auto-closes governed receipts after blocked, allowed, and downstream-launch-failure outcomes.
 - [x] Add automatic real trace intake from ordinary Codex work. `ams runtime-trace record` ingests guarded work as real `AgentTrace` evidence, proposes marker-backed memory candidates with source spans, writes `runtime-trace-latest`, dashboard exposes the latest trace, and `scripts/ams-guarded-command.ps1` records traces automatically after allow/block decisions and downstream launch failures without polluting quiet raw command output; quiet mode still reports AMS trace-recording failures to stderr.
 - [x] Add aging and maintenance checks as a product surface. `ams maintenance review` now detects expired, stale, contradicted, inactive, and pending memory records; monitor names blocking maintenance risks; dashboard exposes `latest_maintenance`; expired/inactive records are pinned by canaries so they do not leak into action briefs.
-- [ ] Package the local operator path.
+- [x] Package the local operator path. `scripts/run_ams_operator_proof.py` creates a fresh local AMS root, writes isolated Codex memory/config inputs, runs init/bootstrap/remember/migrate, proves `ams-memory` primary and legacy memory secondary, retrieves a startup brief, runs maintenance, runs Monitor-0 deep checks, audits a real card, closes the governed run with outcome success, and reruns the Phase 4 frontier eval. Final proof: `AMS_OPERATOR_PROOF_PASS`, startup `brief_f3a88b2624454ddd886505de39e407f6`, monitor `monitor_17adf0c7bc9f4d84a906210bce318d0f`, maintenance items `0`, governed run `run_946ba867b16947438ac0a50919b66619 outcome=success`, frontier eval `PASS margin=75.0pp`.
 
 ## Historical Schedule Note
 

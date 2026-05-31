@@ -12,9 +12,9 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 
 - Product line: **AMS**.
 - Canonical acceptance lock: `PRODUCT-LOCK.md`.
-- Current phase: **AMS Primary Runtime Adoption**.
-- Current status: active, not complete.
-- Current next gap: package the local operator path.
+- Current phase: **AMS v1 Accepted**.
+- Current status: complete for AMS v1.
+- Current next gap: none for AMS v1. Future work must be opened as a named post-v1 phase or a regression fix.
 - Current live rails: `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`.
 
 ## Historical Design State (2026-05-26)
@@ -25,7 +25,7 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 - **D** ACS protocol design (A2A v1.0-compatible relay topology, signed envelopes, 5-message vocab, Jeffreys×Codex escalation, replay protection, 3 phases, 10-test acceptance battery) — DONE + VERIFIED (4 codex passes, 11 patches, READY)
 
 **Historical design state:** all 4 sub-projects were design-complete on 2026-05-26.
-**Current runtime state:** implementation is active on AMS Primary Runtime Adoption. `PRODUCT-LOCK.md` is the canonical acceptance lock; the live rails are `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`. The current open gap is packaging the local operator path; aging/maintenance review, automatic runtime trace intake, governed-run close/finalize, and memory-surface reconciliation are live.
+**Current runtime state:** AMS v1 is accepted. `PRODUCT-LOCK.md` is the canonical acceptance lock; the live rails are `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`. Terminal proof: `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final` passes fresh-root setup, primary AMS memory surface reconciliation, startup brief, maintenance review, Monitor-0 deep, audit, governed-run close, and Phase 4 frontier eval.
 
 ## To continue right now
 

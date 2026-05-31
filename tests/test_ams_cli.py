@@ -361,16 +361,18 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
 
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 11
-    assert monitor["phase"]["completed_through"].startswith("AMS product lock")
-    assert monitor["phase"]["current_phase"] == "AMS Primary Runtime Adoption"
+    assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock")
+    assert monitor["phase"]["current_phase"] == "AMS v1 Accepted"
     assert (
         monitor["phase"]["next_step"]
-        == "package the local operator path"
+        == "none - AMS v1 terminal acceptance contract is complete"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
     assert "real trace intake" not in monitor["phase"]["next_step"]
     assert "aging and maintenance" not in monitor["phase"]["next_step"]
+    assert monitor["phase"]["ready_for_next_phase"] is True
+    assert monitor["phase"]["open_followups"] == []
     assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
     assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
     assert _check_status(monitor, "maintenance_surface_present") == "pass"
@@ -608,9 +610,9 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["ams_directive_count"] == 11
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
-    assert dashboard["phase"]["completed_through"].startswith("AMS product lock")
-    assert dashboard["phase"]["ready_for_next_phase"] is False
-    assert any("package the local operator path" in item for item in dashboard["phase"]["open_followups"])
+    assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock")
+    assert dashboard["phase"]["ready_for_next_phase"] is True
+    assert dashboard["phase"]["open_followups"] == []
 
 
 def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
