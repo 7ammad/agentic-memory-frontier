@@ -61,7 +61,10 @@ def test_installed_codex_entrypoint_blocks_before_original_shim(tmp_path):
 
     assert install.returncode == 0, install.stderr
     assert "AMS_CODEX_ENTRYPOINT_WRAPPER" in target.read_text(encoding="utf-8")
-    assert "wslpath -w" in (bin_dir / "codex").read_text(encoding="utf-8")
+    shell_wrapper = (bin_dir / "codex").read_text(encoding="utf-8")
+    assert "wslpath -w" in shell_wrapper
+    assert "prefer_powershell_exe=1" in shell_wrapper
+    assert shell_wrapper.index('if [ "$prefer_powershell_exe" = "1" ]') < shell_wrapper.index("elif command -v pwsh")
     assert (bin_dir / "codex.ams-original.ps1").exists()
     assert (bin_dir / "codex.ams-original.cmd").exists()
     assert (bin_dir / "codex.ams-original").exists()

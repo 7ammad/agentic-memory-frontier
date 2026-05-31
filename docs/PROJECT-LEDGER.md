@@ -627,19 +627,21 @@ Entry format:
 - Type: implementation / runtime adoption
 - Status: active
 - Source: TODO section 14 Primary Runtime Adoption and Product Lock A2/A6.
-- Summary: Added `ams runtime-trace record` and wired `scripts/ams-guarded-command.ps1` to call it after every AMS-controlled downstream decision. A guarded run now loads its `runtime-control` receipt, creates a real `AgentTrace`, persists it through `CEM.ingest_trace`, proposes marker-backed memory candidates with source spans, writes `runtime-trace-runs.jsonl` / `runtime-trace-latest.json` / `runtime-trace-latest.md`, and exposes `latest_runtime_trace` in `dashboard`. Blocked correction/runtime-control decisions also write failure traces with `downstream_invoked=false`. Quiet guarded invocations preserve raw command stdout while still recording the trace.
+- Summary: Added `ams runtime-trace record` and wired `scripts/ams-guarded-command.ps1` to call it after every AMS-controlled downstream decision. A guarded run now loads its `runtime-control` receipt, creates a real `AgentTrace`, persists it through `CEM.ingest_trace`, proposes marker-backed memory candidates with source spans, writes `runtime-trace-runs.jsonl` / `runtime-trace-latest.json` / `runtime-trace-latest.md`, and exposes `latest_runtime_trace` in `dashboard`. Blocked correction/runtime-control decisions also write failure traces with `downstream_invoked=false`. Quiet guarded invocations preserve raw command stdout while still recording the trace. Codex review found one WSL shell-shim P2; the generated Git Bash/WSL shim now prefers `powershell.exe` after `wslpath -w` conversion before considering Linux `pwsh`.
 - Files:
   - `packages/cem-core/src/cem_core/operations.py`
   - `packages/cem-core/src/cem_core/cli.py`
   - `scripts/ams-guarded-command.ps1`
+  - `scripts/install-ams-codex-entrypoint.ps1`
   - `tests/test_ams_cli.py`
+  - `tests/test_ams_entrypoint.py`
   - `AGENTS.md`
   - `TODO.md`
   - `PRODUCT-LOCK.md`
   - `CHANGELOG.md`
   - `docs/2026-05-31-ams-product-lock-audit.md`
   - `docs/PROJECT-LEDGER.md`
-- Verification: Focused runtime trace intake suite -> **9 passed**. Full `python -m pytest` -> **193 passed**. Live `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ams-guarded-command.ps1 ... -Quiet -Command cmd.exe /c echo AMS_TRACE_SMOKE` -> printed exactly `AMS_TRACE_SMOKE` and exited 0. Live `python scripts/ams.py dashboard` -> `latest_runtime_trace: success trace_c33a54d6d6c84959bb9e3ec8a28d8ed3 atoms=1` and next step `add aging and maintenance checks as a product surface`. Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_c2f34660e7cf4f618f6a9c7cd4db24f4`). `git diff --check` -> clean aside from Windows CRLF warnings.
+- Verification: Focused runtime trace intake suite -> **9 passed**. Codex review loop against `staging` -> **1 P2** (WSL shim path handling), fixed. Focused entrypoint/runtime retest -> **5 passed**. Full `python -m pytest` -> **193 passed**. Live `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ams-guarded-command.ps1 ... -Quiet -Command cmd.exe /c echo AMS_TRACE_SMOKE` -> printed exactly `AMS_TRACE_SMOKE` and exited 0. Live `python scripts/ams.py dashboard` -> `latest_runtime_trace: success trace_c33a54d6d6c84959bb9e3ec8a28d8ed3 atoms=1` and next step `add aging and maintenance checks as a product surface`. Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_c2f34660e7cf4f618f6a9c7cd4db24f4`). Reinstalled the real npm Codex shims; PowerShell `codex --version` and WSL `/mnt/c/Users/7amma/AppData/Roaming/npm/codex --version` both return `codex-cli 0.128.0`. `git diff --check` -> clean aside from Windows CRLF warnings.
 - Follow-up: Add aging and maintenance checks as a product surface.
 
 ## LEDGER-CORRECTION-20260530-ee8e14de - scope trimming

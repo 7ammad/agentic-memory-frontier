@@ -31,6 +31,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 ### Fixed
 
 - Addressed Greptile PR-loop safety findings that still applied in the live branch: governed-run receipts are written before startup briefs can claim them, receipt ids are generated before model construction, run-close/finalization fields are reserved on receipts, bootstrap AMS directive counting is no longer checkout-path-sensitive, live `prompt` hook payloads are accepted by the Python adapter on every platform, multi-atom card audits surface the latest validation decision, influence close is idempotent per brief, `SCORER_VERSION` has one source of truth, single-task MMA cannot pass the confidence gate, and correction resume cannot mint phantom receipts when the gate is already clear.
+- Addressed Codex review's WSL shim finding: when the generated Git Bash/WSL `codex` shim converts `basedir` to a Windows path, it now prefers `powershell.exe` before Linux `pwsh`, preventing Linux PowerShell from receiving an unusable `C:\...` script path.
 
 ### Verified
 
@@ -50,6 +51,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Live `python scripts/ams.py governed-run close --receipt-id run_f24ec46f59b14b49aa204d5a75f3ee69 --outcome success ...` -> closed with `influence_ba6f90954fc14042965b163794b4fb95`; dashboard showed `closed=True outcome=success`.
 - Focused runtime trace intake suite -> `9 passed`, including source-span candidate extraction, missing-control failure, blocked-command failure trace, and quiet raw output preservation.
 - Live guarded-command smoke -> `AMS_TRACE_SMOKE` printed cleanly while dashboard recorded `latest_runtime_trace: success trace_c33a54d6d6c84959bb9e3ec8a28d8ed3 atoms=1`; dashboard now reports next step `add aging and maintenance checks as a product surface`.
+- Codex review loop -> found one P2 in the generated WSL shell shim; fixed and verified with focused entrypoint/runtime tests (`5 passed`) and full `python -m pytest` (`193 passed`). Reinstalled the real npm Codex shims; PowerShell `codex --version` and WSL `/mnt/c/Users/7amma/AppData/Roaming/npm/codex --version` both return `codex-cli 0.128.0`.
 
 ## 2026-05-30
 

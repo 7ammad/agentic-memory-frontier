@@ -103,6 +103,7 @@ $shWrapper = @"
 #!/bin/sh
 # $marker
 basedir=`$(dirname "`$(echo "`$0" | sed -e 's,\\,/,g')")
+prefer_powershell_exe=0
 case ``uname`` in
     *CYGWIN*|*MINGW*|*MSYS*)
         if command -v cygpath > /dev/null 2>&1; then
@@ -114,10 +115,13 @@ esac
 if [ "``uname``" = "Linux" ] && [ -r /proc/version ] && grep -qi microsoft /proc/version; then
   if command -v wslpath > /dev/null 2>&1; then
     basedir=``wslpath -w "`$basedir"``
+    prefer_powershell_exe=1
   fi
 fi
 
-if command -v pwsh > /dev/null 2>&1; then
+if [ "`$prefer_powershell_exe" = "1" ] && command -v powershell.exe > /dev/null 2>&1; then
+  exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "`$basedir/codex.ps1" "`$@"
+elif command -v pwsh > /dev/null 2>&1; then
   exec pwsh -NoProfile -ExecutionPolicy Bypass -File "`$basedir/codex.ps1" "`$@"
 elif command -v powershell.exe > /dev/null 2>&1; then
   exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "`$basedir/codex.ps1" "`$@"
