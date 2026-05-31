@@ -545,6 +545,8 @@ def _emit_monitor(payload: dict[str, Any]) -> None:
 
 def _emit_startup_brief(payload: dict[str, Any]) -> None:
     print(f"startup_brief: {payload['status']} {payload['brief_id']}")
+    if payload.get("governed_run_id"):
+        print(f"governed_run: {payload['governed_run_id']}")
     print(f"monitor: {payload['monitor_id']}")
     print(f"phase: {payload['phase']['current_phase']} ({payload['phase']['status']})")
     print(f"tokens: {payload['estimated_tokens']} / {payload['limits']['max_tokens']}")
@@ -640,3 +642,8 @@ def _emit_dashboard(payload: dict[str, Any]) -> None:
         print(f"latest_startup_brief: {latest_startup_brief['status']} {latest_startup_brief['brief_id']}")
     else:
         print("latest_startup_brief: none")
+    latest_governed_run = payload.get("latest_governed_run")
+    if latest_governed_run:
+        print(f"latest_governed_run: {latest_governed_run['status']} {latest_governed_run['receipt_id']}")
+    else:
+        print("latest_governed_run: none")

@@ -4,6 +4,40 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-05-31
+
+### Added
+
+- Added `PRODUCT-LOCK.md` as the canonical AMS product acceptance lock: product line, scope, acceptance criteria, current status, planning order, and completion rule.
+- Added `docs/2026-05-31-ams-product-lock-execution-plan.md` to map the product lock into the first planning moves without redefining scope.
+- Added `docs/2026-05-31-ams-product-lock-audit.md` with pass/partial/fail status for Product Lock criteria A1-A9.
+- Added `docs/2026-05-31-ams-review-prompts.md` with a Greptile PR review request and optional Codex review preflight prompt.
+- Added governed-run receipts to `startup-brief`: each run now records receipt id, startup brief id, monitor id, cwd, task description, evidence ids, status, and block reasons; dashboard exposes the latest governed run.
+- Added `docs/2026-05-31-codex-hook-runtime-smoke.md` with live Codex hook evidence.
+
+### Changed
+
+- Locked product language to one line: **AMS**. Active source-of-truth docs now point to `PRODUCT-LOCK.md` for acceptance and avoid treating older internal labels as the product identity.
+- New bootstrap, migration, correction, README, TODO, and runtime-facing text now uses AMS product language. Legacy internal labels are recognized only for backwards-compatible parsing/classification.
+- Corrected the primary runtime adoption rail after live proof: Codex CLI 0.128.0 invokes command hooks but does not block on non-zero hook exits, so the next step is an enforceable AMS runtime control path, not another payload-shape check.
+
+### Verified
+
+- `python -m pytest` -> 172 passed.
+- `python scripts/ams.py monitor --deep` -> pass.
+- `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow with a governed-run receipt and AMS-only active action text.
+- `codex exec` live hook smoke -> `UserPromptSubmit` payload includes `prompt` + `session_id`; `PreToolUse` is invoked before tools; non-zero command-hook exits are advisory in Codex CLI 0.128.0.
+
+## 2026-05-30
+
+### Fixed
+
+- Corrected the live phase status: dashboard/monitor no longer reports the already-resolved §12 hook-wiring work as the next active step. The active track is now **AMS Primary Runtime Adoption**.
+
+### Changed
+
+- Added the remaining primary-adoption rail to `TODO.md`: live Codex hook-payload smoke, governed-run brief/monitor/evidence ids, and reconciliation of legacy Codex memories / `codex-memory` / `ams-memory` so AMS becomes the primary startup source.
+
 ## 2026-05-29
 
 ### Added
@@ -57,7 +91,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 - Added `CHANGELOG.md` as the canonical human-readable change timeline.
 - Added `docs/PROJECT-LEDGER.md` as the deeper engineering ledger for decisions, gaps, mistakes, and verification state.
-- Added scoped dashboard/monitor status so AMS/CEM records are separated from global Codex behavior records.
+- Added scoped dashboard/monitor status so AMS records are separated from global Codex behavior records.
 - Added explicit current-phase and next-step output to `python scripts/ams.py dashboard` and monitor records.
 - Added `python scripts/ams.py startup-brief` as the first Memory Use Controller command with allow/block status, monitor linkage, evidence ids, scoped retrieval, and bounded output.
 - Wired `scripts/session-start-gate.ps1` through `startup-brief` so startup execution now blocks when required AMS memory is missing.

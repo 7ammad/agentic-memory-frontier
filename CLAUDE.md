@@ -2,15 +2,17 @@
 
 Project root. **Never write or read files under `C:\Dev\Builds\Waki`** — different project, picked by accident once.
 
-Thesis: *memory is not storage; it is verified experience that improves future action.* The deliverable is **CEM-0 (MemGuard kernel)**: ingest agent traces → extract typed candidate memories → validate → quarantine bad ones → promote verified Experience Cards → return task-scoped **action briefs**, not raw memory dumps.
+Canonical product acceptance lock: `PRODUCT-LOCK.md`.
+Canonical idea source of truth: `IDEA.md`.
 
-## State (as of 2026-05-28)
+Thesis: *Memory is not storage. Memory is verified experience that improves future action.* The deliverable is **AMS**: ingest agent traces -> extract typed candidate memories -> validate -> quarantine bad ones -> promote verified Experience Cards -> return task-scoped **action briefs**, not raw memory dumps.
 
-CEM-0 kernel, synthetic eval, baselines, and external adapters (HaluMem / MemoryArena / LongMemEval-V2) are implemented and tested. AMS v1 (usable local CLI), v1.1 (migration + Monitor-0), the Memory Use Controller (`startup-brief` gate), and the Correction Capture Controller are landed with passing pytest.
+## State (as of 2026-05-30)
 
-- **Source of truth = `TODO.md`** (ordered continuation rail — work the first unchecked item) and **`docs/PROJECT-LEDGER.md`** (decisions/gaps/mistakes/verification).
-- **One open item:** wire the Correction Capture Controller into live agent runtime hooks beyond the CLI.
-- **Known bug:** MCP `current_time` offset-naive vs. offset-aware comparison in action-brief retrieval.
+AMS kernel, synthetic eval, baselines, external adapters (HaluMem / MemoryArena / LongMemEval-V2), AMS v1/v1.1, the Memory Use Controller (`startup-brief` gate), the Correction Capture Controller, and the §12 live-hook wrappers are implemented and tested.
+
+- **Product acceptance source = `PRODUCT-LOCK.md`**. **Idea source of truth = `IDEA.md`**. **Execution source of truth = `TODO.md`** (ordered continuation rail — work the first unchecked item) and **`docs/PROJECT-LEDGER.md`** (decisions/gaps/mistakes/verification).
+- **Current open track:** AMS Primary Runtime Adoption: live Codex hook-payload smoke, governed-run brief/monitor/evidence ids, and reconciliation of legacy Codex memories / `codex-memory` / `ams-memory` into an AMS-primary startup path.
 - A/B/C/D (SuperClaude-memory review, SC v0.3 spec, Codex-memory design, ACS protocol) are **historical design context** — specs live in `specs/`, not the active rail.
 
 ## Commands
@@ -22,7 +24,7 @@ python scripts/ams.py brief "<task>" --domain agentic-memory-system   # action b
 python scripts/ams.py remember "<lesson>" --kind skill --outcome success --domain agentic-memory-system --task-family verification
 python scripts/ams.py monitor --deep              # Monitor-0
 python scripts/ams.py dashboard                   # phase + next step + record layers
-python scripts/run_synthetic_eval.py              # CEM-0 corruption eval smoke
+python scripts/run_synthetic_eval.py              # AMS V0 corruption eval smoke
 powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1   # mandatory before implementation/status claims
 ```
 
@@ -41,7 +43,7 @@ research/ specs/ sessions/        plan + spec + handoffs (incl. historical A/B/C
 
 ## Workflow rules
 
-**HARDGATE — autonomous build loop (CEM-1 Phases 3-5):** Finish the CEM-1 build as ONE self-paced session, not a manual multi-session fan-out. Take the next unchecked `TODO.md` item -> build it (full: no MVP/distillation/stubs; TDD + a failure canary that bites) -> verify (`python -m pytest` green) -> commit -> continue. Ship each slice as a minimal single-surface PR to `staging` and run the Greptile review-loop to 5/5 (stop rule: ~5 turns or stuck at 4/5 -> hand to human). Self-pace across external review waits with the `/loop` dynamic engine (`ScheduleWakeup`). **The agent stops before merge — merging is the user's call.** Full contract: `docs/WORKFLOW.md`.
+**HARDGATE - autonomous AMS build loop:** Finish the AMS build as one self-paced session, not a manual multi-session fan-out. Take the next unchecked `TODO.md` item -> build it (full: no MVP/distillation/stubs; TDD + a failure canary that bites) -> verify (`python -m pytest` green) -> commit -> continue. Ship each slice as a minimal single-surface PR to `staging` and run the Greptile review-loop to 5/5 (stop rule: ~5 turns or stuck at 4/5 -> hand to human). Self-pace across external review waits with the `/loop` dynamic engine (`ScheduleWakeup`). **The agent stops before merge - merging is the user's call.** Full contract: `docs/WORKFLOW.md`.
 
 1. Run `scripts/session-start-gate.ps1` before any implementation, patch, or status claim. If it fails, fix memory wiring first.
 2. Record changes: `CHANGELOG.md` (timeline) + `docs/PROJECT-LEDGER.md` (decisions/gaps/mistakes/verification) — before or alongside the change.

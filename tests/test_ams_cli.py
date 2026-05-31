@@ -281,7 +281,13 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
 
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 7
-    assert monitor["phase"]["current_phase"] == "AMS v1.3 Correction Capture Controller"
+    assert monitor["phase"]["completed_through"].startswith("AMS product lock")
+    assert monitor["phase"]["current_phase"] == "AMS Primary Runtime Adoption"
+    assert (
+        monitor["phase"]["next_step"]
+        == "replace Codex command-hook advisory failure with enforceable AMS runtime control"
+    )
+    assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
     assert (root / "monitor-runs.jsonl").exists()
     assert (root / "monitor-latest.json").exists()
@@ -330,7 +336,9 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["ams_directive_count"] == 7
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
-    assert dashboard["phase"]["completed_through"].startswith("AMS v1.2 Memory Use Controller")
+    assert dashboard["phase"]["completed_through"].startswith("AMS product lock")
+    assert dashboard["phase"]["ready_for_next_phase"] is False
+    assert any("primary startup source" in item for item in dashboard["phase"]["open_followups"])
 
 
 def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
@@ -367,6 +375,7 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
     dashboard = _ams(root, "--json", "dashboard")
 
     assert result["status"] == "allow"
+    assert result["governed_run_id"].startswith("run_")
     assert result["monitor_id"].startswith("monitor_")
     assert result["estimated_tokens"] <= result["limits"]["max_tokens"]
     assert result["required_directives"] == {
@@ -375,10 +384,21 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
         "todo_rule": True,
     }
     assert len(result["recommended_next_actions"]) <= 5
+    action_text = "\n".join(result["recommended_next_actions"])
+    assert "AMS/CEM" not in action_text
+    assert "Causal Experience Memory" not in action_text
+    assert "CEM-0" not in action_text
     assert (root / "startup-brief-runs.jsonl").exists()
     assert (root / "startup-brief-latest.json").exists()
     assert (root / "startup-brief-latest.md").exists()
+    assert (root / "governed-run-runs.jsonl").exists()
+    assert (root / "governed-run-latest.json").exists()
+    assert (root / "governed-run-latest.md").exists()
     assert dashboard["latest_startup_brief"]["brief_id"] == result["brief_id"]
+    assert dashboard["latest_governed_run"]["receipt_id"] == result["governed_run_id"]
+    assert dashboard["latest_governed_run"]["startup_brief_id"] == result["brief_id"]
+    assert dashboard["latest_governed_run"]["monitor_id"] == result["monitor_id"]
+    assert dashboard["latest_governed_run"]["evidence_ids"] == result["evidence_ids"]
 
 
 def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
@@ -394,8 +414,13 @@ def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
     )
 
     assert result["status"] == "block"
+    assert result["governed_run_id"].startswith("run_")
     assert any(reason.startswith("monitor_failed:") for reason in result["block_reasons"])
     assert "missing_required_directive:waki_boundary" in result["block_reasons"]
+    latest = _ams(root, "--json", "dashboard")["latest_governed_run"]
+    assert latest["receipt_id"] == result["governed_run_id"]
+    assert latest["status"] == "block"
+    assert latest["block_reasons"] == result["block_reasons"]
 
 
 def test_ams_cli_startup_brief_human_output_uses_controller_printer(tmp_path):
@@ -434,7 +459,43 @@ def test_ams_cli_startup_brief_human_output_uses_controller_printer(tmp_path):
 
     assert process.returncode == 0, process.stderr
     assert "startup_brief: allow brief_" in process.stdout
+    assert "governed_run: run_" in process.stdout
     assert "confidence:" not in process.stdout
+
+
+def test_ams_cli_brief_renders_legacy_directives_in_ams_language(tmp_path):
+    root = tmp_path / "ams"
+    _ams(
+        root,
+        "--json",
+        "pin",
+        "Keep the active thesis centered on Causal Experience Memory: memory is verified experience that improves future action.",
+        "--scope",
+        "global",
+    )
+    _ams(
+        root,
+        "--json",
+        "pin",
+        "Do not claim state-of-the-art for CEM-0 or AMS v1.",
+        "--scope",
+        "global",
+    )
+
+    brief = _ams(
+        root,
+        "--json",
+        "brief",
+        "continue building Agentic Memory System",
+        "--domain",
+        "agentic-memory-system",
+    )
+    action_text = "\n".join(brief["recommended_next_actions"])
+
+    assert "Keep AMS centered on verified experience" in action_text
+    assert "Do not claim state-of-the-art for AMS." in action_text
+    assert "Causal Experience Memory" not in action_text
+    assert "CEM-0" not in action_text
 
 
 def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resume(tmp_path):
@@ -475,6 +536,8 @@ def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resu
     assert "premature_implementation" in event["categories"]
     assert "workflow_violation" in event["categories"]
     assert "human_approval_gate" in event["route_targets"]
+    assert "ams_candidate_experience_atom" in event["route_targets"]
+    assert "cem_candidate_experience_atom" not in event["route_targets"]
     assert event["affected_files"] == ["package.json", "src/types.ts"]
     assert (root / "correction-events.jsonl").exists()
     assert (root / "correction-latest.json").exists()

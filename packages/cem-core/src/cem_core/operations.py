@@ -97,6 +97,7 @@ class StartupBriefRun(StrictModel):
     generated_at: datetime = Field(default_factory=utc_now)
     root: str
     status: StartupStatus
+    governed_run_id: str | None = None
     monitor_id: str
     task_description: str
     domain_scope: str | None
@@ -108,6 +109,21 @@ class StartupBriefRun(StrictModel):
     recommended_next_actions: list[str]
     evidence_ids: list[str]
     estimated_tokens: int
+    block_reasons: list[str]
+
+
+class GovernedRunReceipt(StrictModel):
+    receipt_id: str = Field(default_factory=lambda: new_id("run"))
+    generated_at: datetime = Field(default_factory=utc_now)
+    root: str
+    cwd: str
+    status: StartupStatus
+    startup_brief_id: str
+    monitor_id: str
+    task_description: str
+    domain_scope: str | None
+    task_family: str | None
+    evidence_ids: list[str]
     block_reasons: list[str]
 
 
@@ -306,6 +322,7 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_migration": _load_json(root / "migration-latest.json"),
         "latest_monitor": _load_json(root / "monitor-latest.json"),
         "latest_startup_brief": _load_json(root / "startup-brief-latest.json"),
+        "latest_governed_run": _load_json(root / "governed-run-latest.json"),
     }
 
 
@@ -331,7 +348,7 @@ def startup_brief(
     )
     directives = brief["directives"][:max_directives]
     directive_actions = [directive["content"] for directive in directives]
-    experience_actions = brief["experience"]["recommended_next_actions"]
+    experience_actions = brief["recommended_next_actions"][len(brief["directives"]) :]
     recommended_actions = _cap_items_by_token_budget(directive_actions + experience_actions, max_tokens)
     evidence_ids = ([directive["directive_id"] for directive in directives] + brief["experience"]["evidence_links"])[:max_evidence]
 
@@ -369,7 +386,21 @@ def startup_brief(
         estimated_tokens=_estimate_tokens("\n".join(recommended_actions)),
         block_reasons=block_reasons,
     )
+    receipt = GovernedRunReceipt(
+        root=str(root),
+        cwd=str(Path.cwd().resolve()),
+        status=run.status,
+        startup_brief_id=run.brief_id,
+        monitor_id=monitor.run_id,
+        task_description=description,
+        domain_scope=domain_scope,
+        task_family=task_family,
+        evidence_ids=evidence_ids,
+        block_reasons=block_reasons,
+    )
+    run.governed_run_id = receipt.receipt_id
     _write_startup_brief_records(root, run)
+    _write_governed_run_records(root, receipt)
     return run
 
 
@@ -396,15 +427,17 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
-        completed_through="AMS v1.2 Memory Use Controller: startup brief and session-start gate are live",
-        current_phase="AMS v1.3 Correction Capture Controller",
+        completed_through=(
+            "AMS product lock: kernel, MCP bridge, startup gate, and hook wrappers are live"
+        ),
+        current_phase="AMS Primary Runtime Adoption",
         status="active",
-        next_step="wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface",
-        ready_for_next_phase=True,
+        next_step="replace Codex command-hook advisory failure with enforceable AMS runtime control",
+        ready_for_next_phase=False,
         open_followups=[
-            "wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface",
-            "attach startup brief ids to agent work records",
-            "add latency budget enforcement to the startup controller",
+            "replace Codex command-hook advisory failure with enforceable AMS runtime control",
+            "add governed-run close/finalize records for outcomes and influence",
+            "reconcile legacy Codex memories, codex-memory, and ams-memory so AMS is the primary startup source",
         ],
     )
 
@@ -415,9 +448,9 @@ def _migration_items_from_section(section: str, source_path: Path) -> list[Migra
         MigrationItem(
             item_id=_stable_id("pin", "active foundation"),
             action="pin",
-            content="Keep Agentic Memory System centered on Causal Experience Memory, not commodity memory storage.",
+            content="Keep AMS centered on verified experience that improves future action, not commodity memory storage.",
             source=source,
-            reason="explicit CEM foundation directive from Codex memory registry",
+            reason="explicit AMS foundation directive from Codex memory registry",
         ),
         MigrationItem(
             item_id=_stable_id("pin", "write path wedge"),
@@ -436,14 +469,14 @@ def _migration_items_from_section(section: str, source_path: Path) -> list[Migra
         MigrationItem(
             item_id=_stable_id("pin", "platform drift"),
             action="pin",
-            content="Do not let MCP, database, dashboard, or platform work outrun the CEM proof and usable operator loop.",
+            content="Do not let MCP, database, dashboard, or platform work outrun the AMS proof and usable operator loop.",
             source=source,
             reason="explicit anti-drift directive from Codex memory registry",
         ),
         MigrationItem(
             item_id=_stable_id("remember", "rerun verification"),
             action="remember",
-            content="run pytest and synthetic eval before claiming CEM or AMS memory changes are complete",
+            content="run pytest and synthetic eval before claiming AMS memory changes are complete",
             source=source,
             reason="verified prior workflow lesson from Codex memory registry",
             kind="skill",
@@ -453,7 +486,7 @@ def _migration_items_from_section(section: str, source_path: Path) -> list[Migra
         MigrationItem(
             item_id=_stable_id("skip", "old snapshot counts"),
             action="skip",
-            content="Do not import stale CEM-0 snapshot counts from the legacy Codex memory registry.",
+            content="Do not import stale historical snapshot counts from the legacy Codex memory registry.",
             source=source,
             reason="old verification counts are snapshot-specific and may be stale",
             domain_scope=None,
@@ -494,6 +527,13 @@ def _write_startup_brief_records(root: Path, run: StartupBriefRun) -> None:
     _append_jsonl(root / "startup-brief-runs.jsonl", run.model_dump(mode="json"))
     _write_json(root / "startup-brief-latest.json", run.model_dump(mode="json"))
     (root / "startup-brief-latest.md").write_text(_render_startup_brief_markdown(run), encoding="utf-8")
+
+
+def _write_governed_run_records(root: Path, receipt: GovernedRunReceipt) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "governed-run-runs.jsonl", receipt.model_dump(mode="json"))
+    _write_json(root / "governed-run-latest.json", receipt.model_dump(mode="json"))
+    (root / "governed-run-latest.md").write_text(_render_governed_run_markdown(receipt), encoding="utf-8")
 
 
 def _render_migration_markdown(run: MigrationRun) -> str:
@@ -547,6 +587,7 @@ def _render_startup_brief_markdown(run: StartupBriefRun) -> str:
         "",
         f"- brief_id: `{run.brief_id}`",
         f"- status: `{run.status}`",
+        f"- governed_run_id: `{run.governed_run_id}`",
         f"- monitor_id: `{run.monitor_id}`",
         f"- phase: `{run.phase.current_phase}`",
         f"- task: {run.task_description}",
@@ -565,6 +606,25 @@ def _render_startup_brief_markdown(run: StartupBriefRun) -> str:
     lines.extend(["", "## Recommended Actions", ""])
     for action in run.recommended_next_actions:
         lines.append(f"- {action}")
+    return "\n".join(lines) + "\n"
+
+
+def _render_governed_run_markdown(receipt: GovernedRunReceipt) -> str:
+    lines = [
+        "# AMS Governed Run Latest",
+        "",
+        f"- receipt_id: `{receipt.receipt_id}`",
+        f"- status: `{receipt.status}`",
+        f"- startup_brief_id: `{receipt.startup_brief_id}`",
+        f"- monitor_id: `{receipt.monitor_id}`",
+        f"- cwd: `{receipt.cwd}`",
+        f"- task: {receipt.task_description}",
+        f"- evidence_ids: `{len(receipt.evidence_ids)}`",
+    ]
+    if receipt.block_reasons:
+        lines.extend(["", "## Block Reasons", ""])
+        for reason in receipt.block_reasons:
+            lines.append(f"- `{reason}`")
     return "\n".join(lines) + "\n"
 
 

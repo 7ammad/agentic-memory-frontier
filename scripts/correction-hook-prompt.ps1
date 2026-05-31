@@ -11,9 +11,12 @@
 # (2) captures STDOUT ONLY (no `2>&1` -- merging native-exe stderr corrupts the JSON
 # stream), and (3) branches on $LASTEXITCODE, not on parsing JSON.
 #
-# [UNVERIFIED] The projection from the live Claude Code / Codex UserPromptSubmit
-# payload onto {prompt_text, session_id} is a best-effort field mapping and MUST be
-# confirmed by a live runtime smoke test before this hook is trusted in production.
+# [VERIFIED 2026-05-31] Codex CLI 0.128 UserPromptSubmit sends `prompt` and
+# `session_id`, plus turn/cwd/model metadata. This wrapper maps those fields
+# correctly. Runtime caveat: Codex command hooks currently report exit 10 as
+# "hook failed" but continue the turn, so this wrapper captures corrections in
+# Codex but is not an enforceable Codex stop gate until a blocking hook contract
+# or external runtime wrapper is added.
 param(
     [string]$Workspace = "C:\Dev\Builds\Agentic Memory System"
 )
@@ -32,7 +35,8 @@ $promptText = ""
 $sessionId = $null
 try {
     $hook = $raw | ConvertFrom-Json
-    # [UNVERIFIED] candidate field names for the runtime prompt + session id.
+    # Codex CLI 0.128 sends `prompt` + `session_id`; keep `prompt_text` as the
+    # generic/backwards-compatible shape consumed by the Python CLI.
     if ($hook.PSObject.Properties.Name -contains "prompt") { $promptText = [string]$hook.prompt }
     elseif ($hook.PSObject.Properties.Name -contains "prompt_text") { $promptText = [string]$hook.prompt_text }
     if ($hook.PSObject.Properties.Name -contains "session_id") { $sessionId = [string]$hook.session_id }

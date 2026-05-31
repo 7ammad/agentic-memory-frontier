@@ -24,6 +24,8 @@ CorrectionCategory = Literal[
 ]
 CorrectionRouteTarget = Literal[
     "ams_directive",
+    "ams_candidate_experience_atom",
+    # Legacy route name kept only so old correction ledgers remain readable.
     "cem_candidate_experience_atom",
     "project_ledger_entry",
     "stale_or_contradicted_memory",
@@ -340,10 +342,10 @@ def _apply_routes(root: Path, event: CorrectionEvent, *, project_ledger: Path | 
             )
         )
 
-    if "cem_candidate_experience_atom" in event.route_targets:
+    if "ams_candidate_experience_atom" in event.route_targets or "cem_candidate_experience_atom" in event.route_targets:
         remembered = remember_experience(
             root,
-            _cem_failure_content(event),
+            _ams_failure_content(event),
             kind="failure",
             outcome="failure",
             domain_scope=event.domain_scope,
@@ -355,7 +357,7 @@ def _apply_routes(root: Path, event: CorrectionEvent, *, project_ledger: Path | 
         ids.extend(str(card["card_id"]) for card in remembered["promoted_cards"])
         routes.append(
             CorrectionRoute(
-                target="cem_candidate_experience_atom",
+                target="ams_candidate_experience_atom",
                 status="written",
                 detail=(
                     f"{remembered['proposed_count']} proposed, "
@@ -419,7 +421,7 @@ def _route_targets(
 ) -> list[CorrectionRouteTarget]:
     targets: list[CorrectionRouteTarget] = [
         "ams_directive",
-        "cem_candidate_experience_atom",
+        "ams_candidate_experience_atom",
         "project_ledger_entry",
     ]
     if "memory_miss" in categories or "repeated_drift" in categories or stale_memory_ids:
@@ -452,13 +454,14 @@ def _directive_content(event: CorrectionEvent) -> str:
     category_text = ", ".join(event.categories)
     return (
         f"When a live user correction is detected ({category_text}), stop the active lane, "
-        "name the mistake plainly, record affected files/actions, route the event to AMS/CEM/project ledger "
+        "name the mistake plainly, record affected files/actions, route the event to AMS directives, "
+        "AMS experience records, and the project ledger "
         "as appropriate, and require explicit resume approval before continuing. "
         f"Latest trigger: {event.mistake}"
     )
 
 
-def _cem_failure_content(event: CorrectionEvent) -> str:
+def _ams_failure_content(event: CorrectionEvent) -> str:
     affected = ""
     if event.affected_files:
         affected = " Affected files: " + ", ".join(event.affected_files) + "."
