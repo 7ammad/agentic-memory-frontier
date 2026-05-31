@@ -6,6 +6,12 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from .correction_capture import (
+    capture_correction,
+    correction_gate_status,
+    list_corrections,
+    resume_correction,
+)
 from .local_memory import (
     audit_memory,
     bootstrap_codex,
@@ -159,6 +165,45 @@ def build_parser() -> argparse.ArgumentParser:
     startup_parser.add_argument("--max-tokens", type=int, default=900, help="Approximate token budget for actions.")
     startup_parser.set_defaults(handler=_cmd_startup_brief)
 
+    correction_parser = subparsers.add_parser(
+        "correction",
+        parents=[json_parent],
+        help="Capture live corrections and manage the resume gate.",
+    )
+    correction_subparsers = correction_parser.add_subparsers(dest="correction_command", required=True)
+    correction_capture_parser = correction_subparsers.add_parser(
+        "capture",
+        parents=[json_parent],
+        help="Record a live user correction and block continuation until resume.",
+    )
+    correction_capture_parser.add_argument("user_text", help="Correction text from the user.")
+    correction_capture_parser.add_argument("--affected-file", action="append", default=[], help="Affected file path.")
+    correction_capture_parser.add_argument("--affected-action", action="append", default=[], help="Affected action.")
+    correction_capture_parser.add_argument("--stale-memory-id", action="append", default=[], help="Stale or contradicted memory id.")
+    correction_capture_parser.add_argument("--source", default="manual", help="Correction source.")
+    correction_capture_parser.add_argument("--domain", default="agentic-memory-system", help="Domain scope.")
+    correction_capture_parser.add_argument("--task-family", default="mistake-capture", help="Task family.")
+    correction_capture_parser.add_argument("--session-id", help="Session id.")
+    correction_capture_parser.add_argument("--project-ledger", type=Path, help="Optional project ledger file to append.")
+    correction_capture_parser.set_defaults(handler=_cmd_correction_capture)
+
+    correction_gate_parser = correction_subparsers.add_parser("gate", parents=[json_parent], help="Inspect resume gate.")
+    correction_gate_parser.set_defaults(handler=_cmd_correction_gate)
+
+    correction_list_parser = correction_subparsers.add_parser("list", parents=[json_parent], help="List correction events.")
+    correction_list_parser.add_argument("--limit", type=int, default=20, help="Maximum events to return.")
+    correction_list_parser.set_defaults(handler=_cmd_correction_list)
+
+    correction_resume_parser = correction_subparsers.add_parser(
+        "resume",
+        parents=[json_parent],
+        help="Clear the resume gate after explicit approval.",
+    )
+    correction_resume_parser.add_argument("event_id", help="Correction event id.")
+    correction_resume_parser.add_argument("--approved-by", required=True, help="Approver name.")
+    correction_resume_parser.add_argument("--note", help="Resume note.")
+    correction_resume_parser.set_defaults(handler=_cmd_correction_resume)
+
     dashboard_parser = subparsers.add_parser("dashboard", parents=[json_parent], help="Show latest AMS operator status.")
     dashboard_parser.set_defaults(handler=_cmd_dashboard)
 
@@ -254,6 +299,38 @@ def _cmd_startup_brief(args: argparse.Namespace) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
+def _cmd_correction_capture(args: argparse.Namespace) -> dict[str, Any]:
+    return capture_correction(
+        args.root,
+        args.user_text,
+        affected_files=args.affected_file,
+        affected_actions=args.affected_action,
+        stale_memory_ids=args.stale_memory_id,
+        source=args.source,
+        domain_scope=args.domain,
+        task_family=args.task_family,
+        session_id=args.session_id,
+        project_ledger=args.project_ledger,
+    ).model_dump(mode="json")
+
+
+def _cmd_correction_gate(args: argparse.Namespace) -> dict[str, Any]:
+    return correction_gate_status(args.root).model_dump(mode="json")
+
+
+def _cmd_correction_list(args: argparse.Namespace) -> dict[str, Any]:
+    return list_corrections(args.root, limit=args.limit)
+
+
+def _cmd_correction_resume(args: argparse.Namespace) -> dict[str, Any]:
+    return resume_correction(
+        args.root,
+        args.event_id,
+        approved_by=args.approved_by,
+        note=args.note,
+    ).model_dump(mode="json")
+
+
 def _cmd_dashboard(args: argparse.Namespace) -> dict[str, Any]:
     return dashboard_status(args.root)
 
@@ -264,6 +341,14 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
         return
     if "brief_id" in payload and "monitor_id" in payload:
         _emit_startup_brief(payload)
+    elif "event_id" in payload and "route_targets" in payload:
+        _emit_correction_event(payload)
+    elif "event_id" in payload and "approved_by" in payload:
+        _emit_correction_resume(payload)
+    elif "active_event_id" in payload and "resume_token" in payload:
+        _emit_correction_gate(payload)
+    elif "events" in payload and "gate" in payload:
+        _emit_correction_list(payload)
     elif "recommended_next_actions" in payload:
         _emit_brief(payload)
     elif "promoted_cards" in payload:
@@ -400,6 +485,39 @@ def _emit_startup_brief(payload: dict[str, Any]) -> None:
         print("actions:")
         for action in payload["recommended_next_actions"]:
             print(f"- {action}")
+
+
+def _emit_correction_event(payload: dict[str, Any]) -> None:
+    print(f"correction: {payload['event_id']} {payload['resume_status']}")
+    print(f"mistake: {payload['mistake']}")
+    print(f"resume_token: {payload['resume_token']}")
+    print("categories:")
+    for category in payload["categories"]:
+        print(f"- {category}")
+    print("routes:")
+    for route in payload["routes"]:
+        print(f"- {route['status']}: {route['target']} :: {route['detail']}")
+
+
+def _emit_correction_gate(payload: dict[str, Any]) -> None:
+    print(f"correction_gate: {payload['status']}")
+    if payload.get("active_event_id"):
+        print(f"event: {payload['active_event_id']}")
+    if payload.get("resume_token"):
+        print(f"resume_token: {payload['resume_token']}")
+
+
+def _emit_correction_list(payload: dict[str, Any]) -> None:
+    print(f"corrections: {len(payload['events'])}")
+    for event in payload["events"]:
+        print(f"- {event['event_id']}: {event['resume_status']} :: {event['mistake']}")
+    _emit_correction_gate(payload["gate"])
+
+
+def _emit_correction_resume(payload: dict[str, Any]) -> None:
+    print(f"correction_resume: {payload['event_id']}")
+    print(f"approved_by: {payload['approved_by']}")
+    print(f"gate: {payload['gate']['status']}")
 
 
 def _emit_dashboard(payload: dict[str, Any]) -> None:

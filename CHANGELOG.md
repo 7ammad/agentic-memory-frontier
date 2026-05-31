@@ -4,6 +4,27 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-05-29
+
+### Added
+
+- Locked the **CEM-1 Full Kernel Build** contract (Phase 0). New evidence primitives `VerificationProbe`, `VerificationResult`, `ActionBriefRecord`, `ActionInfluenceEvent`, plus `ConfidenceInterval` and the `ExpectedActionDeltaSource` enum.
+- Extended `ExperienceCard` with lifecycle fields (`promotion_status`, `measured_lift`, `measured_lift_ci`, `verification_result_ids`, deactivation/supersession) and `ActionBrief` with influence/scoring fields.
+- Added SQLite + in-memory persistence for verification probes, verification results, action-brief records, and action-influence events in both store backends.
+- Added `apply_verification_result()` to the kernel — the only path that can set a card `promotion_status="verified"`.
+- Added `packages/cem-eval/src/cem_eval/eval_protocol.py`: the locked Marginal Memory Advantage metric (paired delta + 95% CI), the 10-baseline ladder (`human_runbook` flagged ceiling), the >=5pp lexical-overlap margin, and a leakage guard.
+- Added `tests/test_no_fake_green_guard.py`: a static AST guard that fails new literal-bool health checks (the two `operations.py` offenders pinned as tracked debt).
+- Added `docs/2026-05-28-cem-1-phase-0-contract-lock-plan.md` (Phase 0 implementation plan).
+
+### Changed
+
+- Fixed the asserted-promotion bug: `promote()` now creates/updates a **candidate** card only and no longer flips the atom or card to `verified`. Verification is a separate, evidence-gated step via `apply_verification_result()`. `audit()` now reports a card's real `promotion_status` instead of a hardcoded `"verified"`.
+
+### Verification
+
+- `python -m pytest` -> 82 passed (21 new Phase 0 tests, including failure canaries for the promotion bug, the audit status, the MMA success bar, the leakage guard, and the no-fake-green guard).
+- `python -m compileall -q packages scripts tests`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1`, and `git diff --check` all clean.
+
 ## 2026-05-28
 
 ### Added
@@ -14,28 +35,42 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added explicit current-phase and next-step output to `python scripts/ams.py dashboard` and monitor records.
 - Added `python scripts/ams.py startup-brief` as the first Memory Use Controller command with allow/block status, monitor linkage, evidence ids, scoped retrieval, and bounded output.
 - Wired `scripts/session-start-gate.ps1` through `startup-brief` so startup execution now blocks when required AMS memory is missing.
+- Added `python scripts/ams.py correction ...` as the first Correction Capture Controller surface with live correction classification, affected file/action recording, directive/CEM/ledger routing, resume gate, and event ledgers.
+- Added `docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md` to make live correction capture part of AMS architecture instead of Vol.
 
 ### Changed
 
 - Promoted the AMS operating target from "memory exists and can be queried" to "agents must use bounded, auditable retrieval before acting."
 - Clarified that startup memory behavior must be action-brief-first and bounded. AMS must not load the full memory corpus into every session.
 - Monitor-0 now checks minimum AMS-scoped directives and learned AMS cards instead of trusting total record counts.
-- The next active phase is now explicit in repo output: `AMS v1.2 Memory Use Controller`.
+- Monitor-0 now checks correction-controller wiring, active resume gates, correction event visibility, and correction directive surfacing.
+- Correction resume now updates the stored event status, so `correction list` does not report a cleared event as still blocked.
+- The next active phase is now explicit in repo output: `AMS v1.3 Correction Capture Controller`.
 
 ### Gap Identified
 
 - Agent behavior was not fully governed by AMS. The system had memory primitives (`brief`, directives, Monitor-0, provenance), but no universal runtime controller forcing agents to retrieve and attach a bounded memory brief before work.
 - The first session-start gate was a useful stopgap, but it checked directive presence rather than enforcing the full bounded startup-brief contract.
+- AMS still lacked the live correction loop: it validated memories after traces, but did not intercept mistakes while the agent was actively drifting.
 
 ### Mistake Logged
 
 - AMS was initially treated too much like a project-local artifact instead of global agent infrastructure.
 - Memory loading happened reactively in-session instead of being enforced as a pre-execution control.
+- Codex started Vol implementation before the full plan was approved. AMS now treats that class of correction as a first-class capture event.
+
+### Verified
+
+- `python -m pytest` passed.
+- `python -m compileall -q packages scripts tests` passed.
+- `python scripts/run_synthetic_eval.py` passed with CEM-0 false-memory resistance, contradiction precision/recall, and action-brief pollution still clean.
+- `python scripts/ams.py monitor --deep` passed with correction-controller checks.
+- `scripts/session-start-gate.ps1` passed after the controller update.
 
 ### Next
 
-- Continue the Memory Use Controller:
-  - verify global `ams-memory` MCP availability after Codex restart;
+- Continue the live control layer:
+  - wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface;
   - add latency budget enforcement;
   - attach `brief_id`, `monitor_id`, and evidence ids to broader governed agent work;
   - extend controller coverage beyond session-start gating.

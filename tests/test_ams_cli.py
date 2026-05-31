@@ -140,12 +140,13 @@ def test_ams_cli_bootstrap_codex_is_idempotent_and_briefable(tmp_path):
     second = _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
     brief = _ams(root, "--json", "brief", "continue building Agentic Memory System")
 
-    assert first["created_count"] == 6
+    assert first["created_count"] == 7
     assert second["created_count"] == 0
-    assert second["existing_count"] == 6
+    assert second["existing_count"] == 7
     assert any("Waki" in action for action in brief["recommended_next_actions"])
     assert any("pytest" in action for action in brief["recommended_next_actions"])
     assert any("TODO.md" in action for action in brief["recommended_next_actions"])
+    assert any("Capture live user corrections" in action for action in brief["recommended_next_actions"])
 
 
 def test_ams_cli_session_commands_rotate_current_session(tmp_path):
@@ -279,15 +280,16 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     dashboard = _ams(root, "--json", "dashboard")
 
     assert monitor["status"] == "pass"
-    assert monitor["scope"]["ams_directive_count"] == 6
-    assert monitor["phase"]["current_phase"] == "AMS v1.2 Memory Use Controller"
+    assert monitor["scope"]["ams_directive_count"] == 7
+    assert monitor["phase"]["current_phase"] == "AMS v1.3 Correction Capture Controller"
+    assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
     assert (root / "monitor-runs.jsonl").exists()
     assert (root / "monitor-latest.json").exists()
     assert (root / "monitor-latest.md").exists()
     assert dashboard["latest_monitor"]["run_id"] == monitor["run_id"]
     assert dashboard["card_count"] == 1
     assert dashboard["scope"]["ams_card_count"] == 1
-    assert dashboard["directive_count"] == 6
+    assert dashboard["directive_count"] == 7
     assert dashboard["scope"]["global_behavior_directive_count"] == 0
 
 
@@ -324,11 +326,11 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     dashboard = _ams(root, "--json", "dashboard")
 
     assert monitor["status"] == "pass"
-    assert dashboard["directive_count"] == 7
-    assert dashboard["scope"]["ams_directive_count"] == 6
+    assert dashboard["directive_count"] == 8
+    assert dashboard["scope"]["ams_directive_count"] == 7
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
-    assert dashboard["phase"]["completed_through"].startswith("AMS v1.1 Monitor-0")
+    assert dashboard["phase"]["completed_through"].startswith("AMS v1.2 Memory Use Controller")
 
 
 def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
@@ -435,6 +437,95 @@ def test_ams_cli_startup_brief_human_output_uses_controller_printer(tmp_path):
     assert "confidence:" not in process.stdout
 
 
+def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resume(tmp_path):
+    root = tmp_path / "ams"
+    ledger = tmp_path / "PROJECT-LEDGER.md"
+    ledger.write_text("# Project Ledger\n\n## Open Follow-Ups\n\n- existing follow-up\n", encoding="utf-8")
+
+    event = _ams(
+        root,
+        "--json",
+        "correction",
+        "capture",
+        "why are you building before planning; the full plan was approved first",
+        "--affected-file",
+        "package.json",
+        "--affected-file",
+        "src/types.ts",
+        "--affected-action",
+        "created implementation files before plan approval",
+        "--project-ledger",
+        str(ledger),
+    )
+    gate = _ams(root, "--json", "correction", "gate")
+    brief = _ams(
+        root,
+        "--json",
+        "brief",
+        "plan first correction capture resume approval",
+        "--domain",
+        "agentic-memory-system",
+        "--task-family",
+        "mistake-capture",
+    )
+    monitor = _ams(root, "--json", "monitor")
+
+    assert event["resume_status"] == "blocked"
+    assert event["resume_required"] is True
+    assert "premature_implementation" in event["categories"]
+    assert "workflow_violation" in event["categories"]
+    assert "human_approval_gate" in event["route_targets"]
+    assert event["affected_files"] == ["package.json", "src/types.ts"]
+    assert (root / "correction-events.jsonl").exists()
+    assert (root / "correction-latest.json").exists()
+    assert gate["status"] == "blocked"
+    assert gate["active_event_id"] == event["event_id"]
+    ledger_text = ledger.read_text(encoding="utf-8")
+    assert "Correction Capture Controller" in ledger_text
+    assert ledger_text.index("LEDGER-CORRECTION") < ledger_text.index("## Open Follow-Ups")
+    assert any("avoid continuing after live correction" in action for action in brief["recommended_next_actions"])
+    assert monitor["status"] == "fail"
+    assert _check_status(monitor, "correction_resume_gate_clear") == "fail"
+
+    resumed = _ams(
+        root,
+        "--json",
+        "correction",
+        "resume",
+        event["event_id"],
+        "--approved-by",
+        "Hammad",
+        "--note",
+        "plan-first correction recorded",
+    )
+    cleared = _ams(root, "--json", "correction", "gate")
+    listed = _ams(root, "--json", "correction", "list")
+
+    assert resumed["gate"]["status"] == "clear"
+    assert cleared["status"] == "clear"
+    assert listed["events"][0]["resume_status"] == "resumed"
+
+
+def test_ams_cli_correction_capture_links_repeated_memory_drift(tmp_path):
+    root = tmp_path / "ams"
+
+    event = _ams(
+        root,
+        "--json",
+        "correction",
+        "capture",
+        "we already said no scaffolding again, save this to memory",
+        "--stale-memory-id",
+        "directive_old",
+    )
+    stale_route = next(route for route in event["routes"] if route["target"] == "stale_or_contradicted_memory")
+
+    assert "repeated_drift" in event["categories"]
+    assert "memory_miss" in event["categories"]
+    assert stale_route["status"] == "written"
+    assert stale_route["ids"] == ["directive_old"]
+
+
 def test_ams_cli_monitor_fails_visibly_when_memory_is_not_seeded(tmp_path):
     root = tmp_path / "ams"
 
@@ -455,6 +546,10 @@ def _ams(root: Path, *args: str) -> dict:
     )
     assert process.returncode == 0, process.stderr
     return json.loads(process.stdout)
+
+
+def _check_status(monitor: dict, name: str) -> str:
+    return next(check["status"] for check in monitor["checks"] if check["name"] == name)
 
 
 def _legacy_memory_base(tmp_path: Path) -> Path:

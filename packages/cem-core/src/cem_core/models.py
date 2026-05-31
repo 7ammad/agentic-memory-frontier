@@ -29,6 +29,19 @@ class SourceSpan(StrictModel):
     text: str
 
 
+class ConfidenceInterval(StrictModel):
+    low: float
+    high: float
+
+
+ExpectedActionDeltaSource = Literal[
+    "none",
+    "observational_unverified",
+    "probe_verified",
+    "heldout_eval",
+]
+
+
 class TraceTurn(StrictModel):
     turn_id: str = Field(default_factory=lambda: new_id("turn"))
     index: int
@@ -122,6 +135,19 @@ class ExperienceCard(StrictModel):
     tested_by_probe_ids: list[str] = Field(default_factory=list)
     last_validated_at: datetime | None = None
     action_brief_template: str
+    promotion_status: Literal[
+        "candidate",
+        "verified",
+        "deprecated",
+        "superseded",
+        "quarantined",
+    ] = "candidate"
+    measured_lift: float | None = None
+    measured_lift_ci: ConfidenceInterval | None = None
+    verification_result_ids: list[str] = Field(default_factory=list)
+    deactivated_at: datetime | None = None
+    deactivated_reason: str | None = None
+    superseded_by_card_ids: list[str] = Field(default_factory=list)
 
 
 class TaskContext(StrictModel):
@@ -144,6 +170,11 @@ class ActionBrief(StrictModel):
     evidence_links: list[str]
     confidence_score: float
     expected_action_delta: float | None = None
+    brief_id: str = Field(default_factory=lambda: new_id("brief"))
+    influence_id: str | None = None
+    scorer_version: str | None = None
+    expected_action_delta_source: ExpectedActionDeltaSource = "none"
+    score_breakdown_by_card: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
 class TraceReceipt(StrictModel):
@@ -188,3 +219,49 @@ class MemoryAudit(StrictModel):
     validation_decision: ValidationDecision | None = None
     promotion_status: str
     quarantine_reason: str | None = None
+
+
+class VerificationProbe(StrictModel):
+    probe_id: str = Field(default_factory=lambda: new_id("probe"))
+    kind: Literal["held_out_replay", "staleness", "contradiction", "negative_control"]
+    target_card_id: str | None = None
+    target_atom_id: str | None = None
+    control_definition: str
+    threshold: float
+    status: Literal["scheduled", "run", "skipped"] = "scheduled"
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class VerificationResult(StrictModel):
+    result_id: str = Field(default_factory=lambda: new_id("vresult"))
+    probe_id: str
+    card_id: str
+    measured_lift: float
+    measured_lift_ci: ConfidenceInterval | None = None
+    passed: bool
+    evidence_pointer: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ActionBriefRecord(StrictModel):
+    brief_id: str = Field(default_factory=lambda: new_id("brief"))
+    task_id: str | None = None
+    candidate_card_ids: list[str] = Field(default_factory=list)
+    selected_card_ids: list[str] = Field(default_factory=list)
+    score_breakdown_by_card: dict[str, dict[str, float]] = Field(default_factory=dict)
+    scorer_version: str
+    expected_action_delta_source: ExpectedActionDeltaSource = "none"
+    influence_id: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ActionInfluenceEvent(StrictModel):
+    influence_id: str
+    brief_id: str
+    task_id: str | None = None
+    action_taken: str | None = None
+    outcome: Literal["success", "failure", "partial", "unknown"] = "unknown"
+    observed_post_brief_delta: float | None = None
+    counterfactual_method: str | None = None
+    baseline_comparison: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)

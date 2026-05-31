@@ -7,7 +7,10 @@ from .extractor import DeterministicExtractor, MemoryExtractor
 from .kernel import CEM
 from .models import (
     ActionBrief,
+    ActionBriefRecord,
+    ActionInfluenceEvent,
     AgentTrace,
+    ConfidenceInterval,
     ExperienceAtom,
     ExperienceCard,
     MemoryAudit,
@@ -17,6 +20,8 @@ from .models import (
     TraceTurn,
     ValidationDecision,
     ValidationResult,
+    VerificationProbe,
+    VerificationResult,
 )
 from .mcp_tools import CEMMCPToolServer, MCPToolDefinition
 from .multi_agent import (
@@ -32,8 +37,11 @@ from .storage import CEMStore, InMemoryStore, SQLiteStore
 
 __all__ = [
     "ActionBrief",
+    "ActionBriefRecord",
+    "ActionInfluenceEvent",
     "AgentTrace",
     "CEM",
+    "ConfidenceInterval",
     "CEMMCPToolServer",
     "ContradictionDetector",
     "ContradictionMatch",
@@ -56,6 +64,8 @@ __all__ = [
     "TraceTurn",
     "ValidationDecision",
     "ValidationResult",
+    "VerificationProbe",
+    "VerificationResult",
     "build_shared_trace_envelope",
     "import_shared_trace",
     "trace_body_hash",

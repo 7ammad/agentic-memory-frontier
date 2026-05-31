@@ -68,6 +68,9 @@ python scripts/ams.py migrate apply
 python scripts/ams.py monitor
 python scripts/ams.py monitor --deep
 python scripts/ams.py startup-brief "continue building Agentic Memory System" --domain agentic-memory-system
+python scripts/ams.py correction capture "why are you building before planning" --affected-file package.json
+python scripts/ams.py correction gate
+python scripts/ams.py correction resume <event_id> --approved-by Hammad
 python scripts/ams.py dashboard
 ```
 
@@ -91,6 +94,10 @@ monitor-latest.md
 startup-brief-runs.jsonl
 startup-brief-latest.json
 startup-brief-latest.md
+correction-events.jsonl
+correction-latest.json
+correction-resume-gate.json
+correction-resume-runs.jsonl
 ```
 
 The dashboard reports three layers:
@@ -102,6 +109,8 @@ The dashboard reports three layers:
 It also prints the current phase and next step so the overnight monitor runs show where the build stands, not only whether the store is alive.
 
 `startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, enforces required startup directives, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns `allow` or `block`.
+
+`correction capture` is the first Correction Capture Controller surface. It detects live correction signals, classifies the mistake, records affected files/actions, routes the correction to directives/CEM/project ledger where appropriate, opens a resume gate, and makes Monitor-0 fail visibly until `correction resume` clears the gate. The plan is in [docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md](docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md).
 
 The current V0 benchmark report is in [docs/cem-0-benchmark-report.md](docs/cem-0-benchmark-report.md).
 

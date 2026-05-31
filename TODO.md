@@ -172,7 +172,28 @@ Do not start these until CEM-0 proof items above and the external benchmark runn
 - [x] Attach monitor id, brief id, and evidence ids to startup gate output.
 - [x] Block session-start execution when required startup directives are missing.
 - [x] Wire `startup-brief` into `scripts/session-start-gate.ps1`.
-- [ ] Verify global `ams-memory` MCP availability after Codex runtime restart.
+- [x] Verify global `ams-memory` MCP availability after Codex runtime restart.
+
+### 12. Correction Capture Controller
+
+- [x] Add correction event schema.
+- [x] Add deterministic V0 mistake classifier.
+- [x] Add correction router for directives, CEM failure-mode candidates, project ledger entries, stale/contradicted memory review, and human resume gate.
+- [x] Add `correction capture`, `correction gate`, `correction list`, and `correction resume` CLI commands.
+- [x] Add Monitor-0 checks for correction controller wiring, resume gate state, recorded corrections, and correction directive surfacing in action briefs.
+- [x] Add subprocess tests for plan-first violation, repeated drift, routing, resume gate, and action-brief retrieval.
+- [ ] Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface.
+
+### 13. CEM-1 Full Kernel Build
+
+Full Causal Experience Memory program (Approach C, eval-first), per `docs/2026-05-28-causal-experience-memory-full-program-design.md` and the round-2 phase sequencing. Every lifecycle transition, retrieval decision, and action-improvement claim must be auditable, testable, and measurable. No stubs, no fake-green.
+
+- [x] Phase 0 - Contract lock: evidence primitives (`VerificationProbe`, `VerificationResult`, `ActionBriefRecord`, `ActionInfluenceEvent`, `ConfidenceInterval`, `ExpectedActionDeltaSource`); `ExperienceCard`/`ActionBrief` field extensions; SQLite + in-memory persistence for the new tables; `promote()`/`apply_verification_result()` lifecycle separation (asserted-promotion bug fixed); locked eval protocol (MMA + 10-baseline ladder + leakage guard); no-fake-green AST guard with failure canaries.
+- [ ] Phase 1 - Full vertical skeleton: end-to-end trace -> atom -> card -> action brief -> influence event path with real persisted state at every hop, no stubs.
+- [ ] Phase 2 - Grounded consolidation + verification: real consolidation into cards and the evidence-gated verification loop (probes -> results -> verified promotion).
+- [ ] Phase 3 - Action-value retrieval: task-scoped action briefs ranked by measured/expected action value, with influence events recorded.
+- [ ] Phase 4 - MMA + baseline ladder exam: run all 10 baselines honestly on held-out tasks against the locked eval protocol; report MMA with 95% CI and the >=5pp lexical margin.
+- [ ] Phase 5 - Hardening: latency budgets, failure-mode coverage, and production-readiness gates.
 
 ## Historical Schedule Note
 
