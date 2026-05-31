@@ -189,11 +189,12 @@ Built and verified:
 - default Codex entrypoint wrapping through AMS runtime control;
 - legacy `codex-memory` and native Codex memory reconciled under AMS as secondary inputs;
 - governed-run close/finalize records with observational influence events;
-- automatic runtime trace intake from ordinary guarded Codex work.
+- automatic runtime trace intake from ordinary guarded Codex work;
+- automatic governed-run closure for guarded work outcomes;
+- aging and maintenance review for expired, stale, inactive, contradicted, and pending records.
 
 Not yet accepted:
 
-- aging and maintenance as a first-class product surface;
 - external operator install/run proof.
 
 ## Planning Order

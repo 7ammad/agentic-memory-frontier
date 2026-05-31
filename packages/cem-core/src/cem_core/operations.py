@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
 import tomllib
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,7 +22,7 @@ from .correction_hooks import (
     hook_on_pre_tool_use_gate,
     hook_on_user_prompt_submit,
 )
-from .kernel import CEM
+from .kernel import CEM, card_is_inactive
 from .local_memory import (
     default_root,
     init_memory,
@@ -30,15 +32,17 @@ from .local_memory import (
     retrieve_brief,
     run_eval,
 )
-from .models import AgentTrace, StrictModel, TraceTurn, new_id, utc_now
+from .models import AgentTrace, ExperienceCard, StrictModel, TraceTurn, new_id, utc_now
 
 MigrationAction = Literal["pin", "remember", "skip"]
+MaintenanceStatus = Literal["pass", "warn", "fail"]
 MonitorStatus = Literal["pass", "fail"]
 StartupStatus = Literal["allow", "block"]
 
 AMS_DOMAIN_SCOPE = "agentic-memory-system"
 GLOBAL_BEHAVIOR_SCOPE = "codex-behavior"
 RUNTIME_CONTROL_EXIT_BLOCK = 12
+AMS_ACRONYM_PATTERN = re.compile(r"(?<![a-z0-9])ams(?![a-z0-9])")
 
 
 class MigrationItem(StrictModel):
@@ -205,6 +209,42 @@ class RuntimeTraceRun(StrictModel):
     source_turn_ids: list[str]
 
 
+class MaintenanceItem(StrictModel):
+    memory_id: str
+    memory_kind: Literal["card", "atom"]
+    status: MaintenanceStatus
+    reason: str
+    action: str
+    promotion_status: str
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    last_validated_at: datetime | None = None
+    age_days: float | None = None
+    related_memory_ids: list[str] = Field(default_factory=list)
+
+
+class MaintenanceSummary(StrictModel):
+    active_card_count: int
+    inactive_card_count: int
+    expired_active_count: int
+    stale_active_count: int
+    contradicted_active_count: int
+    pending_atom_count: int
+    stale_pending_atom_count: int
+    review_item_count: int
+
+
+class MaintenanceRun(StrictModel):
+    run_id: str = Field(default_factory=lambda: new_id("maintenance"))
+    generated_at: datetime = Field(default_factory=utc_now)
+    root: str
+    status: MaintenanceStatus
+    stale_after_days: int
+    pending_atom_after_days: int
+    summary: MaintenanceSummary
+    items: list[MaintenanceItem]
+
+
 class MonitorRun(StrictModel):
     run_id: str = Field(default_factory=lambda: new_id("monitor"))
     generated_at: datetime = Field(default_factory=utc_now)
@@ -307,6 +347,159 @@ def _correction_controller_wired(summary: CorrectionControllerSummary, root: Pat
     return summary.root == str(root) and gate_file.parent == root and gate_file.exists()
 
 
+def maintenance_review(
+    root: Path | None = None,
+    *,
+    stale_after_days: int = 90,
+    pending_atom_after_days: int = 14,
+) -> MaintenanceRun:
+    root = _root(root)
+    if stale_after_days < 1:
+        raise ValueError("stale_after_days must be at least 1.")
+    if pending_atom_after_days < 1:
+        raise ValueError("pending_atom_after_days must be at least 1.")
+
+    init_memory(root)
+    cem = CEM(root)
+    now = utc_now()
+    cards = cem.store.list_cards()
+    atoms = cem.store.list_atoms()
+    card_evidence_atom_ids = {atom_id for card in cards for atom_id in card.evidence_atom_ids}
+    items: list[MaintenanceItem] = []
+    expired_active_ids: set[str] = set()
+    stale_active_ids: set[str] = set()
+    contradicted_active_ids: set[str] = set()
+    stale_pending_atom_ids: set[str] = set()
+
+    for card in cards:
+        if card_is_inactive(card):
+            continue
+        if _is_before(card.valid_until, now):
+            expired_active_ids.add(card.card_id)
+            items.append(
+                MaintenanceItem(
+                    memory_id=card.card_id,
+                    memory_kind="card",
+                    status="fail",
+                    reason="active card is past valid_until and must not be treated as fresh memory",
+                    action="run ams audit on this card, then supersede, deactivate, or extend validity with fresh evidence",
+                    promotion_status=card.promotion_status,
+                    valid_from=card.valid_from,
+                    valid_until=card.valid_until,
+                    last_validated_at=card.last_validated_at,
+                    age_days=_age_days(_card_validation_anchor(card), now),
+                )
+            )
+        else:
+            validation_anchor = _card_validation_anchor(card)
+            age_days = _age_days(validation_anchor, now)
+            if validation_anchor is None:
+                stale_active_ids.add(card.card_id)
+                items.append(
+                    MaintenanceItem(
+                        memory_id=card.card_id,
+                        memory_kind="card",
+                        status="warn",
+                        reason="active card has no validation freshness anchor",
+                        action="run ams audit on this card and refresh it with trace-backed evidence before trusting it as fresh",
+                        promotion_status=card.promotion_status,
+                        valid_from=card.valid_from,
+                        valid_until=card.valid_until,
+                        last_validated_at=card.last_validated_at,
+                        age_days=None,
+                    )
+                )
+            elif age_days is not None and age_days >= stale_after_days:
+                stale_active_ids.add(card.card_id)
+                items.append(
+                    MaintenanceItem(
+                        memory_id=card.card_id,
+                        memory_kind="card",
+                        status="warn",
+                        reason=f"active card has not been validated for {age_days:.1f} days",
+                        action="run ams audit on this card and schedule a staleness probe or refresh it with new trace evidence",
+                        promotion_status=card.promotion_status,
+                        valid_from=card.valid_from,
+                        valid_until=card.valid_until,
+                        last_validated_at=card.last_validated_at,
+                        age_days=age_days,
+                    )
+                )
+        if card.contradicts_card_ids:
+            contradicted_active_ids.add(card.card_id)
+            items.append(
+                MaintenanceItem(
+                    memory_id=card.card_id,
+                    memory_kind="card",
+                    status="warn",
+                    reason="active card has contradiction links that need operator review",
+                    action="run ams audit on both linked memories and decide whether to keep scoped coexistence or supersede one side",
+                    promotion_status=card.promotion_status,
+                    valid_from=card.valid_from,
+                    valid_until=card.valid_until,
+                    last_validated_at=card.last_validated_at,
+                    age_days=_age_days(_card_validation_anchor(card), now),
+                    related_memory_ids=list(card.contradicts_card_ids),
+                )
+            )
+
+    pending_atom_count = 0
+    for atom in atoms:
+        if atom.atom_id in card_evidence_atom_ids:
+            continue
+        if atom.promotion_status not in {"proposed", "candidate"}:
+            continue
+        pending_atom_count += 1
+        age_days = _age_days(atom.last_confirmed_at or atom.observed_at, now)
+        if age_days is None or age_days < pending_atom_after_days:
+            continue
+        stale_pending_atom_ids.add(atom.atom_id)
+        items.append(
+            MaintenanceItem(
+                memory_id=atom.atom_id,
+                memory_kind="atom",
+                status="warn",
+                reason=f"pending atom has waited {age_days:.1f} days without promotion, rejection, or quarantine",
+                action="run ams audit on this atom, then confirm, reject, or promote it through normal validation",
+                promotion_status=atom.promotion_status,
+                valid_from=atom.valid_from,
+                valid_until=atom.valid_until,
+                last_validated_at=atom.last_confirmed_at,
+                age_days=age_days,
+                related_memory_ids=atom.source_trace_ids,
+            )
+        )
+
+    status: MaintenanceStatus
+    if any(item.status == "fail" for item in items):
+        status = "fail"
+    elif any(item.status == "warn" for item in items):
+        status = "warn"
+    else:
+        status = "pass"
+
+    summary = MaintenanceSummary(
+        active_card_count=sum(1 for card in cards if not card_is_inactive(card)),
+        inactive_card_count=sum(1 for card in cards if card_is_inactive(card)),
+        expired_active_count=len(expired_active_ids),
+        stale_active_count=len(stale_active_ids),
+        contradicted_active_count=len(contradicted_active_ids),
+        pending_atom_count=pending_atom_count,
+        stale_pending_atom_count=len(stale_pending_atom_ids),
+        review_item_count=len(items),
+    )
+    run = MaintenanceRun(
+        root=str(root),
+        status=status,
+        stale_after_days=stale_after_days,
+        pending_atom_after_days=pending_atom_after_days,
+        summary=summary,
+        items=items,
+    )
+    _write_maintenance_records(root, run)
+    return run
+
+
 def run_monitor(
     root: Path | None = None,
     *,
@@ -333,6 +526,14 @@ def run_monitor(
                 f"{scope.global_behavior_directive_count} global behavior directives, "
                 f"{scope.other_directive_count} other directives"
             ),
+        )
+    )
+    surfaces = memory_surface_report(root)
+    checks.append(
+        _check(
+            "memory_surfaces_reconciled",
+            surfaces.reconciled,
+            _memory_surface_check_detail(surfaces),
         )
     )
 
@@ -370,6 +571,22 @@ def run_monitor(
             "correction capture directive surfaces in action brief",
         )
     )
+    maintenance = maintenance_review(root)
+    maintenance_detail = _maintenance_check_detail(maintenance)
+    checks.append(
+        _check(
+            "maintenance_surface_present",
+            (root / "maintenance-latest.json").exists(),
+            f"{maintenance.status} {maintenance.run_id}; {maintenance_detail}",
+        )
+    )
+    checks.append(
+        _check(
+            "maintenance_no_blocking_risks",
+            maintenance.status != "fail",
+            maintenance_detail,
+        )
+    )
 
     if deep:
         eval_result = run_eval(root)["result"]
@@ -405,6 +622,7 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_governed_run": _load_json(root / "governed-run-latest.json"),
         "latest_runtime_control": _load_json(root / "runtime-control-latest.json"),
         "latest_runtime_trace": _load_json(root / "runtime-trace-latest.json"),
+        "latest_maintenance": _load_json(root / "maintenance-latest.json"),
     }
 
 
@@ -717,13 +935,21 @@ def memory_surface_report(
     memory_base: Path | None = None,
 ) -> MemorySurfaceReport:
     root = _root(root)
-    config_path = (config_path or (Path.home() / ".codex" / "config.toml")).expanduser().resolve()
-    memory_base = (memory_base or (Path.home() / ".codex" / "memories")).expanduser().resolve()
+    config_path = (
+        config_path
+        or _env_path("AMS_CODEX_CONFIG_PATH")
+        or (Path.home() / ".codex" / "config.toml")
+    ).expanduser().resolve()
+    memory_base = (
+        memory_base
+        or _env_path("AMS_MEMORY_BASE")
+        or (Path.home() / ".codex" / "memories")
+    ).expanduser().resolve()
     config = _load_toml(config_path)
     servers = config.get("mcp_servers", {}) if isinstance(config.get("mcp_servers", {}), dict) else {}
     ams_server = servers.get("ams-memory") if isinstance(servers.get("ams-memory"), dict) else None
     codex_server = servers.get("codex-memory") if isinstance(servers.get("codex-memory"), dict) else None
-    latest_migration = _load_json(root / "migration-latest.json")
+    latest_migration = _load_latest_applied_migration(root)
     legacy_registry = memory_base / "MEMORY.md"
     migration_matches_legacy = bool(
         latest_migration
@@ -731,7 +957,7 @@ def memory_surface_report(
         and _same_path(latest_migration.get("source_path"), legacy_registry)
     )
 
-    ams_root = _server_env_path(ams_server, "AMS_ROOT")
+    ams_root = _server_configured_root(ams_server)
     ams_matches_root = ams_root is not None and _same_path(str(ams_root), root)
     ams_surface = MemorySurface(
         name="ams-memory",
@@ -811,14 +1037,15 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS product lock: kernel, MCP bridge, startup gate, hook wrappers, memory surface reconciliation, governed-run close/finalize, and automatic runtime trace intake are live"
+            "AMS product lock: kernel, MCP bridge, startup gate, hook wrappers, memory surface reconciliation, governed-run close/finalize, automatic runtime trace intake, and aging/maintenance review are live"
         ),
         current_phase="AMS Primary Runtime Adoption",
         status="active",
-        next_step="add aging and maintenance checks as a product surface",
+        next_step="package the local operator path",
         ready_for_next_phase=False,
         open_followups=[
-            "add aging and maintenance checks as a product surface",
+            "package the local operator path",
+            "run fresh operator setup proof",
         ],
     )
 
@@ -948,6 +1175,13 @@ def _write_runtime_trace_records(root: Path, run: RuntimeTraceRun) -> None:
     _append_jsonl(root / "runtime-trace-runs.jsonl", run.model_dump(mode="json"))
     _write_json(root / "runtime-trace-latest.json", run.model_dump(mode="json"))
     (root / "runtime-trace-latest.md").write_text(_render_runtime_trace_markdown(run), encoding="utf-8")
+
+
+def _write_maintenance_records(root: Path, run: MaintenanceRun) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "maintenance-runs.jsonl", run.model_dump(mode="json"))
+    _write_json(root / "maintenance-latest.json", run.model_dump(mode="json"))
+    (root / "maintenance-latest.md").write_text(_render_maintenance_markdown(run), encoding="utf-8")
 
 
 def _load_runtime_control_run(root: Path, control_id: str) -> RuntimeControlRun:
@@ -1112,6 +1346,35 @@ def _render_runtime_trace_markdown(run: RuntimeTraceRun) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _render_maintenance_markdown(run: MaintenanceRun) -> str:
+    lines = [
+        "# AMS Maintenance Latest",
+        "",
+        f"- run_id: `{run.run_id}`",
+        f"- status: `{run.status}`",
+        f"- root: `{run.root}`",
+        f"- stale_after_days: `{run.stale_after_days}`",
+        f"- pending_atom_after_days: `{run.pending_atom_after_days}`",
+        f"- active_cards: `{run.summary.active_card_count}`",
+        f"- inactive_cards: `{run.summary.inactive_card_count}`",
+        f"- expired_active: `{run.summary.expired_active_count}`",
+        f"- stale_active: `{run.summary.stale_active_count}`",
+        f"- contradicted_active: `{run.summary.contradicted_active_count}`",
+        f"- pending_atoms: `{run.summary.pending_atom_count}`",
+        f"- stale_pending_atoms: `{run.summary.stale_pending_atom_count}`",
+        "",
+        "## Review Items",
+        "",
+    ]
+    if not run.items:
+        lines.append("- none")
+    for item in run.items:
+        lines.append(f"- `{item.status}` `{item.memory_kind}` `{item.memory_id}`: {item.reason} -> {item.action}")
+        if item.related_memory_ids:
+            lines.append(f"  - related: `{', '.join(item.related_memory_ids)}`")
+    return "\n".join(lines) + "\n"
+
+
 def _agentic_memory_section(source_path: Path) -> str:
     text = source_path.read_text(encoding="utf-8")
     marker = "# Task Group: C:\\Dev\\Builds\\Agentic Memory System"
@@ -1140,6 +1403,52 @@ def _check(name: str, passed: bool, detail: str) -> MonitorCheck:
     return MonitorCheck(name=name, status="pass" if passed else "fail", detail=detail)
 
 
+def _maintenance_check_detail(run: MaintenanceRun) -> str:
+    return (
+        f"status={run.status}; "
+        f"expired_active={run.summary.expired_active_count}; "
+        f"stale_active={run.summary.stale_active_count}; "
+        f"contradicted_active={run.summary.contradicted_active_count}; "
+        f"inactive={run.summary.inactive_card_count}; "
+        f"stale_pending_atoms={run.summary.stale_pending_atom_count}"
+    )
+
+
+def _memory_surface_check_detail(report: MemorySurfaceReport) -> str:
+    if report.reconciled:
+        return "reconciled: ams-memory primary, codex-memory secondary, native import current"
+    details = [
+        f"{surface.name}={surface.status}/{surface.role}: {surface.detail}"
+        for surface in report.surfaces
+        if surface.status != "pass" or surface.role == "unconfigured"
+    ]
+    return "not reconciled; " + "; ".join(details)
+
+
+def _as_utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _is_before(value: datetime | None, now: datetime) -> bool:
+    value = _as_utc_datetime(value)
+    return value is not None and value < now
+
+
+def _age_days(anchor: datetime | None, now: datetime) -> float | None:
+    anchor = _as_utc_datetime(anchor)
+    if anchor is None:
+        return None
+    return round(max(0.0, (now - anchor).total_seconds() / 86400.0), 1)
+
+
+def _card_validation_anchor(card: ExperienceCard) -> datetime | None:
+    return card.last_validated_at or card.valid_from
+
+
 def _card_exists(root: Path, content: str, domain_scope: str | None) -> bool:
     cem = CEM(root)
     use_when = domain_scope or "similar task context"
@@ -1164,9 +1473,8 @@ def _directive_is_ams_scoped(directive: dict[str, Any]) -> bool:
     source = str(directive.get("source") or "")
     content = str(directive.get("content") or "")
     haystack = f"{source}\n{content}".casefold()
-    markers = (
+    phrase_markers = (
         "agentic memory system",
-        "ams",
         "causal experience memory",
         "cem-0",
         "waki",
@@ -1175,7 +1483,7 @@ def _directive_is_ams_scoped(directive: dict[str, Any]) -> bool:
         "deterministic extractor",
         "contradiction detector",
     )
-    return any(marker in haystack for marker in markers)
+    return any(marker in haystack for marker in phrase_markers) or AMS_ACRONYM_PATTERN.search(haystack) is not None
 
 
 def _directive_is_global_behavior(directive: dict[str, Any]) -> bool:
@@ -1222,6 +1530,26 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _load_latest_applied_migration(root: Path) -> dict[str, Any] | None:
+    runs_path = root / "migration-runs.jsonl"
+    if runs_path.exists():
+        for line in reversed(runs_path.read_text(encoding="utf-8").splitlines()):
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            if payload.get("applied") is True:
+                return payload
+    latest = _load_json(root / "migration-latest.json")
+    if latest and latest.get("applied") is True:
+        return latest
+    return None
+
+
+def _env_path(name: str) -> Path | None:
+    value = os.environ.get(name)
+    return Path(value) if value else None
+
+
 def _load_toml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -1243,6 +1571,30 @@ def _server_env_path(server: dict[str, Any] | None, name: str) -> Path | None:
     if value is None:
         return None
     return Path(value).expanduser().resolve()
+
+
+def _server_configured_root(server: dict[str, Any] | None) -> Path | None:
+    return (
+        _server_env_path(server, "AMS_ROOT")
+        or _server_env_path(server, "CEM_ROOT")
+        or _server_arg_path(server, "--root")
+    )
+
+
+def _server_arg_path(server: dict[str, Any] | None, flag: str) -> Path | None:
+    if not server:
+        return None
+    args = server.get("args")
+    if not isinstance(args, list):
+        return None
+    for index, raw_arg in enumerate(args):
+        arg = str(raw_arg)
+        if arg == flag and index + 1 < len(args):
+            return Path(str(args[index + 1])).expanduser().resolve()
+        prefix = f"{flag}="
+        if arg.startswith(prefix):
+            return Path(arg[len(prefix):]).expanduser().resolve()
+    return None
 
 
 def _same_path(left: str | Path | None, right: str | Path | None) -> bool:

@@ -31,6 +31,7 @@ from .operations import (
     build_codex_memory_migration_run,
     close_governed_run,
     dashboard_status,
+    maintenance_review,
     memory_surface_report,
     record_runtime_trace,
     run_monitor,
@@ -173,6 +174,31 @@ def build_parser() -> argparse.ArgumentParser:
     monitor_parser = subparsers.add_parser("monitor", parents=[json_parent], help="Run AMS Monitor-0 checks.")
     monitor_parser.add_argument("--deep", action="store_true", help="Also run the synthetic corruption eval.")
     monitor_parser.set_defaults(handler=_cmd_monitor)
+
+    maintenance_parser = subparsers.add_parser(
+        "maintenance",
+        parents=[json_parent],
+        help="Review AMS memory freshness and maintenance risk.",
+    )
+    maintenance_subparsers = maintenance_parser.add_subparsers(dest="maintenance_command", required=True)
+    maintenance_review_parser = maintenance_subparsers.add_parser(
+        "review",
+        parents=[json_parent],
+        help="List stale, expired, contradicted, and pending records requiring operator action.",
+    )
+    maintenance_review_parser.add_argument(
+        "--stale-after-days",
+        type=int,
+        default=90,
+        help="Warn on active cards not validated for this many days.",
+    )
+    maintenance_review_parser.add_argument(
+        "--pending-atom-after-days",
+        type=int,
+        default=14,
+        help="Warn on proposed/candidate atoms waiting this many days.",
+    )
+    maintenance_review_parser.set_defaults(handler=_cmd_maintenance_review)
 
     startup_parser = subparsers.add_parser(
         "startup-brief",
@@ -393,6 +419,14 @@ def _cmd_monitor(args: argparse.Namespace) -> dict[str, Any]:
     return run_monitor(args.root, deep=args.deep).model_dump(mode="json")
 
 
+def _cmd_maintenance_review(args: argparse.Namespace) -> dict[str, Any]:
+    return maintenance_review(
+        args.root,
+        stale_after_days=args.stale_after_days,
+        pending_atom_after_days=args.pending_atom_after_days,
+    ).model_dump(mode="json")
+
+
 def _cmd_startup_brief(args: argparse.Namespace) -> dict[str, Any]:
     return startup_brief(
         args.root,
@@ -568,6 +602,8 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
         _emit_migration(payload)
     elif "memory_base" in payload and "surfaces" in payload:
         _emit_memory_surfaces(payload)
+    elif "summary" in payload and "stale_after_days" in payload:
+        _emit_maintenance(payload)
     elif "checks" in payload and "status" in payload:
         _emit_monitor(payload)
     elif "latest_monitor" in payload:
@@ -684,6 +720,32 @@ def _emit_monitor(payload: dict[str, Any]) -> None:
         )
     for check in payload["checks"]:
         print(f"- {check['status']}: {check['name']} :: {check['detail']}")
+
+
+def _emit_maintenance(payload: dict[str, Any]) -> None:
+    print(f"maintenance: {payload['status']} {payload['run_id']}")
+    summary = payload["summary"]
+    print(
+        "summary: "
+        f"{summary['active_card_count']} active cards, "
+        f"{summary['inactive_card_count']} inactive cards, "
+        f"{summary['expired_active_count']} expired active, "
+        f"{summary['stale_active_count']} stale active, "
+        f"{summary['contradicted_active_count']} contradicted active, "
+        f"{summary['stale_pending_atom_count']} stale pending atoms"
+    )
+    if not payload["items"]:
+        print("items: none")
+        return
+    print("items:")
+    for item in payload["items"]:
+        related = ""
+        if item["related_memory_ids"]:
+            related = f" related={','.join(item['related_memory_ids'])}"
+        print(
+            f"- {item['status']}: {item['memory_kind']} {item['memory_id']} :: "
+            f"{item['reason']} -> {item['action']}{related}"
+        )
 
 
 def _emit_startup_brief(payload: dict[str, Any]) -> None:
@@ -853,3 +915,11 @@ def _emit_dashboard(payload: dict[str, Any]) -> None:
         )
     else:
         print("latest_runtime_trace: none")
+    latest_maintenance = payload.get("latest_maintenance")
+    if latest_maintenance:
+        print(
+            f"latest_maintenance: {latest_maintenance['status']} "
+            f"{latest_maintenance['run_id']} items={latest_maintenance['summary']['review_item_count']}"
+        )
+    else:
+        print("latest_maintenance: none")

@@ -33,7 +33,10 @@ function Backup-Original {
         }
         return
     }
-    if (-not (Test-Path -LiteralPath $Backup)) {
+    if (Test-Path -LiteralPath $Backup) {
+        Copy-Item -LiteralPath $Original -Destination $Backup -Force
+        Write-Output "backup refreshed: $Backup"
+    } else {
         Copy-Item -LiteralPath $Original -Destination $Backup
         Write-Output "backup: $Backup"
     }

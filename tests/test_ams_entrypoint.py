@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -69,7 +70,7 @@ def test_installed_codex_entrypoint_blocks_before_original_shim(tmp_path):
     assert (bin_dir / "codex.ams-original.cmd").exists()
     assert (bin_dir / "codex.ams-original").exists()
 
-    env = os.environ.copy()
+    env = _ams_env(root)
     env["AMS_ROOT"] = str(root)
     env["RAW_SENTINEL"] = str(sentinel)
 
@@ -178,6 +179,63 @@ def test_codex_entrypoint_installer_can_restore_original_shim(tmp_path):
     assert target.read_text(encoding="utf-8") == original
 
 
+def test_codex_entrypoint_installer_refreshes_stale_backup_for_fresh_shim(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        pytest.skip("Codex entrypoint installer smoke is Windows PowerShell-only")
+
+    bin_dir = tmp_path / "npm"
+    bin_dir.mkdir()
+    target = bin_dir / "codex.ps1"
+    backup = bin_dir / "codex.ams-original.ps1"
+    target.write_text("Write-Output 'NEW CODEX SHIM'\n", encoding="utf-8")
+    backup.write_text("Write-Output 'OLD CODEX SHIM'\n", encoding="utf-8")
+
+    install = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(INSTALLER),
+            "-Workspace",
+            str(ROOT),
+            "-TargetPath",
+            str(target),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert install.returncode == 0, install.stderr
+    assert "backup refreshed:" in install.stdout
+    assert backup.read_text(encoding="utf-8") == "Write-Output 'NEW CODEX SHIM'\n"
+
+    env = os.environ.copy()
+    env["AMS_CODEX_BYPASS"] = "1"
+    bypass = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(target),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+    assert bypass.returncode == 0, bypass.stderr
+    assert bypass.stdout.strip() == "NEW CODEX SHIM"
+
+
 def _seed_ams_root(root: Path) -> None:
     _ams(
         root,
@@ -200,6 +258,9 @@ def _seed_ams_root(root: Path) -> None:
         "ams-usage",
         "--json",
     )
+    memory_base = _legacy_memory_base(root.parent)
+    _codex_config(root.parent, root)
+    _ams(root, "migrate", "apply", "--memory-base", str(memory_base), "--json")
 
 
 def _ams(root: Path, *args: str) -> None:
@@ -209,6 +270,63 @@ def _ams(root: Path, *args: str) -> None:
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=_ams_env(root),
         check=False,
     )
     assert process.returncode == 0, process.stderr
+
+
+def _ams_env(root: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    config_path = root.parent / "config.toml"
+    memory_base = root.parent / "legacy-memory"
+    if config_path.exists():
+        env["AMS_CODEX_CONFIG_PATH"] = str(config_path)
+    if memory_base.exists():
+        env["AMS_MEMORY_BASE"] = str(memory_base)
+    return env
+
+
+def _legacy_memory_base(tmp_path: Path) -> Path:
+    memory_base = tmp_path / "legacy-memory"
+    memory_base.mkdir(exist_ok=True)
+    (memory_base / "MEMORY.md").write_text(
+        "\n".join(
+            [
+                "# Task Group: C:\\Dev\\Builds\\Agentic Memory System / CEM-0 foundation pivot",
+                "scope: Agentic Memory System after the pivot away from universal onboarding.",
+                "",
+                "## Reusable knowledge",
+                "- The project pivot is explicit: Causal Experience Memory.",
+                "- The first implementation wedge is CEM-0 / MemGuard Kernel.",
+                "- The immediate next-work queue is verification.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return memory_base
+
+
+def _codex_config(tmp_path: Path, root: Path) -> Path:
+    config_path = tmp_path / "config.toml"
+    codex_db = tmp_path / "codex-memory" / "lancedb"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[mcp_servers.ams-memory]",
+                'command = "node"',
+                "",
+                "[mcp_servers.ams-memory.env]",
+                f"AMS_ROOT = {json.dumps(str(root))}",
+                "",
+                "[mcp_servers.codex-memory]",
+                'command = "node"',
+                "",
+                "[mcp_servers.codex-memory.env]",
+                f"CODEX_MEMORY_DB_PATH = {json.dumps(str(codex_db))}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path

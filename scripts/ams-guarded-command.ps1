@@ -22,15 +22,22 @@ $control = & python $amsScript runtime-control $Prompt --json
 $code = $LASTEXITCODE
 $controlObject = $null
 $controlId = $null
+$governedRunId = $null
 if ($control) {
     try {
         $controlObject = $control | ConvertFrom-Json
         $controlId = $controlObject.control_id
+        $governedRunId = $controlObject.governed_run_id
     } catch {
         if (-not $Quiet) {
             Write-Output "AMS_TRACE_RECORD_FAIL: unable to parse runtime-control output: $_"
         }
     }
+}
+
+function Write-AmsPersistenceFailure {
+    param([string]$Message)
+    [Console]::Error.WriteLine($Message)
 }
 
 function Record-AmsRuntimeTrace {
@@ -40,9 +47,7 @@ function Record-AmsRuntimeTrace {
     )
 
     if (-not $controlId) {
-        if (-not $Quiet) {
-            Write-Output "AMS_TRACE_RECORD_FAIL: missing runtime-control id"
-        }
+        Write-AmsPersistenceFailure "AMS_TRACE_RECORD_FAIL: missing runtime-control id"
         return
     }
 
@@ -66,10 +71,57 @@ function Record-AmsRuntimeTrace {
         $traceArgs += @("--command-arg=$arg")
     }
 
-    $traceOutput = & python @traceArgs 2>&1
-    $traceCode = $LASTEXITCODE
-    if (($traceCode -ne 0) -and (-not $Quiet)) {
-        Write-Output "AMS_TRACE_RECORD_FAIL: $traceOutput"
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $traceOutput = & python @traceArgs 2>&1
+        $traceCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($traceCode -ne 0) {
+        Write-AmsPersistenceFailure "AMS_TRACE_RECORD_FAIL: $traceOutput"
+    }
+}
+
+function Close-AmsGovernedRun {
+    param(
+        [int]$ObservedExitCode,
+        [string]$ActionTaken
+    )
+
+    if (-not $governedRunId) {
+        Write-AmsPersistenceFailure "AMS_GOVERNED_RUN_CLOSE_FAIL: missing governed-run id"
+        return
+    }
+
+    $outcome = "failure"
+    if ($ObservedExitCode -eq 0) {
+        $outcome = "success"
+    }
+
+    $closeArgs = @(
+        $amsScript,
+        "governed-run",
+        "close",
+        "--receipt-id",
+        $governedRunId,
+        "--outcome",
+        $outcome,
+        "--action-taken",
+        $ActionTaken,
+        "--json"
+    )
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $closeOutput = & python @closeArgs 2>&1
+        $closeCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($closeCode -ne 0) {
+        Write-AmsPersistenceFailure "AMS_GOVERNED_RUN_CLOSE_FAIL: $closeOutput"
     }
 }
 
@@ -80,11 +132,22 @@ if ((-not $Quiet) -or $code -ne 0) {
 
 if ($code -ne 0) {
     Record-AmsRuntimeTrace -ObservedExitCode $code -EndedAt ((Get-Date).ToUniversalTime().ToString("o"))
+    Close-AmsGovernedRun -ObservedExitCode $code -ActionTaken "AMS guard blocked downstream command: $Command $($CommandArgs -join ' ')"
     Write-Output "AMS_GUARD_BLOCKED: downstream command was not invoked"
     exit $code
 }
 
-& $Command @CommandArgs
-$downstreamExitCode = $LASTEXITCODE
+try {
+    & $Command @CommandArgs
+    $downstreamExitCode = $LASTEXITCODE
+} catch {
+    $downstreamExitCode = 127
+    Record-AmsRuntimeTrace -ObservedExitCode $downstreamExitCode -EndedAt ((Get-Date).ToUniversalTime().ToString("o"))
+    Close-AmsGovernedRun -ObservedExitCode $downstreamExitCode -ActionTaken "AMS guarded command failed to launch: $Command $($CommandArgs -join ' ')"
+    [Console]::Error.WriteLine("AMS_GUARD_DOWNSTREAM_LAUNCH_FAIL: $($_.Exception.Message)")
+    exit $downstreamExitCode
+}
+
 Record-AmsRuntimeTrace -ObservedExitCode $downstreamExitCode -EndedAt ((Get-Date).ToUniversalTime().ToString("o"))
+Close-AmsGovernedRun -ObservedExitCode $downstreamExitCode -ActionTaken "AMS guarded command: $Command $($CommandArgs -join ' ')"
 exit $downstreamExitCode

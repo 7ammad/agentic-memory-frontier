@@ -5,11 +5,12 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
-from cem_core import CEM
+from cem_core import CEM, ExperienceCard
 from cem_core import operations
 from cem_core.local_memory import _active_product_directive_content
 
@@ -283,16 +284,49 @@ def test_ams_cli_memory_surfaces_reconcile_legacy_and_codex_memory(tmp_path):
         "--memory-base",
         str(memory_base),
     )
+    _ams(root, "--json", "migrate", "dry-run", "--memory-base", str(memory_base))
+    report_after_dry_run = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
     surfaces = {surface["name"]: surface for surface in report["surfaces"]}
 
     assert migration["applied"] is True
     assert report["reconciled"] is True
+    assert report_after_dry_run["reconciled"] is True
     assert surfaces["ams-memory"]["role"] == "primary"
     assert surfaces["ams-memory"]["status"] == "pass"
     assert surfaces["codex-memory"]["role"] == "secondary"
     assert surfaces["codex-memory"]["status"] == "pass"
     assert surfaces["native-codex-memory"]["role"] == "secondary_import_source"
     assert surfaces["native-codex-memory"]["status"] == "pass"
+
+
+def test_ams_cli_memory_surfaces_accept_ams_mcp_root_arg_without_env(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = _legacy_memory_base(tmp_path)
+    config_path = _codex_config_with_ams_root_arg(tmp_path, root)
+
+    _ams(root, "--json", "migrate", "apply", "--memory-base", str(memory_base))
+    report = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
+    surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+
+    assert report["reconciled"] is True
+    assert surfaces["ams-memory"]["status"] == "pass"
+    assert surfaces["ams-memory"]["source_path"] == str(root.resolve())
 
 
 def test_ams_cli_memory_surfaces_warn_until_legacy_migration_applied(tmp_path):
@@ -321,42 +355,199 @@ def test_ams_cli_memory_surfaces_warn_until_legacy_migration_applied(tmp_path):
 def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     root = tmp_path / "ams"
 
-    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
-    _ams(
-        root,
-        "--json",
-        "remember",
-        "run python scripts/ams.py brief before continuing Agentic Memory System work",
-        "--kind",
-        "skill",
-        "--outcome",
-        "success",
-        "--domain",
-        "agentic-memory-system",
-    )
+    _seed_runtime_control_root(root)
     monitor = _ams(root, "--json", "monitor")
     dashboard = _ams(root, "--json", "dashboard")
 
     assert monitor["status"] == "pass"
-    assert monitor["scope"]["ams_directive_count"] == 7
+    assert monitor["scope"]["ams_directive_count"] == 11
     assert monitor["phase"]["completed_through"].startswith("AMS product lock")
     assert monitor["phase"]["current_phase"] == "AMS Primary Runtime Adoption"
     assert (
         monitor["phase"]["next_step"]
-        == "add aging and maintenance checks as a product surface"
+        == "package the local operator path"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
     assert "real trace intake" not in monitor["phase"]["next_step"]
+    assert "aging and maintenance" not in monitor["phase"]["next_step"]
+    assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
     assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
+    assert _check_status(monitor, "maintenance_surface_present") == "pass"
+    assert _check_status(monitor, "maintenance_no_blocking_risks") == "pass"
     assert (root / "monitor-runs.jsonl").exists()
     assert (root / "monitor-latest.json").exists()
     assert (root / "monitor-latest.md").exists()
+    assert (root / "maintenance-runs.jsonl").exists()
+    assert (root / "maintenance-latest.json").exists()
+    assert (root / "maintenance-latest.md").exists()
     assert dashboard["latest_monitor"]["run_id"] == monitor["run_id"]
-    assert dashboard["card_count"] == 1
-    assert dashboard["scope"]["ams_card_count"] == 1
-    assert dashboard["directive_count"] == 7
+    assert dashboard["latest_maintenance"]["status"] == "pass"
+    assert dashboard["card_count"] == 2
+    assert dashboard["scope"]["ams_card_count"] == 2
+    assert dashboard["directive_count"] == 11
     assert dashboard["scope"]["global_behavior_directive_count"] == 0
+
+
+def test_ams_cli_monitor_blocks_unreconciled_memory_surfaces(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_records(root)
+
+    monitor = _ams(root, "--json", "monitor")
+    result = _ams(
+        root,
+        "--json",
+        "startup-brief",
+        "continue building Agentic Memory System",
+        "--domain",
+        "agentic-memory-system",
+    )
+
+    assert monitor["status"] == "fail"
+    assert _check_status(monitor, "memory_surfaces_reconciled") == "fail"
+    assert "not reconciled" in _check_detail(monitor, "memory_surfaces_reconciled")
+    assert result["status"] == "block"
+    assert any(reason.startswith("monitor_failed:") for reason in result["block_reasons"])
+
+
+def test_ams_cli_maintenance_review_detects_aging_risks_and_persists_report(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    cem = CEM(root)
+    now = operations.utc_now()
+
+    stale_card = cem.store.list_cards()[0]
+    stale_card.valid_from = now - timedelta(days=140)
+    stale_card.last_validated_at = now - timedelta(days=120)
+    cem.store.save_card(stale_card)
+    promoted_atom = cem.store.get_atom(stale_card.evidence_atom_ids[0])
+    promoted_atom.observed_at = now - timedelta(days=90)
+    cem.store.save_atom(promoted_atom)
+    cem.store.save_card(
+        ExperienceCard(
+            card_id="card_expired",
+            title="expired startup runbook",
+            use_when="agentic-memory-system",
+            do=["open the expired startup runbook"],
+            evidence_atom_ids=["atom_expired"],
+            confidence_score=0.8,
+            valid_from=now - timedelta(days=180),
+            valid_until=now - timedelta(days=1),
+            last_validated_at=now - timedelta(days=100),
+            action_brief_template="open the expired startup runbook",
+        )
+    )
+    cem.store.save_card(
+        ExperienceCard(
+            card_id="card_inactive",
+            title="superseded operator note",
+            use_when="agentic-memory-system",
+            do=["use the superseded note"],
+            evidence_atom_ids=["atom_inactive"],
+            confidence_score=0.7,
+            promotion_status="superseded",
+            deactivated_at=now,
+            deactivated_reason="superseded by fresher evidence",
+            action_brief_template="use the superseded note",
+        )
+    )
+    cem.store.save_card(
+        ExperienceCard(
+            card_id="card_contradicted",
+            title="contradicted operator note",
+            use_when="agentic-memory-system",
+            do=["review the contradicted note"],
+            evidence_atom_ids=["atom_contradicted"],
+            confidence_score=0.7,
+            valid_from=now - timedelta(days=10),
+            last_validated_at=now - timedelta(days=10),
+            action_brief_template="review the contradicted note",
+            contradicts_card_ids=["card_other_side"],
+        )
+    )
+
+    result = _ams(root, "--json", "maintenance", "review", "--stale-after-days", "30")
+    dashboard = _ams(root, "--json", "dashboard")
+    brief = _ams(
+        root,
+        "--json",
+        "brief",
+        "open expired startup runbook",
+        "--domain",
+        "agentic-memory-system",
+    )
+
+    assert result["status"] == "fail"
+    assert result["summary"]["expired_active_count"] == 1
+    assert result["summary"]["stale_active_count"] == 1
+    assert result["summary"]["contradicted_active_count"] == 1
+    assert result["summary"]["inactive_card_count"] == 1
+    assert result["summary"]["pending_atom_count"] == 0
+    assert result["summary"]["stale_pending_atom_count"] == 0
+    assert result["summary"]["review_item_count"] == 3
+    assert {item["memory_id"] for item in result["items"]} == {
+        stale_card.card_id,
+        "card_expired",
+        "card_contradicted",
+    }
+    assert (root / "maintenance-runs.jsonl").exists()
+    assert (root / "maintenance-latest.json").exists()
+    assert (root / "maintenance-latest.md").exists()
+    assert dashboard["latest_maintenance"]["run_id"] == result["run_id"]
+    assert "open the expired startup runbook" not in brief["recommended_next_actions"]
+
+
+def test_ams_cli_maintenance_review_flags_active_cards_without_freshness_anchor(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    CEM(root).store.save_card(
+        ExperienceCard(
+            card_id="card_unknown_freshness",
+            title="manual card with unknown freshness",
+            use_when="agentic-memory-system",
+            do=["review the manually inserted card"],
+            evidence_atom_ids=["atom_unknown_freshness"],
+            confidence_score=0.7,
+            action_brief_template="review the manually inserted card",
+        )
+    )
+
+    result = _ams(root, "--json", "maintenance", "review")
+    item = next(item for item in result["items"] if item["memory_id"] == "card_unknown_freshness")
+
+    assert result["status"] == "warn"
+    assert result["summary"]["stale_active_count"] == 1
+    assert item["status"] == "warn"
+    assert "no validation freshness anchor" in item["reason"]
+    assert item["age_days"] is None
+
+
+def test_ams_cli_monitor_names_maintenance_blocking_risks(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    now = operations.utc_now()
+    CEM(root).store.save_card(
+        ExperienceCard(
+            card_id="card_expired",
+            title="expired monitor runbook",
+            use_when="agentic-memory-system",
+            do=["use expired monitor runbook"],
+            evidence_atom_ids=["atom_expired"],
+            confidence_score=0.8,
+            valid_from=now - timedelta(days=180),
+            valid_until=now - timedelta(days=1),
+            last_validated_at=now - timedelta(days=120),
+            action_brief_template="use expired monitor runbook",
+        )
+    )
+
+    monitor = _ams(root, "--json", "monitor")
+
+    assert monitor["status"] == "fail"
+    assert _check_status(monitor, "maintenance_surface_present") == "pass"
+    assert _check_status(monitor, "maintenance_no_blocking_risks") == "fail"
+    detail = _check_detail(monitor, "maintenance_no_blocking_risks")
+    assert "expired_active=1" in detail
 
 
 def test_ams_cli_bootstrap_scopes_directives_without_checkout_path_name(tmp_path):
@@ -373,10 +564,29 @@ def test_ams_cli_bootstrap_scopes_directives_without_checkout_path_name(tmp_path
     assert dashboard["scope"]["other_directive_count"] == 0
 
 
-def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
+def test_ams_cli_dashboard_does_not_scope_ams_by_substring(tmp_path):
     root = tmp_path / "ams"
 
     _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
+    _ams(
+        root,
+        "--json",
+        "pin",
+        "Keep teams params diagrams in the unrelated planning note.",
+        "--scope",
+        "workspace",
+    )
+    dashboard = _ams(root, "--json", "dashboard")
+
+    assert dashboard["directive_count"] == 8
+    assert dashboard["scope"]["ams_directive_count"] == 7
+    assert dashboard["scope"]["other_directive_count"] == 1
+
+
+def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
+    root = tmp_path / "ams"
+
+    _seed_runtime_control_root(root)
     _ams(
         root,
         "--json",
@@ -389,50 +599,24 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
         "--task-family",
         "writing",
     )
-    _ams(
-        root,
-        "--json",
-        "remember",
-        "run python scripts/ams.py brief before continuing Agentic Memory System work",
-        "--kind",
-        "skill",
-        "--outcome",
-        "success",
-        "--domain",
-        "agentic-memory-system",
-    )
 
     monitor = _ams(root, "--json", "monitor")
     dashboard = _ams(root, "--json", "dashboard")
 
     assert monitor["status"] == "pass"
-    assert dashboard["directive_count"] == 8
-    assert dashboard["scope"]["ams_directive_count"] == 7
+    assert dashboard["directive_count"] == 12
+    assert dashboard["scope"]["ams_directive_count"] == 11
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
     assert dashboard["phase"]["completed_through"].startswith("AMS product lock")
     assert dashboard["phase"]["ready_for_next_phase"] is False
-    assert any("aging and maintenance" in item for item in dashboard["phase"]["open_followups"])
+    assert any("package the local operator path" in item for item in dashboard["phase"]["open_followups"])
 
 
 def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
     root = tmp_path / "ams"
 
-    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
-    _ams(
-        root,
-        "--json",
-        "remember",
-        "run python scripts/ams.py brief before continuing Agentic Memory System work",
-        "--kind",
-        "skill",
-        "--outcome",
-        "success",
-        "--domain",
-        "agentic-memory-system",
-        "--task-family",
-        "ams-usage",
-    )
+    _seed_runtime_control_root(root)
 
     result = _ams(
         root,
@@ -443,6 +627,8 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
         "agentic-memory-system",
         "--max-directives",
         "4",
+        "--max-cards",
+        "1",
         "--max-tokens",
         "120",
     )
@@ -716,7 +902,7 @@ def test_ams_guarded_command_enforces_block_before_downstream_command(tmp_path):
     root = tmp_path / "ams"
     _seed_runtime_control_root(root)
     sentinel = tmp_path / "blocked-command-ran.txt"
-    env = os.environ.copy()
+    env = _ams_env(root)
     env["AMS_ROOT"] = str(root)
 
     process = subprocess.run(
@@ -749,6 +935,9 @@ def test_ams_guarded_command_enforces_block_before_downstream_command(tmp_path):
     latest_trace = json.loads((root / "runtime-trace-latest.json").read_text(encoding="utf-8"))
     assert latest_trace["final_outcome"] == "failure"
     assert latest_trace["downstream_invoked"] is False
+    latest_run = _ams(root, "--json", "dashboard")["latest_governed_run"]
+    assert latest_run["closed"] is True
+    assert latest_run["outcome"] == "failure"
     assert not sentinel.exists()
 
 
@@ -760,7 +949,7 @@ def test_ams_guarded_command_runs_downstream_command_when_allowed(tmp_path):
     root = tmp_path / "ams"
     _seed_runtime_control_root(root)
     sentinel = tmp_path / "allowed-command-ran.txt"
-    env = os.environ.copy()
+    env = _ams_env(root)
     env["AMS_ROOT"] = str(root)
 
     process = subprocess.run(
@@ -793,7 +982,56 @@ def test_ams_guarded_command_runs_downstream_command_when_allowed(tmp_path):
     latest_trace = json.loads((root / "runtime-trace-latest.json").read_text(encoding="utf-8"))
     assert latest_trace["final_outcome"] == "success"
     assert latest_trace["downstream_invoked"] is True
+    latest_run = _ams(root, "--json", "dashboard")["latest_governed_run"]
+    assert latest_run["closed"] is True
+    assert latest_run["outcome"] == "success"
+    assert latest_run["influence_ids"] == [latest_run["influence_id"]]
     assert sentinel.exists()
+
+
+def test_ams_guarded_command_records_runtime_trace_when_allowed_launch_fails(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    env = _ams_env(root)
+    env["AMS_ROOT"] = str(root)
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(ROOT),
+            "-Prompt",
+            "continue building Agentic Memory System with verification",
+            "-Command",
+            "definitely-not-a-command-xyz",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 127
+    assert "AMS_RUNTIME_CONTROL_EXIT: 0" in process.stdout
+    assert "AMS_GUARD_DOWNSTREAM_LAUNCH_FAIL" in process.stderr
+    latest_trace = json.loads((root / "runtime-trace-latest.json").read_text(encoding="utf-8"))
+    assert latest_trace["final_outcome"] == "failure"
+    assert latest_trace["observed_exit_code"] == 127
+    assert latest_trace["downstream_invoked"] is True
+    latest_run = _ams(root, "--json", "dashboard")["latest_governed_run"]
+    assert latest_run["closed"] is True
+    assert latest_run["outcome"] == "failure"
 
 
 def test_ams_guarded_command_quietly_records_runtime_trace(tmp_path):
@@ -803,7 +1041,7 @@ def test_ams_guarded_command_quietly_records_runtime_trace(tmp_path):
 
     root = tmp_path / "ams"
     _seed_runtime_control_root(root)
-    env = os.environ.copy()
+    env = _ams_env(root)
     env["AMS_ROOT"] = str(root)
 
     process = subprocess.run(
@@ -839,6 +1077,53 @@ def test_ams_guarded_command_quietly_records_runtime_trace(tmp_path):
     assert latest_trace["observed_exit_code"] == 0
 
 
+def test_ams_guarded_command_quiet_mode_surfaces_trace_recording_failure(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    env = _ams_env(root)
+    env["AMS_ROOT"] = str(root)
+    control_log = root / "runtime-control-runs.jsonl"
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(ROOT),
+            "-Prompt",
+            "continue building Agentic Memory System with verification",
+            "-Quiet",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            f"del /q \"{control_log}\" && echo RAW_OK",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0
+    assert process.stdout.strip() == "RAW_OK"
+    assert "AMS_TRACE_RECORD_FAIL" in process.stderr
+    assert "Runtime control receipt not found" in process.stderr
+    assert not (root / "runtime-trace-latest.json").exists()
+    latest_run = _ams(root, "--json", "dashboard")["latest_governed_run"]
+    assert latest_run["closed"] is True
+    assert latest_run["outcome"] == "success"
+
+
 def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
     root = tmp_path / "ams"
 
@@ -865,19 +1150,7 @@ def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
 
 def test_ams_cli_startup_brief_human_output_uses_controller_printer(tmp_path):
     root = tmp_path / "ams"
-    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
-    _ams(
-        root,
-        "--json",
-        "remember",
-        "run python scripts/ams.py brief before continuing Agentic Memory System work",
-        "--kind",
-        "skill",
-        "--outcome",
-        "success",
-        "--domain",
-        "agentic-memory-system",
-    )
+    _seed_runtime_control_root(root)
 
     process = subprocess.run(
         [
@@ -894,6 +1167,7 @@ def test_ams_cli_startup_brief_human_output_uses_controller_printer(tmp_path):
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=_ams_env(root),
         check=False,
     )
 
@@ -1065,16 +1339,32 @@ def _ams_process(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=_ams_env(root),
         check=False,
     )
     return process
+
+
+def _ams_env(root: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    config_path = root.parent / "config.toml"
+    memory_base = root.parent / "legacy-memory"
+    if config_path.exists():
+        env["AMS_CODEX_CONFIG_PATH"] = str(config_path)
+    if memory_base.exists():
+        env["AMS_MEMORY_BASE"] = str(memory_base)
+    return env
 
 
 def _check_status(monitor: dict, name: str) -> str:
     return next(check["status"] for check in monitor["checks"] if check["name"] == name)
 
 
-def _seed_runtime_control_root(root: Path) -> None:
+def _check_detail(monitor: dict, name: str) -> str:
+    return next(check["detail"] for check in monitor["checks"] if check["name"] == name)
+
+
+def _seed_runtime_records(root: Path) -> None:
     _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
     _ams(
         root,
@@ -1092,9 +1382,20 @@ def _seed_runtime_control_root(root: Path) -> None:
     )
 
 
+def _seed_reconciled_memory_surfaces(root: Path) -> None:
+    memory_base = _legacy_memory_base(root.parent)
+    _codex_config(root.parent, root)
+    _ams(root, "--json", "migrate", "apply", "--memory-base", str(memory_base))
+
+
+def _seed_runtime_control_root(root: Path) -> None:
+    _seed_runtime_records(root)
+    _seed_reconciled_memory_surfaces(root)
+
+
 def _legacy_memory_base(tmp_path: Path) -> Path:
     memory_base = tmp_path / "legacy-memory"
-    memory_base.mkdir()
+    memory_base.mkdir(exist_ok=True)
     (memory_base / "MEMORY.md").write_text(
         "\n".join(
             [
@@ -1130,6 +1431,29 @@ def _codex_config(tmp_path: Path, root: Path) -> Path:
                 "",
                 "[mcp_servers.ams-memory.env]",
                 f"AMS_ROOT = {json.dumps(str(root))}",
+                "",
+                "[mcp_servers.codex-memory]",
+                'command = "node"',
+                "",
+                "[mcp_servers.codex-memory.env]",
+                f"CODEX_MEMORY_DB_PATH = {json.dumps(str(codex_db))}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _codex_config_with_ams_root_arg(tmp_path: Path, root: Path) -> Path:
+    config_path = tmp_path / "config.toml"
+    codex_db = tmp_path / "codex-memory" / "lancedb"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[mcp_servers.ams-memory]",
+                'command = "python"',
+                f"args = [{json.dumps(str(ROOT / 'scripts' / 'run_cem_mcp_stdio.py'))}, \"--root\", {json.dumps(str(root))}]",
                 "",
                 "[mcp_servers.codex-memory]",
                 'command = "node"',
