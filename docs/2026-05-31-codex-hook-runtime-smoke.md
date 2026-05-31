@@ -121,6 +121,6 @@ Not verified as acceptable:
 - Codex blocking on `UserPromptSubmit` correction capture;
 - Codex blocking on `PreToolUse` while the resume gate is armed.
 
-AMS A6 remains partial until the runtime path is enforceable. The next product
-step is to replace the Codex command-hook exit-code assumption with an
-enforceable AMS runtime control path.
+Update: the enforceable AMS-owned path is now `ams runtime-control` plus
+`scripts/ams-guarded-command.ps1`. A6 remains partial until that guarded
+launcher is wired into the default Codex entrypoint.

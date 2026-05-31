@@ -190,7 +190,7 @@ Built and verified:
 Not yet accepted:
 
 - AMS as the primary Codex memory path;
-- live hook payload proof in the actual Codex runtime;
+- default Codex entrypoint wired through the AMS guarded launcher;
 - governed-run receipts for every serious run;
 - continuous real trace intake from ordinary Codex work;
 - aging and maintenance as a first-class product surface;
@@ -203,7 +203,7 @@ Work proceeds in this order. Do not skip ahead to platform features.
 1. Lock this document as the product acceptance source.
 2. Make Codex start through AMS as primary memory.
 3. Add governed-run receipts everywhere: `brief_id`, `monitor_id`, evidence ids.
-4. Prove live correction hooks against the real Codex runtime.
+4. Wire the AMS guarded launcher into the default Codex entrypoint.
 5. Add real trace intake from ordinary work.
 6. Close the influence loop for governed runs.
 7. Add aging and maintenance checks.

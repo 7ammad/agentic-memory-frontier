@@ -13,6 +13,12 @@ from .correction_capture import (
     correction_controller_summary,
     correction_rule_surfaces_in_brief,
 )
+from .correction_hooks import (
+    HOOK_EXIT_ALLOW,
+    HookDecision,
+    hook_on_pre_tool_use_gate,
+    hook_on_user_prompt_submit,
+)
 from .kernel import CEM
 from .local_memory import (
     default_root,
@@ -31,6 +37,7 @@ StartupStatus = Literal["allow", "block"]
 
 AMS_DOMAIN_SCOPE = "agentic-memory-system"
 GLOBAL_BEHAVIOR_SCOPE = "codex-behavior"
+RUNTIME_CONTROL_EXIT_BLOCK = 12
 
 
 class MigrationItem(StrictModel):
@@ -125,6 +132,27 @@ class GovernedRunReceipt(StrictModel):
     task_family: str | None
     evidence_ids: list[str]
     block_reasons: list[str]
+
+
+class RuntimeControlRun(StrictModel):
+    control_id: str = Field(default_factory=lambda: new_id("control"))
+    generated_at: datetime = Field(default_factory=utc_now)
+    root: str
+    cwd: str
+    enforcement: Literal["external_guard"]
+    status: StartupStatus
+    task_description: str
+    domain_scope: str | None
+    task_family: str | None
+    session_id: str | None
+    startup_brief_id: str
+    governed_run_id: str | None
+    monitor_id: str
+    prompt_decision: HookDecision
+    gate_decision: HookDecision
+    evidence_ids: list[str]
+    block_reasons: list[str]
+    runtime_exit_code: int
 
 
 class MonitorRun(StrictModel):
@@ -323,6 +351,7 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_monitor": _load_json(root / "monitor-latest.json"),
         "latest_startup_brief": _load_json(root / "startup-brief-latest.json"),
         "latest_governed_run": _load_json(root / "governed-run-latest.json"),
+        "latest_runtime_control": _load_json(root / "runtime-control-latest.json"),
     }
 
 
@@ -398,9 +427,71 @@ def startup_brief(
         evidence_ids=evidence_ids,
         block_reasons=block_reasons,
     )
+    _write_governed_run_records(root, receipt)
     run.governed_run_id = receipt.receipt_id
     _write_startup_brief_records(root, run)
-    _write_governed_run_records(root, receipt)
+    return run
+
+
+def runtime_control(
+    root: Path | None = None,
+    *,
+    description: str,
+    domain_scope: str | None = AMS_DOMAIN_SCOPE,
+    task_family: str | None = None,
+    session_id: str | None = None,
+    affected_files: list[str] | None = None,
+) -> RuntimeControlRun:
+    """Build an enforceable AMS allow/block decision for an external launcher.
+
+    Codex command hooks currently report non-zero exits as hook failures but still
+    continue. This control path is owned by AMS instead: a caller must run it before
+    invoking the downstream command and must not invoke that command when the exit
+    code is non-zero.
+    """
+    root = _root(root)
+    prompt_decision = hook_on_user_prompt_submit(
+        root,
+        description,
+        session_id=session_id,
+        affected_files=affected_files or [],
+    )
+    startup = startup_brief(
+        root,
+        description=description,
+        domain_scope=domain_scope,
+        task_family=task_family,
+    )
+    gate_decision = hook_on_pre_tool_use_gate(root)
+
+    block_reasons: list[str] = []
+    if prompt_decision.decision == "block":
+        block_reasons.append(f"correction_prompt_blocked:{prompt_decision.event_id}")
+    if gate_decision.decision == "block":
+        block_reasons.append(f"resume_gate_blocked:{gate_decision.active_event_id or 'unknown'}")
+    for reason in startup.block_reasons:
+        block_reasons.append(f"startup_blocked:{reason}")
+
+    status: StartupStatus = "block" if block_reasons else "allow"
+    run = RuntimeControlRun(
+        root=str(root),
+        cwd=str(Path.cwd().resolve()),
+        enforcement="external_guard",
+        status=status,
+        task_description=description,
+        domain_scope=domain_scope,
+        task_family=task_family,
+        session_id=session_id,
+        startup_brief_id=startup.brief_id,
+        governed_run_id=startup.governed_run_id,
+        monitor_id=startup.monitor_id,
+        prompt_decision=prompt_decision,
+        gate_decision=gate_decision,
+        evidence_ids=startup.evidence_ids,
+        block_reasons=block_reasons,
+        runtime_exit_code=HOOK_EXIT_ALLOW if status == "allow" else RUNTIME_CONTROL_EXIT_BLOCK,
+    )
+    _write_runtime_control_records(root, run)
     return run
 
 
@@ -432,10 +523,10 @@ def phase_status() -> PhaseStatus:
         ),
         current_phase="AMS Primary Runtime Adoption",
         status="active",
-        next_step="replace Codex command-hook advisory failure with enforceable AMS runtime control",
+        next_step="wire AMS guarded launcher into the default Codex entrypoint",
         ready_for_next_phase=False,
         open_followups=[
-            "replace Codex command-hook advisory failure with enforceable AMS runtime control",
+            "wire AMS guarded launcher into the default Codex entrypoint",
             "add governed-run close/finalize records for outcomes and influence",
             "reconcile legacy Codex memories, codex-memory, and ams-memory so AMS is the primary startup source",
         ],
@@ -536,6 +627,13 @@ def _write_governed_run_records(root: Path, receipt: GovernedRunReceipt) -> None
     (root / "governed-run-latest.md").write_text(_render_governed_run_markdown(receipt), encoding="utf-8")
 
 
+def _write_runtime_control_records(root: Path, run: RuntimeControlRun) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "runtime-control-runs.jsonl", run.model_dump(mode="json"))
+    _write_json(root / "runtime-control-latest.json", run.model_dump(mode="json"))
+    (root / "runtime-control-latest.md").write_text(_render_runtime_control_markdown(run), encoding="utf-8")
+
+
 def _render_migration_markdown(run: MigrationRun) -> str:
     lines = [
         "# AMS Migration Latest",
@@ -624,6 +722,30 @@ def _render_governed_run_markdown(receipt: GovernedRunReceipt) -> str:
     if receipt.block_reasons:
         lines.extend(["", "## Block Reasons", ""])
         for reason in receipt.block_reasons:
+            lines.append(f"- `{reason}`")
+    return "\n".join(lines) + "\n"
+
+
+def _render_runtime_control_markdown(run: RuntimeControlRun) -> str:
+    lines = [
+        "# AMS Runtime Control Latest",
+        "",
+        f"- control_id: `{run.control_id}`",
+        f"- status: `{run.status}`",
+        f"- enforcement: `{run.enforcement}`",
+        f"- runtime_exit_code: `{run.runtime_exit_code}`",
+        f"- startup_brief_id: `{run.startup_brief_id}`",
+        f"- governed_run_id: `{run.governed_run_id}`",
+        f"- monitor_id: `{run.monitor_id}`",
+        f"- prompt_decision: `{run.prompt_decision.decision}`",
+        f"- gate_decision: `{run.gate_decision.decision}`",
+        f"- cwd: `{run.cwd}`",
+        f"- task: {run.task_description}",
+        f"- evidence_ids: `{len(run.evidence_ids)}`",
+    ]
+    if run.block_reasons:
+        lines.extend(["", "## Block Reasons", ""])
+        for reason in run.block_reasons:
             lines.append(f"- `{reason}`")
     return "\n".join(lines) + "\n"
 

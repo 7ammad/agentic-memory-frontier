@@ -207,7 +207,8 @@ The kernel, MCP bridge, startup gate, and hook wrappers are live. The remaining 
 - [x] Write independent review prompts for Greptile and optional Codex review (`docs/2026-05-31-ams-review-prompts.md`).
 - [x] Attach `brief_id`, `monitor_id`, and evidence ids to governed-run receipts created by `startup-brief`; expose the latest receipt in dashboard output.
 - [x] Live runtime smoke: confirm the real Codex hook payload projection for `scripts/correction-hook-prompt.ps1` and `scripts/correction-hook-gate.ps1`. `UserPromptSubmit` sends `prompt` + `session_id`; the prompt wrapper maps them correctly. `PreToolUse` invokes the gate wrapper before tools. **Finding:** Codex CLI 0.128.0 command hooks report non-zero exits as hook failures but do not block the turn/tool; evidence recorded in `docs/2026-05-31-codex-hook-runtime-smoke.md`.
-- [ ] Replace the Codex command-hook exit-code blocking assumption with an enforceable AMS runtime control path.
+- [x] Replace the Codex command-hook exit-code blocking assumption with an enforceable AMS runtime control path: `ams runtime-control` records allow/block receipts and `scripts/ams-guarded-command.ps1` refuses to invoke the downstream command when AMS blocks.
+- [ ] Wire the AMS guarded launcher into the default Codex entrypoint.
 - [ ] Reconcile legacy Codex memories, `codex-memory`, and `ams-memory` so AMS is the primary startup source.
 
 ## Historical Schedule Note

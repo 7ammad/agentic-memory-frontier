@@ -8,7 +8,7 @@ Product line: AMS.
 
 Thesis: *Memory is not storage. Memory is verified experience that improves future action.*
 
-## State (as of 2026-05-26 — session 2 end, ALL DESIGN COMPLETE)
+## State (as of 2026-05-31 — AMS Primary Runtime Adoption)
 
 - **A** Deep technical review of SuperClaude memory MCP — DONE + VERIFIED
 - **B** SuperClaude memory v0.3 upgrade spec (P0+P1 cut, 5 phases) — DONE + VERIFIED
@@ -16,7 +16,7 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 - **D** ACS protocol design (A2A v1.0-compatible relay topology, signed envelopes, 5-message vocab, Jeffreys×Codex escalation, replay protection, 3 phases, 10-test acceptance battery) — DONE + VERIFIED (4 codex passes, 11 patches, READY)
 
 **Historical design state:** all 4 sub-projects were design-complete on 2026-05-26.
-**Current runtime state:** implementation work started on 2026-05-27; read `sessions/2026-05-27-session-handoff.md` for live status, especially the SC/ACS identity-mismatch blocker.
+**Current runtime state:** implementation is active on AMS Primary Runtime Adoption. `PRODUCT-LOCK.md` is the canonical acceptance lock; the live rails are `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`. The current open gap is wiring the AMS guarded launcher into the default Codex entrypoint.
 
 ## To continue right now
 

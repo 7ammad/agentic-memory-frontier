@@ -475,15 +475,15 @@ Entry format:
   - `CHANGELOG.md`
   - `TODO.md`
 - Verification: `python -m pytest` -> **172 passed**. Focused startup/dashboard/correction tests -> **7 passed**. `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** with `brief_6eda3208ffec47ffa0c69b276645b78d`, `run_c156c3cecbad4d42895e7754d69b5651`, and clean AMS-only active action text. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_e15b0880ae67480d8e463c8a8eabf63f`). `git diff --check` clean except Windows CRLF warnings.
-- Follow-up: Replace the Codex command-hook blocking assumption with an enforceable AMS runtime control path, reconcile legacy Codex memories under AMS as secondary input, and add a governed-run close/finalize path for outcomes and influence.
+- Follow-up: Runtime-control path was added in LEDGER-20260531-026; next wire the guarded launcher as the default Codex entrypoint, reconcile legacy Codex memories under AMS as secondary input, and add a governed-run close/finalize path for outcomes and influence.
 
 ## LEDGER-20260531-025 - Live Codex command hooks are advisory, not blocking
 
 - Date: 2026-05-31
 - Type: verification / gap
-- Status: active
+- Status: resolved by LEDGER-20260531-026 for the runtime-control path; default-entrypoint adoption remains open
 - Source: TODO section 14 Primary Runtime Adoption and live `codex exec` hook smoke.
-- Summary: Live Codex CLI 0.128.0 smoke verified the real `UserPromptSubmit` payload shape: `prompt`, `session_id`, `turn_id`, `cwd`, `hook_event_name`, `model`, and `permission_mode`. The existing prompt wrapper maps `prompt` and `session_id` correctly, and the gate wrapper is invoked on `PreToolUse`. The same smoke found the important runtime gap: non-zero command-hook exits are reported as `hook failed` but do not stop the turn or the tool. Therefore AMS correction capture can record events through Codex hooks today, but A6 blocking remains unaccepted until AMS has an enforceable runtime control path.
+- Summary: Live Codex CLI 0.128.0 smoke verified the real `UserPromptSubmit` payload shape: `prompt`, `session_id`, `turn_id`, `cwd`, `hook_event_name`, `model`, and `permission_mode`. The existing prompt wrapper maps `prompt` and `session_id` correctly, and the gate wrapper is invoked on `PreToolUse`. The same smoke found the important runtime gap: non-zero command-hook exits are reported as `hook failed` but do not stop the turn or the tool. At smoke time, AMS correction capture could record events through Codex hooks but could not enforce A6 blocking; LEDGER-20260531-026 adds the AMS-owned runtime-control path.
 - Files:
   - `docs/2026-05-31-codex-hook-runtime-smoke.md`
   - `scripts/correction-hook-prompt.ps1`
@@ -497,7 +497,52 @@ Entry format:
   - `docs/2026-05-31-ams-review-prompts.md`
   - `CHANGELOG.md`
 - Verification: `codex exec` live smoke with temporary `AMS_ROOT` showed benign prompt allow/no event, correction prompt capture/gate-blocked but Codex continued with exit 0, and pre-armed `PreToolUse` gate failed but Codex still ran `pwd`. Wrapper regression test added for the live Codex payload shape.
-- Follow-up: Replace the Codex command-hook exit-code blocking assumption with an enforceable AMS runtime control path.
+- Follow-up: Runtime-control path added in LEDGER-20260531-026; wire the guarded launcher into the default Codex entrypoint.
+
+## LEDGER-20260531-026 - Enforceable AMS runtime control path
+
+- Date: 2026-05-31
+- Type: implementation / verification
+- Status: active
+- Source: TODO section 14 Primary Runtime Adoption and Product Lock A1/A4/A6.
+- Summary: Replaced the Codex command-hook blocking assumption with an AMS-owned runtime control path. `ams runtime-control` now classifies the prompt, opens the correction gate on live corrections, runs `startup-brief`, records a runtime-control receipt with prompt decision, gate decision, startup brief id, governed-run id, monitor id, evidence ids, and block reasons, and exits non-zero on block. `scripts/ams-guarded-command.ps1` invokes that control path before any downstream command and refuses to run the downstream command when AMS blocks.
+- Files:
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/cli.py`
+  - `scripts/ams-guarded-command.ps1`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `docs/2026-05-31-ams-product-lock-audit.md`
+  - `docs/2026-05-31-ams-product-lock-execution-plan.md`
+  - `docs/2026-05-31-ams-review-prompts.md`
+  - `CHANGELOG.md`
+- Verification: Focused review-remediation suite -> **75 passed**, including the blocked guarded-command canary that proves the downstream command is not invoked when AMS blocks. `python -m pytest` -> **183 passed**. Live `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** (`control_b65dc67a59d84b5d8c29ec0f9317c74a`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_8810e1de0fb54fa68cee4a57eaf18961`).
+- Follow-up: Wire `scripts/ams-guarded-command.ps1` into the default Codex entrypoint, then reconcile legacy Codex memories under AMS as secondary input and add governed-run close/finalize records.
+
+## LEDGER-20260531-027 - Greptile review-loop remediation
+
+- Date: 2026-05-31
+- Type: review remediation / implementation safety
+- Status: active
+- Source: Greptile PR loop on review PRs #9, #10, and #11.
+- Summary: First Greptile pass returned 3/5 on the product-lock reset PR and both retro review PRs. Live applicable findings were fixed in the active branch: startup briefs can no longer persist a governed-run id before the governed-run receipt is written; `AGENTS.md` no longer presents the stale 2026-05-26 design state as current; the Python hook adapter now accepts the live Codex `prompt` payload without relying on the Windows wrapper; legacy AMS directive rewrites have an identity-token invariant; scorer version comes from one source; `close_influence` is idempotent; card audit reports the latest validation decision across multiple evidence atoms; n=1 MMA cannot pass; and correction resume refuses clear-gate phantom receipts.
+- Files:
+  - `AGENTS.md`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/cli.py`
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-core/src/cem_core/correction_capture.py`
+  - `packages/cem-eval/src/cem_eval/eval_protocol.py`
+  - `packages/cem-eval/src/cem_eval/vertical_loop.py`
+  - `tests/test_ams_cli.py`
+  - `tests/test_correction_hooks_cli.py`
+  - `tests/test_correction_hooks.py`
+  - `tests/test_cem_kernel.py`
+  - `tests/test_close_influence.py`
+  - `tests/test_eval_protocol.py`
+- Verification: Focused review-remediation suite -> **75 passed**. Full suite -> **183 passed**. `git diff --check` clean except Windows CRLF warnings. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_8810e1de0fb54fa68cee4a57eaf18961`).
+- Follow-up: Push the active branch update and rerun Greptile on the PRs; do not claim Product Lock A1/A6 complete until the guarded launcher is the default Codex entrypoint.
 
 ## LEDGER-CORRECTION-20260530-ee8e14de - scope trimming
 
@@ -533,7 +578,8 @@ Entry format:
 
 - ~~Record `brief_id`, `monitor_id`, and evidence ids for every governed agent run, not only session-start gate output.~~ **RESOLVED PARTIAL (LEDGER-024):** `startup-brief` now writes governed-run receipts with brief, monitor, evidence, cwd, task, status, and block reasons; still need the global Codex runtime proof that every serious run invokes the AMS startup path.
 - ~~Live PS-wrapper runtime smoke (§12): confirm real Codex payload field names.~~ **RESOLVED (LEDGER-025):** Codex `UserPromptSubmit` sends `prompt` and `session_id`; the prompt wrapper maps them correctly and `PreToolUse` invokes the gate wrapper.
-- **Codex hook enforcement gap:** Codex CLI 0.128.0 command hooks are advisory for this use case; non-zero `UserPromptSubmit`/`PreToolUse` exits are reported as hook failures but do not block the turn/tool. Replace this with an enforceable AMS runtime control path.
+- ~~Codex hook enforcement gap: replace advisory command-hook failure with an enforceable AMS runtime control path.~~ **RESOLVED (LEDGER-026):** `ams runtime-control` records allow/block receipts and `scripts/ams-guarded-command.ps1` refuses to run the downstream command when AMS blocks.
+- Wire the AMS guarded launcher into the default Codex entrypoint.
 - Reconcile legacy Codex memories / `codex-memory` / `ams-memory` so AMS is the primary startup source, not just a parallel MCP surface.
 - ~~Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface.~~ **RESOLVED (LEDGER-021):** runtime-agnostic `correction_hooks.py` core + `correction hook-prompt`/`hook-gate` CLI + two PowerShell wrappers; Monitor-0 single-source-of-truth bridge test; human-approval-only resume preserved.
 - ~~Add latency budget enforcement to the startup controller.~~ **RESOLVED (LEDGER-020):** `within_latency_budget` + the pre-registered `RETRIEVAL_LATENCY_BUDGET_MS` now enforce a p95 budget on the CEM retrieval read path (the exact hot path the startup brief shares via `retrieve_brief` -> `retrieve_action_brief`), gated in CI through the Phase 4 exam report and the composite readiness gate.

@@ -67,6 +67,13 @@ def test_mma_passes_requires_positive_lower_ci():
     assert mma_passes(straddles_zero) is False
 
 
+def test_mma_passes_rejects_single_task_degenerate_ci():
+    result = marginal_memory_advantage([1.0], [0.0])
+    assert result.n == 1
+    assert result.ci_low == result.ci_high == result.mma
+    assert mma_passes(result) is False
+
+
 def test_beats_lexical_by_margin_boundary():
     # The >=5pp gate (spec section 9): CEM must beat the lexical-overlap baseline by
     # at least LEXICAL_MARGIN_PP percentage points of held-out task success. Lock the

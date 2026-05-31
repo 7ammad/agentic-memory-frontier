@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
+
+from cem_core import operations
+from cem_core.local_memory import _active_product_directive_content
 
 ROOT = Path(__file__).resolve().parents[1]
 AMS = ROOT / "scripts" / "ams.py"
@@ -285,7 +292,7 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert monitor["phase"]["current_phase"] == "AMS Primary Runtime Adoption"
     assert (
         monitor["phase"]["next_step"]
-        == "replace Codex command-hook advisory failure with enforceable AMS runtime control"
+        == "wire AMS guarded launcher into the default Codex entrypoint"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
@@ -401,6 +408,160 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
     assert dashboard["latest_governed_run"]["evidence_ids"] == result["evidence_ids"]
 
 
+def test_startup_brief_does_not_persist_dangling_governed_run_id_when_receipt_write_fails(tmp_path, monkeypatch):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+
+    def fail_receipt_write(_root: Path, _receipt: operations.GovernedRunReceipt) -> None:
+        raise RuntimeError("receipt write failed")
+
+    monkeypatch.setattr(operations, "_write_governed_run_records", fail_receipt_write)
+
+    with pytest.raises(RuntimeError, match="receipt write failed"):
+        operations.startup_brief(
+            root,
+            description="continue building Agentic Memory System with verification",
+            domain_scope="agentic-memory-system",
+        )
+
+    assert not (root / "startup-brief-latest.json").exists()
+    assert not (root / "startup-brief-runs.jsonl").exists()
+
+
+def test_ams_cli_runtime_control_allows_and_persists_receipt(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+
+    result = _ams(
+        root,
+        "--json",
+        "runtime-control",
+        "continue building Agentic Memory System with verification",
+        "--session-id",
+        "session_allow",
+    )
+
+    assert result["status"] == "allow"
+    assert result["runtime_exit_code"] == 0
+    assert result["enforcement"] == "external_guard"
+    assert result["prompt_decision"]["decision"] == "allow"
+    assert result["gate_decision"]["decision"] == "allow"
+    assert result["startup_brief_id"].startswith("brief_")
+    assert result["governed_run_id"].startswith("run_")
+    assert result["monitor_id"].startswith("monitor_")
+    latest = json.loads((root / "runtime-control-latest.json").read_text(encoding="utf-8"))
+    assert latest["control_id"] == result["control_id"]
+    dashboard = _ams(root, "--json", "dashboard")
+    assert dashboard["latest_runtime_control"]["control_id"] == result["control_id"]
+
+
+def test_ams_cli_runtime_control_blocks_correction_prompt(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+
+    process = _ams_process(
+        root,
+        "--json",
+        "runtime-control",
+        "we already said no scaffolding; stop and record this correction",
+        "--session-id",
+        "session_block",
+    )
+
+    assert process.returncode == 12
+    result = json.loads(process.stdout)
+    assert result["status"] == "block"
+    assert result["runtime_exit_code"] == 12
+    assert result["prompt_decision"]["decision"] == "block"
+    assert result["gate_decision"]["decision"] == "block"
+    assert any(reason.startswith("correction_prompt_blocked:") for reason in result["block_reasons"])
+    assert any(reason.startswith("resume_gate_blocked:") for reason in result["block_reasons"])
+    assert (root / "correction-latest.json").exists()
+    assert (root / "runtime-control-latest.json").exists()
+
+
+def test_ams_guarded_command_enforces_block_before_downstream_command(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    sentinel = tmp_path / "blocked-command-ran.txt"
+    env = os.environ.copy()
+    env["AMS_ROOT"] = str(root)
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(ROOT),
+            "-Prompt",
+            "we already said no scaffolding; stop and record this correction",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            f"echo ran>\"{sentinel}\"",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 12
+    assert "AMS_RUNTIME_CONTROL_EXIT: 12" in process.stdout
+    assert not sentinel.exists()
+
+
+def test_ams_guarded_command_runs_downstream_command_when_allowed(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    sentinel = tmp_path / "allowed-command-ran.txt"
+    env = os.environ.copy()
+    env["AMS_ROOT"] = str(root)
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(ROOT),
+            "-Prompt",
+            "continue building Agentic Memory System with verification",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            f"echo ran>\"{sentinel}\"",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "AMS_RUNTIME_CONTROL_EXIT: 0" in process.stdout
+    assert sentinel.exists()
+
+
 def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
     root = tmp_path / "ams"
 
@@ -496,6 +657,20 @@ def test_ams_cli_brief_renders_legacy_directives_in_ams_language(tmp_path):
     assert "Do not claim state-of-the-art for AMS." in action_text
     assert "Causal Experience Memory" not in action_text
     assert "CEM-0" not in action_text
+
+
+def test_active_product_directive_rewrite_removes_legacy_identity_tokens():
+    legacy_inputs = [
+        "Keep the active thesis centered on Causal Experience Memory: memory is verified experience that improves future action.",
+        "Capture live user corrections immediately: stop the active lane, name the mistake, record affected files/actions, route the event to AMS/CEM/project ledger as appropriate, and require explicit resume before continuing.",
+        "run pytest and synthetic eval before claiming CEM or AMS memory changes are complete",
+        "The CEM-1 proof must not reuse CEM-0 fake-green claims.",
+    ]
+    forbidden = ("AMS/CEM", "CEM or AMS", "Causal Experience Memory", "CEM-0", "CEM-1", "CEM proof")
+
+    for content in legacy_inputs:
+        rendered = _active_product_directive_content(content)
+        assert all(token not in rendered for token in forbidden)
 
 
 def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resume(tmp_path):
@@ -599,6 +774,12 @@ def test_ams_cli_monitor_fails_visibly_when_memory_is_not_seeded(tmp_path):
 
 
 def _ams(root: Path, *args: str) -> dict:
+    process = _ams_process(root, *args)
+    assert process.returncode == 0, process.stderr
+    return json.loads(process.stdout)
+
+
+def _ams_process(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     process = subprocess.run(
         [sys.executable, str(AMS), "--root", str(root), *args],
         cwd=ROOT,
@@ -607,12 +788,29 @@ def _ams(root: Path, *args: str) -> dict:
         stderr=subprocess.PIPE,
         check=False,
     )
-    assert process.returncode == 0, process.stderr
-    return json.loads(process.stdout)
+    return process
 
 
 def _check_status(monitor: dict, name: str) -> str:
     return next(check["status"] for check in monitor["checks"] if check["name"] == name)
+
+
+def _seed_runtime_control_root(root: Path) -> None:
+    _ams(root, "--json", "bootstrap-codex", "--workspace", str(ROOT))
+    _ams(
+        root,
+        "--json",
+        "remember",
+        "run python scripts/ams.py brief before continuing Agentic Memory System work",
+        "--kind",
+        "skill",
+        "--outcome",
+        "success",
+        "--domain",
+        "agentic-memory-system",
+        "--task-family",
+        "ams-usage",
+    )
 
 
 def _legacy_memory_base(tmp_path: Path) -> Path:

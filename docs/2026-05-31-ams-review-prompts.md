@@ -14,14 +14,15 @@ Context:
 - Product line is AMS. Older internal labels are historical implementation detail, not product identity.
 - `PRODUCT-LOCK.md` is now the canonical product acceptance lock.
 - The goal of this PR is to stop scope drift and make AMS completion measurable against Product Lock criteria A1-A9.
-- This PR should not be judged as broad engine feature work. It is a scope/acceptance reset plus primary-runtime adoption work: phase-status correction, planning/audit scaffolding, and governed-run receipts for `startup-brief`.
-- Live Codex hook smoke now proves payload projection, but also found Codex CLI 0.128.0 command-hook failures are advisory: non-zero `UserPromptSubmit`/`PreToolUse` hooks did not block the turn/tool.
+- This PR should not be judged as broad engine feature work. It is a scope/acceptance reset plus primary-runtime adoption work: phase-status correction, planning/audit scaffolding, governed-run receipts for `startup-brief`, and an enforceable runtime-control/guarded-command path.
+- Live Codex hook smoke proves payload projection, but also found Codex CLI 0.128.0 command-hook failures are advisory: non-zero `UserPromptSubmit`/`PreToolUse` hooks did not block the turn/tool. The new enforcement path is therefore `ams runtime-control` plus `scripts/ams-guarded-command.ps1`, not Codex hook exit codes.
 
 Primary files:
 - `PRODUCT-LOCK.md`
 - `docs/2026-05-31-ams-product-lock-execution-plan.md`
 - `docs/2026-05-31-ams-product-lock-audit.md`
 - `docs/2026-05-31-codex-hook-runtime-smoke.md`
+- `scripts/ams-guarded-command.ps1`
 - `IDEA.md`
 - `TODO.md`
 - `README.md`
@@ -44,8 +45,9 @@ Review questions:
 7. Are there missing acceptance criteria needed for primary runtime adoption?
 8. Do tests cover the status behavior changed in `operations.py`?
 9. Do governed-run receipts actually make startup work auditable, or can AMS still look primary while being bypassed?
-10. Does the live hook smoke correctly prevent a false A6 pass now that Codex command hooks are shown to be advisory?
-11. What must be fixed before this PR can be treated as the new product baseline?
+10. Does `ams runtime-control` plus `scripts/ams-guarded-command.ps1` actually prevent downstream execution when AMS blocks?
+11. Does the audit still avoid a false A1/A6 pass until the guarded launcher is wired as the default Codex entrypoint?
+12. What must be fixed before this PR can be treated as the new product baseline?
 
 Please prioritize bugs, contradictions, false acceptance claims, and missing gates. Be strict about anything that lets AMS look complete while Codex can still ignore it during normal work.
 ```
@@ -71,6 +73,7 @@ Review for:
 - active docs that still split the product identity;
 - mismatch between `PRODUCT-LOCK.md`, `TODO.md`, dashboard phase status, and `PROJECT-LEDGER.md`;
 - false claims that Codex command hooks enforce blocking after the live smoke showed they are advisory in Codex CLI 0.128.0;
+- false claims that the guarded launcher is already the default Codex entrypoint;
 - missing tests for changed behavior;
 - evidence claims in the audit that are unsupported by repo files or commands.
 

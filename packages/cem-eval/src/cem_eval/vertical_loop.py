@@ -14,9 +14,8 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from cem_core import CEM, AgentTrace, TaskContext, TraceTurn, VerificationProbe, card_is_inactive
+from cem_core.kernel import SCORER_VERSION
 from cem_eval.eval_protocol import assert_no_leakage, marginal_memory_advantage
-
-SCORER_VERSION = "action_value_v1"
 
 # Held-out decisive actions double as the seeded skill content. The toy agent
 # "succeeds" on a task iff the retrieved brief recommends its decisive action;

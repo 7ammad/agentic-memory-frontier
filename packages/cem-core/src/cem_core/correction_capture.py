@@ -265,7 +265,9 @@ def resume_correction(
 ) -> CorrectionResumeReceipt:
     root = _root(root)
     gate = correction_gate_status(root)
-    if gate.status == "blocked" and gate.active_event_id != event_id:
+    if gate.status != "blocked":
+        raise ValueError("Correction resume gate is not blocked; no active correction to resume.")
+    if gate.active_event_id != event_id:
         raise ValueError(f"Correction resume gate is blocked by {gate.active_event_id}, not {event_id}.")
 
     cleared = CorrectionGate(status="clear")

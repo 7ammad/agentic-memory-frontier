@@ -14,19 +14,27 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added `docs/2026-05-31-ams-review-prompts.md` with a Greptile PR review request and optional Codex review preflight prompt.
 - Added governed-run receipts to `startup-brief`: each run now records receipt id, startup brief id, monitor id, cwd, task description, evidence ids, status, and block reasons; dashboard exposes the latest governed run.
 - Added `docs/2026-05-31-codex-hook-runtime-smoke.md` with live Codex hook evidence.
+- Added `ams runtime-control` and `scripts/ams-guarded-command.ps1` as the enforceable AMS-owned runtime path: AMS records allow/block control receipts, and the guarded launcher refuses to invoke the downstream command when AMS blocks.
 
 ### Changed
 
 - Locked product language to one line: **AMS**. Active source-of-truth docs now point to `PRODUCT-LOCK.md` for acceptance and avoid treating older internal labels as the product identity.
 - New bootstrap, migration, correction, README, TODO, and runtime-facing text now uses AMS product language. Legacy internal labels are recognized only for backwards-compatible parsing/classification.
-- Corrected the primary runtime adoption rail after live proof: Codex CLI 0.128.0 invokes command hooks but does not block on non-zero hook exits, so the next step is an enforceable AMS runtime control path, not another payload-shape check.
+- Corrected the primary runtime adoption rail after live proof: Codex CLI 0.128.0 invokes command hooks but does not block on non-zero hook exits, so AMS now uses its own runtime-control/guarded-command path instead of another payload-shape check.
+- Advanced the active next step from command-hook enforcement replacement to wiring the AMS guarded launcher into the default Codex entrypoint.
+
+### Fixed
+
+- Addressed Greptile PR-loop safety findings that still applied in the live branch: governed-run receipts are written before startup briefs can claim them, live `prompt` hook payloads are accepted by the Python adapter on every platform, multi-atom card audits surface the latest validation decision, influence close is idempotent per brief, `SCORER_VERSION` has one source of truth, single-task MMA cannot pass the confidence gate, and correction resume cannot mint phantom receipts when the gate is already clear.
 
 ### Verified
 
-- `python -m pytest` -> 172 passed.
-- `python scripts/ams.py monitor --deep` -> pass.
+- `python -m pytest` -> 183 passed.
+- `python scripts/ams.py monitor --deep` -> pass (`monitor_8810e1de0fb54fa68cee4a57eaf18961`).
 - `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow with a governed-run receipt and AMS-only active action text.
+- `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow (`control_b65dc67a59d84b5d8c29ec0f9317c74a`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached.
 - `codex exec` live hook smoke -> `UserPromptSubmit` payload includes `prompt` + `session_id`; `PreToolUse` is invoked before tools; non-zero command-hook exits are advisory in Codex CLI 0.128.0.
+- Focused review-remediation verification -> `75 passed`, including the blocked guarded-command canary that proves the downstream command is not invoked.
 
 ## 2026-05-30
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from math import exp
 from pathlib import Path
@@ -16,6 +17,7 @@ from .models import (
     MemoryAudit,
     TaskContext,
     TraceReceipt,
+    ValidationDecision,
     VerificationProbe,
     VerificationResult,
     new_id,
@@ -24,6 +26,7 @@ from .models import (
 from .storage import CEMStore, SQLiteStore
 from .validator import MemoryValidator
 
+SCORER_VERSION = "action_value_v1"
 _INACTIVE_STATUSES = frozenset({"deprecated", "superseded", "quarantined"})
 
 
@@ -429,6 +432,9 @@ class CEM:
         baseline_comparison: str | None = None,
     ) -> ActionInfluenceEvent:
         record = self.store.get_action_brief_record(brief_id)
+        existing = self.store.list_action_influence_events(record.influence_id)
+        if existing:
+            return existing[-1]
         event = ActionInfluenceEvent(
             influence_id=record.influence_id,
             brief_id=brief_id,
@@ -511,7 +517,7 @@ class CEM:
                 evidence_atom_count=len(card.evidence_atom_ids),
                 validation_check_names=sorted({result.check_name for result in validations}),
                 validation_results=validations,
-                validation_decision=decisions[0] if len(decisions) == 1 else None,
+                validation_decision=_latest_validation_decision(decisions),
                 promotion_status=card.promotion_status,
                 quarantine_reason=None,
             )
@@ -552,6 +558,12 @@ def _title(content: str) -> str:
     return cleaned[:80]
 
 
+def _latest_validation_decision(decisions: Sequence[ValidationDecision]) -> ValidationDecision | None:
+    if not decisions:
+        return None
+    return max(enumerate(decisions), key=lambda item: (item[1].created_at, item[0]))[1]
+
+
 # Consolidation merges atoms whose normalized content tokens overlap at or above
 # this Jaccard threshold within the same use_when scope. Tuned conservatively so
 # distinct lessons that share a stray token (e.g. "before") stay separate cards.
@@ -590,8 +602,6 @@ def _abstraction_grounded(atom: ExperienceAtom) -> bool:
     span_tokens = _content_tokens(" ".join(span.text for span in atom.source_spans))
     return claim_tokens <= span_tokens
 
-
-SCORER_VERSION = "action_value_v1"
 
 # --- action_value_v1 transparent feature ranker (design 4.1) -----------------
 # Pre-registered weight set: the SINGLE locked candidate. Per spec section 10

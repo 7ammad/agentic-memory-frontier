@@ -8,6 +8,8 @@ PowerShell) is thin. Every test is RED-first and watched to fail for the right r
 """
 from __future__ import annotations
 
+import pytest
+
 from cem_core import operations
 from cem_core.correction_capture import (
     _event_log_path,
@@ -113,6 +115,17 @@ def test_hook_resume_clears_gate_deny_to_allow_end_to_end(tmp_path):
     assert after.decision == "allow"
     assert after.gate_status == "clear"
     assert after.hook_exit_code == HOOK_EXIT_ALLOW
+
+
+def test_resume_correction_refuses_clear_gate_phantom_receipt(tmp_path):
+    event = capture_correction(tmp_path, BLOCKING_PROMPT)
+    resume_correction(tmp_path, event.event_id, approved_by="Hammad")
+
+    with pytest.raises(ValueError, match="not blocked"):
+        resume_correction(tmp_path, event.event_id, approved_by="Hammad")
+
+    resume_log = _root(tmp_path) / "correction-resume-runs.jsonl"
+    assert len(resume_log.read_text(encoding="utf-8").splitlines()) == 1
 
 
 def test_monitor0_bridge_hook_block_then_resume(tmp_path):

@@ -28,7 +28,7 @@ Not accepted yet:
 
 - primary Codex runtime lock;
 - governed-run receipts on every serious run;
-- live hook payload proof in the real Codex runtime;
+- default Codex entrypoint wired through the AMS guarded launcher;
 - continuous trace intake from ordinary Codex work;
 - aging and maintenance product surface;
 - fresh operator setup proof.
@@ -84,22 +84,32 @@ Acceptance:
 - the receipt links to the startup brief and memory evidence;
 - tests prove a missing receipt is visible.
 
-### Step 4. Live Correction Hook Proof
+### Step 4. Live Correction Runtime Control
 
-Prove correction hooks against the real Codex payloads.
+Prove correction capture against the real Codex payloads, then replace
+advisory command-hook failure with an enforceable AMS runtime control path.
 
 Work:
 
-- capture a benign prompt payload shape;
-- capture a correction prompt payload shape;
-- verify `scripts/correction-hook-prompt.ps1` maps prompt/session fields correctly;
-- verify `scripts/correction-hook-gate.ps1` blocks while the resume gate is armed.
+- DONE: capture a benign prompt payload shape;
+- DONE: capture a correction prompt payload shape;
+- DONE: verify `scripts/correction-hook-prompt.ps1` maps prompt/session fields correctly;
+- DONE: verify `scripts/correction-hook-gate.ps1` is invoked before tools;
+- DONE: implement `ams runtime-control` because Codex CLI 0.128.0 command-hook
+  exits are advisory and do not stop the turn/tool;
+- DONE: add `scripts/ams-guarded-command.ps1`, which refuses to invoke the
+  downstream command when AMS blocks.
 
 Acceptance:
 
 - benign prompt returns allow with no side effects;
-- correction prompt records event and blocks;
-- pre-tool gate blocks until explicit resume.
+- correction prompt records event and enforceably stops continuation;
+- pre-tool/tool execution is denied until explicit resume;
+- tests and smoke evidence cannot pass A6 on hook-failure output alone.
+
+Remaining adoption work:
+
+- wire the guarded launcher into the default Codex entrypoint.
 
 ### Step 5. Real Trace Intake
 

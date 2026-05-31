@@ -30,6 +30,7 @@ from .operations import (
     build_codex_memory_migration_run,
     dashboard_status,
     run_monitor,
+    runtime_control,
     startup_brief,
 )
 
@@ -48,6 +49,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     # every other command returns 0 (no hook_exit_code key).
     if isinstance(payload, dict) and "hook_exit_code" in payload:
         return int(payload["hook_exit_code"])
+    if isinstance(payload, dict) and "runtime_exit_code" in payload:
+        return int(payload["runtime_exit_code"])
     return 0
 
 
@@ -171,6 +174,18 @@ def build_parser() -> argparse.ArgumentParser:
     startup_parser.add_argument("--max-evidence", type=int, default=20, help="Maximum evidence ids in startup context.")
     startup_parser.add_argument("--max-tokens", type=int, default=900, help="Approximate token budget for actions.")
     startup_parser.set_defaults(handler=_cmd_startup_brief)
+
+    runtime_control_parser = subparsers.add_parser(
+        "runtime-control",
+        parents=[json_parent],
+        help="Build an enforceable AMS allow/block decision before a guarded runtime action.",
+    )
+    runtime_control_parser.add_argument("description", help="Prompt or task description to guard.")
+    runtime_control_parser.add_argument("--domain", default="agentic-memory-system", help="Domain scope.")
+    runtime_control_parser.add_argument("--task-family", help="Task family.")
+    runtime_control_parser.add_argument("--session-id", help="Runtime session id.")
+    runtime_control_parser.add_argument("--affected-file", action="append", default=[], help="Affected file path.")
+    runtime_control_parser.set_defaults(handler=_cmd_runtime_control)
 
     correction_parser = subparsers.add_parser(
         "correction",
@@ -324,6 +339,17 @@ def _cmd_startup_brief(args: argparse.Namespace) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
+def _cmd_runtime_control(args: argparse.Namespace) -> dict[str, Any]:
+    return runtime_control(
+        args.root,
+        description=args.description,
+        domain_scope=args.domain,
+        task_family=args.task_family,
+        session_id=args.session_id,
+        affected_files=args.affected_file,
+    ).model_dump(mode="json")
+
+
 def _cmd_correction_capture(args: argparse.Namespace) -> dict[str, Any]:
     return capture_correction(
         args.root,
@@ -387,9 +413,12 @@ def _cmd_correction_hook_prompt(args: argparse.Namespace) -> dict[str, Any]:
     # raises json.JSONDecodeError (a ValueError subclass) -> main() maps it to exit 2,
     # before any capture, so no event is written.
     payload = json.loads(_read_hook_stdin() or "{}")
+    prompt_text = payload.get("prompt_text")
+    if prompt_text is None:
+        prompt_text = payload.get("prompt", "")
     decision = hook_on_user_prompt_submit(
         args.root,
-        payload.get("prompt_text", ""),
+        prompt_text,
         session_id=payload.get("session_id"),
         affected_files=payload.get("affected_files") or [],
     )
@@ -413,6 +442,8 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
     # correction-event or gate emitters below.
     if "hook" in payload and "hook_exit_code" in payload:
         _emit_correction_hook(payload)
+    elif "control_id" in payload and "runtime_exit_code" in payload:
+        _emit_runtime_control(payload)
     elif "brief_id" in payload and "monitor_id" in payload:
         _emit_startup_brief(payload)
     elif "event_id" in payload and "route_targets" in payload:
@@ -563,6 +594,21 @@ def _emit_startup_brief(payload: dict[str, Any]) -> None:
             print(f"- {action}")
 
 
+def _emit_runtime_control(payload: dict[str, Any]) -> None:
+    print(f"runtime_control: {payload['status']} {payload['control_id']} (exit {payload['runtime_exit_code']})")
+    print(f"enforcement: {payload['enforcement']}")
+    print(f"startup_brief: {payload['startup_brief_id']}")
+    if payload.get("governed_run_id"):
+        print(f"governed_run: {payload['governed_run_id']}")
+    print(f"monitor: {payload['monitor_id']}")
+    print(f"prompt_decision: {payload['prompt_decision']['decision']}")
+    print(f"gate_decision: {payload['gate_decision']['decision']}")
+    if payload["block_reasons"]:
+        print("block_reasons:")
+        for reason in payload["block_reasons"]:
+            print(f"- {reason}")
+
+
 def _emit_correction_hook(payload: dict[str, Any]) -> None:
     print(f"hook: {payload['hook']} {payload['decision']} (exit {payload['hook_exit_code']})")
     if payload.get("event_id"):
@@ -647,3 +693,8 @@ def _emit_dashboard(payload: dict[str, Any]) -> None:
         print(f"latest_governed_run: {latest_governed_run['status']} {latest_governed_run['receipt_id']}")
     else:
         print("latest_governed_run: none")
+    latest_runtime_control = payload.get("latest_runtime_control")
+    if latest_runtime_control:
+        print(f"latest_runtime_control: {latest_runtime_control['status']} {latest_runtime_control['control_id']}")
+    else:
+        print("latest_runtime_control: none")
