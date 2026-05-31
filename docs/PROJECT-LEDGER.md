@@ -517,7 +517,7 @@ Entry format:
   - `docs/2026-05-31-ams-product-lock-execution-plan.md`
   - `docs/2026-05-31-ams-review-prompts.md`
   - `CHANGELOG.md`
-- Verification: Focused review-remediation suite -> **75 passed**, including the blocked guarded-command canary that proves the downstream command is not invoked when AMS blocks. `python -m pytest` -> **183 passed**. Live `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** (`control_b65dc67a59d84b5d8c29ec0f9317c74a`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_8810e1de0fb54fa68cee4a57eaf18961`).
+- Verification: Focused AMS CLI suite -> **28 passed**, including the portable checkout-path canary and the blocked guarded-command canary that proves the downstream command is not invoked when AMS blocks. `python -m pytest` -> **184 passed**. Live `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** (`control_21266e4ab3274b73972bfb84aadbd761`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_7ea1ffa4bffe4e8db97d8c6248559aa0`).
 - Follow-up: Wire `scripts/ams-guarded-command.ps1` into the default Codex entrypoint, then reconcile legacy Codex memories under AMS as secondary input and add governed-run close/finalize records.
 
 ## LEDGER-20260531-027 - Greptile review-loop remediation
@@ -526,7 +526,7 @@ Entry format:
 - Type: review remediation / implementation safety
 - Status: active
 - Source: Greptile PR loop on review PRs #9, #10, and #11.
-- Summary: First Greptile pass returned 3/5 on the product-lock reset PR and both retro review PRs. Live applicable findings were fixed in the active branch: startup briefs can no longer persist a governed-run id before the governed-run receipt is written; `AGENTS.md` no longer presents the stale 2026-05-26 design state as current; the Python hook adapter now accepts the live Codex `prompt` payload without relying on the Windows wrapper; legacy AMS directive rewrites have an identity-token invariant; scorer version comes from one source; `close_influence` is idempotent; card audit reports the latest validation decision across multiple evidence atoms; n=1 MMA cannot pass; and correction resume refuses clear-gate phantom receipts.
+- Summary: Greptile passes returned 3/5 until the active branch fixed the live applicable findings: startup briefs can no longer persist a governed-run id before the governed-run receipt is written; receipt ids are generated before model construction; governed-run receipts reserve close/outcome/finalization fields for A5; `AGENTS.md` now separates current AMS runtime state from historical A/B/C/D design state; bootstrap AMS directive counting is not tied to the checkout path; the Python hook adapter accepts the live Codex `prompt` payload without relying on the Windows wrapper; legacy AMS directive rewrites have an identity-token invariant; scorer version comes from one source; `close_influence` is idempotent; card audit reports the latest validation decision across multiple evidence atoms; n=1 MMA cannot pass; and correction resume refuses clear-gate phantom receipts.
 - Files:
   - `AGENTS.md`
   - `packages/cem-core/src/cem_core/operations.py`
@@ -541,7 +541,7 @@ Entry format:
   - `tests/test_cem_kernel.py`
   - `tests/test_close_influence.py`
   - `tests/test_eval_protocol.py`
-- Verification: Focused review-remediation suite -> **75 passed**. Full suite -> **183 passed**. `git diff --check` clean except Windows CRLF warnings. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_8810e1de0fb54fa68cee4a57eaf18961`).
+- Verification: Focused AMS CLI suite -> **28 passed**. Full suite -> **184 passed**. `git diff --check` clean except Windows CRLF warnings. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_7ea1ffa4bffe4e8db97d8c6248559aa0`). `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** (`control_21266e4ab3274b73972bfb84aadbd761`).
 - Follow-up: Push the active branch update and rerun Greptile on the PRs; do not claim Product Lock A1/A6 complete until the guarded launcher is the default Codex entrypoint.
 
 ## LEDGER-CORRECTION-20260530-ee8e14de - scope trimming

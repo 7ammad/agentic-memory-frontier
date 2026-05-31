@@ -306,6 +306,20 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert dashboard["scope"]["global_behavior_directive_count"] == 0
 
 
+def test_ams_cli_bootstrap_scopes_directives_without_checkout_path_name(tmp_path):
+    root = tmp_path / "ams"
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+
+    _ams(root, "--json", "bootstrap-codex", "--workspace", str(workspace))
+    dashboard = _ams(root, "--json", "dashboard")
+
+    assert "Agentic Memory System" not in str(workspace)
+    assert dashboard["directive_count"] == 7
+    assert dashboard["scope"]["ams_directive_count"] == 7
+    assert dashboard["scope"]["other_directive_count"] == 0
+
+
 def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     root = tmp_path / "ams"
 
@@ -406,6 +420,10 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
     assert dashboard["latest_governed_run"]["startup_brief_id"] == result["brief_id"]
     assert dashboard["latest_governed_run"]["monitor_id"] == result["monitor_id"]
     assert dashboard["latest_governed_run"]["evidence_ids"] == result["evidence_ids"]
+    assert dashboard["latest_governed_run"]["closed"] is False
+    assert dashboard["latest_governed_run"]["outcome"] is None
+    assert dashboard["latest_governed_run"]["finalized_at"] is None
+    assert dashboard["latest_governed_run"]["influence_ids"] == []
 
 
 def test_startup_brief_does_not_persist_dangling_governed_run_id_when_receipt_write_fails(tmp_path, monkeypatch):
@@ -582,6 +600,8 @@ def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
     assert latest["receipt_id"] == result["governed_run_id"]
     assert latest["status"] == "block"
     assert latest["block_reasons"] == result["block_reasons"]
+    assert latest["closed"] is False
+    assert latest["outcome"] is None
 
 
 def test_ams_cli_startup_brief_human_output_uses_controller_printer(tmp_path):

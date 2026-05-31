@@ -8,7 +8,16 @@ Product line: AMS.
 
 Thesis: *Memory is not storage. Memory is verified experience that improves future action.*
 
-## State (as of 2026-05-31 — AMS Primary Runtime Adoption)
+## Current State (as of 2026-05-31 — AMS Primary Runtime Adoption)
+
+- Product line: **AMS**.
+- Canonical acceptance lock: `PRODUCT-LOCK.md`.
+- Current phase: **AMS Primary Runtime Adoption**.
+- Current status: active, not complete.
+- Current next gap: wire the AMS guarded launcher into the default Codex entrypoint.
+- Current live rails: `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`.
+
+## Historical Design State (2026-05-26)
 
 - **A** Deep technical review of SuperClaude memory MCP — DONE + VERIFIED
 - **B** SuperClaude memory v0.3 upgrade spec (P0+P1 cut, 5 phases) — DONE + VERIFIED

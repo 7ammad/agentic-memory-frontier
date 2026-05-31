@@ -25,16 +25,16 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 ### Fixed
 
-- Addressed Greptile PR-loop safety findings that still applied in the live branch: governed-run receipts are written before startup briefs can claim them, live `prompt` hook payloads are accepted by the Python adapter on every platform, multi-atom card audits surface the latest validation decision, influence close is idempotent per brief, `SCORER_VERSION` has one source of truth, single-task MMA cannot pass the confidence gate, and correction resume cannot mint phantom receipts when the gate is already clear.
+- Addressed Greptile PR-loop safety findings that still applied in the live branch: governed-run receipts are written before startup briefs can claim them, receipt ids are generated before model construction, run-close/finalization fields are reserved on receipts, bootstrap AMS directive counting is no longer checkout-path-sensitive, live `prompt` hook payloads are accepted by the Python adapter on every platform, multi-atom card audits surface the latest validation decision, influence close is idempotent per brief, `SCORER_VERSION` has one source of truth, single-task MMA cannot pass the confidence gate, and correction resume cannot mint phantom receipts when the gate is already clear.
 
 ### Verified
 
-- `python -m pytest` -> 183 passed.
-- `python scripts/ams.py monitor --deep` -> pass (`monitor_8810e1de0fb54fa68cee4a57eaf18961`).
+- `python -m pytest` -> 184 passed.
+- `python scripts/ams.py monitor --deep` -> pass (`monitor_7ea1ffa4bffe4e8db97d8c6248559aa0`).
 - `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow with a governed-run receipt and AMS-only active action text.
-- `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow (`control_b65dc67a59d84b5d8c29ec0f9317c74a`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached.
+- `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow (`control_21266e4ab3274b73972bfb84aadbd761`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached.
 - `codex exec` live hook smoke -> `UserPromptSubmit` payload includes `prompt` + `session_id`; `PreToolUse` is invoked before tools; non-zero command-hook exits are advisory in Codex CLI 0.128.0.
-- Focused review-remediation verification -> `75 passed`, including the blocked guarded-command canary that proves the downstream command is not invoked.
+- Focused AMS CLI verification -> `28 passed`, including the portable checkout-path canary and the blocked guarded-command canary that proves the downstream command is not invoked.
 
 ## 2026-05-30
 

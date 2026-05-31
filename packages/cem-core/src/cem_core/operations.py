@@ -132,6 +132,10 @@ class GovernedRunReceipt(StrictModel):
     task_family: str | None
     evidence_ids: list[str]
     block_reasons: list[str]
+    closed: bool = False
+    outcome: Literal["success", "failure", "partial", "unknown"] | None = None
+    finalized_at: datetime | None = None
+    influence_ids: list[str] = Field(default_factory=list)
 
 
 class RuntimeControlRun(StrictModel):
@@ -394,9 +398,11 @@ def startup_brief(
         if not present:
             block_reasons.append(f"missing_required_directive:{name}")
 
+    receipt_id = new_id("run")
     run = StartupBriefRun(
         root=str(root),
         status="block" if block_reasons else "allow",
+        governed_run_id=receipt_id,
         monitor_id=monitor.run_id,
         task_description=description,
         domain_scope=domain_scope,
@@ -416,6 +422,7 @@ def startup_brief(
         block_reasons=block_reasons,
     )
     receipt = GovernedRunReceipt(
+        receipt_id=receipt_id,
         root=str(root),
         cwd=str(Path.cwd().resolve()),
         status=run.status,
@@ -428,7 +435,6 @@ def startup_brief(
         block_reasons=block_reasons,
     )
     _write_governed_run_records(root, receipt)
-    run.governed_run_id = receipt.receipt_id
     _write_startup_brief_records(root, run)
     return run
 
@@ -718,6 +724,10 @@ def _render_governed_run_markdown(receipt: GovernedRunReceipt) -> str:
         f"- cwd: `{receipt.cwd}`",
         f"- task: {receipt.task_description}",
         f"- evidence_ids: `{len(receipt.evidence_ids)}`",
+        f"- closed: `{receipt.closed}`",
+        f"- outcome: `{receipt.outcome}`",
+        f"- finalized_at: `{receipt.finalized_at}`",
+        f"- influence_ids: `{len(receipt.influence_ids)}`",
     ]
     if receipt.block_reasons:
         lines.extend(["", "## Block Reasons", ""])
@@ -795,9 +805,25 @@ def _atom_is_ams_scoped(atom: dict[str, Any]) -> bool:
 def _directive_is_ams_scoped(directive: dict[str, Any]) -> bool:
     if directive.get("domain_scope") == AMS_DOMAIN_SCOPE:
         return True
+    if directive.get("domain_scope") == GLOBAL_BEHAVIOR_SCOPE:
+        return False
+    if directive.get("scope") == "global":
+        return False
     source = str(directive.get("source") or "")
     content = str(directive.get("content") or "")
-    return "Agentic Memory System" in source or "Causal Experience Memory" in content or "CEM-0" in content
+    haystack = f"{source}\n{content}".casefold()
+    markers = (
+        "agentic memory system",
+        "ams",
+        "causal experience memory",
+        "cem-0",
+        "waki",
+        "todo.md",
+        "synthetic eval",
+        "deterministic extractor",
+        "contradiction detector",
+    )
+    return any(marker in haystack for marker in markers)
 
 
 def _directive_is_global_behavior(directive: dict[str, Any]) -> bool:
