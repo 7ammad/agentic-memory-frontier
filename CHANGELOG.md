@@ -18,6 +18,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added `scripts/install-ams-codex-entrypoint.ps1` to install, restore, and smoke-test AMS-wrapped Codex shims with `codex.ams-original*` backups.
 - Added `ams memory-surfaces` plus dashboard reporting for the active memory topology: `ams-memory` primary, `codex-memory` secondary, and native Codex memory accepted only after an applied AMS migration.
 - Added `ams governed-run close` to finalize governed-run receipts with observed outcome and an observational influence event linked to the startup/action brief.
+- Added `ams runtime-trace record` and automatic guarded-command trace capture: ordinary AMS-guarded Codex work now writes real `AgentTrace` records, proposes marker-backed memory candidates with source spans, persists `runtime-trace-latest`, and exposes the latest trace in the dashboard.
 
 ### Changed
 
@@ -25,7 +26,7 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - New bootstrap, migration, correction, README, TODO, and runtime-facing text now uses AMS product language. Legacy internal labels are recognized only for backwards-compatible parsing/classification.
 - Corrected the primary runtime adoption rail after live proof: Codex CLI 0.128.0 invokes command hooks but does not block on non-zero hook exits, so AMS now uses its own runtime-control/guarded-command path instead of another payload-shape check.
 - Advanced the active next step from command-hook enforcement replacement through default Codex entrypoint wiring.
-- Advanced the active next step again after installing the default Codex shims, reconciling memory surfaces, and adding governed-run close/finalize; the current next rail is automatic real trace intake from ordinary Codex work.
+- Advanced the active next step again after installing the default Codex shims, reconciling memory surfaces, adding governed-run close/finalize, and wiring automatic runtime trace intake; the current next rail is aging and maintenance as a product surface.
 
 ### Fixed
 
@@ -33,8 +34,8 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 ### Verified
 
-- `python -m pytest` -> 190 passed.
-- `python scripts/ams.py monitor --deep` -> pass (`monitor_e712045689274d038a97036a81cbc943`).
+- `python -m pytest` -> 193 passed.
+- `python scripts/ams.py monitor --deep` -> pass (`monitor_c2f34660e7cf4f618f6a9c7cd4db24f4`).
 - `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow with a governed-run receipt and AMS-only active action text.
 - `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow (`control_21266e4ab3274b73972bfb84aadbd761`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached.
 - `codex exec` live hook smoke -> `UserPromptSubmit` payload includes `prompt` + `session_id`; `PreToolUse` is invoked before tools; non-zero command-hook exits are advisory in Codex CLI 0.128.0.
@@ -46,7 +47,9 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - `python scripts/ams.py memory-surfaces` -> reconciled; `ams-memory` primary, `codex-memory` secondary, native Codex memory secondary import source via `migration_8b2e1532c74b4cdd896d78d787d4e4d0`.
 - Focused memory-surface and phase-status canaries -> `4 passed`, including the failure case where native memory remains `warn` until migration is applied.
 - Focused governed-run close/finalize and phase-status canaries -> `4 passed`, including idempotent close and the failure case for receipts missing action-brief/influence ids.
-- Live `python scripts/ams.py governed-run close --receipt-id run_f24ec46f59b14b49aa204d5a75f3ee69 --outcome success ...` -> closed with `influence_ba6f90954fc14042965b163794b4fb95`; dashboard shows `closed=True outcome=success` and next step `add automatic real trace intake from ordinary Codex work`.
+- Live `python scripts/ams.py governed-run close --receipt-id run_f24ec46f59b14b49aa204d5a75f3ee69 --outcome success ...` -> closed with `influence_ba6f90954fc14042965b163794b4fb95`; dashboard showed `closed=True outcome=success`.
+- Focused runtime trace intake suite -> `9 passed`, including source-span candidate extraction, missing-control failure, blocked-command failure trace, and quiet raw output preservation.
+- Live guarded-command smoke -> `AMS_TRACE_SMOKE` printed cleanly while dashboard recorded `latest_runtime_trace: success trace_c33a54d6d6c84959bb9e3ec8a28d8ed3 atoms=1`; dashboard now reports next step `add aging and maintenance checks as a product surface`.
 
 ## 2026-05-30
 

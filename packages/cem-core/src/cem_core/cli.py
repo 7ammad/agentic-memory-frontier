@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,7 @@ from .operations import (
     close_governed_run,
     dashboard_status,
     memory_surface_report,
+    record_runtime_trace,
     run_monitor,
     runtime_control,
     startup_brief,
@@ -197,6 +199,25 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_control_parser.add_argument("--session-id", help="Runtime session id.")
     runtime_control_parser.add_argument("--affected-file", action="append", default=[], help="Affected file path.")
     runtime_control_parser.set_defaults(handler=_cmd_runtime_control)
+
+    runtime_trace_parser = subparsers.add_parser(
+        "runtime-trace",
+        parents=[json_parent],
+        help="Record a real AMS runtime trace after a guarded command.",
+    )
+    runtime_trace_subparsers = runtime_trace_parser.add_subparsers(dest="runtime_trace_command", required=True)
+    runtime_trace_record_parser = runtime_trace_subparsers.add_parser(
+        "record",
+        parents=[json_parent],
+        help="Ingest a guarded runtime command into the CEM trace ledger.",
+    )
+    runtime_trace_record_parser.add_argument("--control-id", required=True, help="Runtime control receipt id.")
+    runtime_trace_record_parser.add_argument("--command", required=True, help="Downstream command path or name.")
+    runtime_trace_record_parser.add_argument("--command-arg", action="append", default=[], help="Downstream command arg.")
+    runtime_trace_record_parser.add_argument("--exit-code", required=True, type=int, help="Observed downstream/guard exit code.")
+    runtime_trace_record_parser.add_argument("--started-at", type=_parse_datetime, help="Command start time as ISO-8601.")
+    runtime_trace_record_parser.add_argument("--ended-at", type=_parse_datetime, help="Command end time as ISO-8601.")
+    runtime_trace_record_parser.set_defaults(handler=_cmd_runtime_trace_record)
 
     governed_parser = subparsers.add_parser(
         "governed-run",
@@ -396,6 +417,18 @@ def _cmd_runtime_control(args: argparse.Namespace) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
+def _cmd_runtime_trace_record(args: argparse.Namespace) -> dict[str, Any]:
+    return record_runtime_trace(
+        args.root,
+        control_id=args.control_id,
+        command=args.command,
+        command_args=args.command_arg,
+        observed_exit_code=args.exit_code,
+        started_at=args.started_at,
+        ended_at=args.ended_at,
+    ).model_dump(mode="json")
+
+
 def _cmd_governed_run_close(args: argparse.Namespace) -> dict[str, Any]:
     return close_governed_run(
         args.root,
@@ -437,6 +470,10 @@ def _cmd_correction_resume(args: argparse.Namespace) -> dict[str, Any]:
         approved_by=args.approved_by,
         note=args.note,
     ).model_dump(mode="json")
+
+
+def _parse_datetime(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _read_hook_stdin() -> str:
@@ -501,6 +538,8 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
         _emit_correction_hook(payload)
     elif "control_id" in payload and "runtime_exit_code" in payload:
         _emit_runtime_control(payload)
+    elif "trace_id" in payload and "control_id" in payload and "observed_exit_code" in payload:
+        _emit_runtime_trace(payload)
     elif "receipt_id" in payload and "startup_brief_id" in payload and "closed" in payload:
         _emit_governed_run(payload)
     elif "brief_id" in payload and "monitor_id" in payload:
@@ -686,6 +725,18 @@ def _emit_runtime_control(payload: dict[str, Any]) -> None:
             print(f"- {reason}")
 
 
+def _emit_runtime_trace(payload: dict[str, Any]) -> None:
+    print(f"runtime_trace: {payload['final_outcome']} {payload['trace_id']}")
+    print(f"control: {payload['control_id']} ({payload['runtime_control_status']})")
+    if payload.get("governed_run_id"):
+        print(f"governed_run: {payload['governed_run_id']}")
+    print(f"monitor: {payload['monitor_id']}")
+    print(f"command: {payload['command']}")
+    print(f"exit_code: {payload['observed_exit_code']}")
+    print(f"downstream_invoked: {payload['downstream_invoked']}")
+    print(f"proposed_atoms: {payload['proposed_atom_count']}")
+
+
 def _emit_governed_run(payload: dict[str, Any]) -> None:
     status = "closed" if payload["closed"] else "open"
     print(f"governed_run: {status} {payload['receipt_id']}")
@@ -794,3 +845,11 @@ def _emit_dashboard(payload: dict[str, Any]) -> None:
         print(f"latest_runtime_control: {latest_runtime_control['status']} {latest_runtime_control['control_id']}")
     else:
         print("latest_runtime_control: none")
+    latest_runtime_trace = payload.get("latest_runtime_trace")
+    if latest_runtime_trace:
+        print(
+            f"latest_runtime_trace: {latest_runtime_trace['final_outcome']} "
+            f"{latest_runtime_trace['trace_id']} atoms={latest_runtime_trace['proposed_atom_count']}"
+        )
+    else:
+        print("latest_runtime_trace: none")

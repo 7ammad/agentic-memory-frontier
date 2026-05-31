@@ -619,7 +619,28 @@ Entry format:
   - `docs/2026-05-31-codex-hook-runtime-smoke.md`
   - `docs/PROJECT-LEDGER.md`
 - Verification: Focused governed-run close/finalize and phase-status suite -> **4 passed**. Full `python -m pytest` -> **190 passed**. Live `python scripts/ams.py runtime-control "continue AMS primary runtime adoption close finalize smoke" --domain agentic-memory-system` -> **allow** (`control_62c6f9cef6484ac186636c6bc8169836`, governed run `run_f24ec46f59b14b49aa204d5a75f3ee69`). Live `python scripts/ams.py governed-run close --receipt-id run_f24ec46f59b14b49aa204d5a75f3ee69 --outcome success ...` -> **closed** with `influence_ba6f90954fc14042965b163794b4fb95`. Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_e712045689274d038a97036a81cbc943`). Live dashboard shows `closed=True outcome=success` and next step `add automatic real trace intake from ordinary Codex work`. Global `python scripts/ams.py correction gate` remained **clear**.
-- Follow-up: Add automatic real trace intake from ordinary Codex work.
+- Follow-up: Automatic runtime trace intake resolved in LEDGER-20260531-031; next add aging and maintenance as a product surface.
+
+## LEDGER-20260531-031 - Guarded Codex work writes runtime traces
+
+- Date: 2026-05-31
+- Type: implementation / runtime adoption
+- Status: active
+- Source: TODO section 14 Primary Runtime Adoption and Product Lock A2/A6.
+- Summary: Added `ams runtime-trace record` and wired `scripts/ams-guarded-command.ps1` to call it after every AMS-controlled downstream decision. A guarded run now loads its `runtime-control` receipt, creates a real `AgentTrace`, persists it through `CEM.ingest_trace`, proposes marker-backed memory candidates with source spans, writes `runtime-trace-runs.jsonl` / `runtime-trace-latest.json` / `runtime-trace-latest.md`, and exposes `latest_runtime_trace` in `dashboard`. Blocked correction/runtime-control decisions also write failure traces with `downstream_invoked=false`. Quiet guarded invocations preserve raw command stdout while still recording the trace.
+- Files:
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/cli.py`
+  - `scripts/ams-guarded-command.ps1`
+  - `tests/test_ams_cli.py`
+  - `AGENTS.md`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `CHANGELOG.md`
+  - `docs/2026-05-31-ams-product-lock-audit.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: Focused runtime trace intake suite -> **9 passed**. Full `python -m pytest` -> **193 passed**. Live `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ams-guarded-command.ps1 ... -Quiet -Command cmd.exe /c echo AMS_TRACE_SMOKE` -> printed exactly `AMS_TRACE_SMOKE` and exited 0. Live `python scripts/ams.py dashboard` -> `latest_runtime_trace: success trace_c33a54d6d6c84959bb9e3ec8a28d8ed3 atoms=1` and next step `add aging and maintenance checks as a product surface`. Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_c2f34660e7cf4f618f6a9c7cd4db24f4`). `git diff --check` -> clean aside from Windows CRLF warnings.
+- Follow-up: Add aging and maintenance checks as a product surface.
 
 ## LEDGER-CORRECTION-20260530-ee8e14de - scope trimming
 
@@ -659,7 +680,8 @@ Entry format:
 - ~~Wire the AMS guarded launcher into the default Codex entrypoint.~~ **RESOLVED (LEDGER-028):** real npm Codex shims now route through AMS runtime-control with backups and bypass escape hatch.
 - ~~Reconcile legacy Codex memories / `codex-memory` / `ams-memory` so AMS is the primary startup source, not just a parallel MCP surface.~~ **RESOLVED (LEDGER-029):** `ams memory-surfaces` reports `ams-memory` primary, `codex-memory` secondary, and native Codex memory as an applied secondary import source; dashboard exposes the reconciled state.
 - ~~Add governed-run close/finalize records for outcomes and influence.~~ **RESOLVED (LEDGER-030):** `ams governed-run close` finalizes the receipt, writes an observational influence event, and refuses old/dangling receipts without action-brief links.
-- Add automatic real trace intake from ordinary Codex work.
+- ~~Add automatic real trace intake from ordinary Codex work.~~ **RESOLVED (LEDGER-031):** guarded Codex work now writes real runtime traces and source-span candidates without polluting quiet command output.
+- Add aging and maintenance checks as a product surface.
 - ~~Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface.~~ **RESOLVED (LEDGER-021):** runtime-agnostic `correction_hooks.py` core + `correction hook-prompt`/`hook-gate` CLI + two PowerShell wrappers; Monitor-0 single-source-of-truth bridge test; human-approval-only resume preserved.
 - ~~Add latency budget enforcement to the startup controller.~~ **RESOLVED (LEDGER-020):** `within_latency_budget` + the pre-registered `RETRIEVAL_LATENCY_BUDGET_MS` now enforce a p95 budget on the CEM retrieval read path (the exact hot path the startup brief shares via `retrieve_brief` -> `retrieve_action_brief`), gated in CI through the Phase 4 exam report and the composite readiness gate.
 - ~~**Phase 5 hardening — two latent defensive consistency nits surfaced by PR#4's 5/5 re-review:**~~ **RESOLVED (LEDGER-020):** both `_supersede_stale_cards` (was: skip only `"superseded"`) and `vertical_loop` `active_card_count` (was: `deactivated_at is None`) now use the shared module-level `card_is_inactive` predicate; a predicate unit test covers all five states and a behavioural canary proves the supersession nit would have clobbered an already-inactive card.

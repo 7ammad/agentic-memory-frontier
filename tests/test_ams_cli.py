@@ -343,10 +343,11 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert monitor["phase"]["current_phase"] == "AMS Primary Runtime Adoption"
     assert (
         monitor["phase"]["next_step"]
-        == "add automatic real trace intake from ordinary Codex work"
+        == "add aging and maintenance checks as a product surface"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
+    assert "real trace intake" not in monitor["phase"]["next_step"]
     assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
     assert (root / "monitor-runs.jsonl").exists()
     assert (root / "monitor-latest.json").exists()
@@ -411,7 +412,7 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["other_directive_count"] == 0
     assert dashboard["phase"]["completed_through"].startswith("AMS product lock")
     assert dashboard["phase"]["ready_for_next_phase"] is False
-    assert any("real trace intake" in item for item in dashboard["phase"]["open_followups"])
+    assert any("aging and maintenance" in item for item in dashboard["phase"]["open_followups"])
 
 
 def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
@@ -639,6 +640,74 @@ def test_ams_cli_runtime_control_blocks_correction_prompt(tmp_path):
     assert (root / "runtime-control-latest.json").exists()
 
 
+def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    control = _ams(
+        root,
+        "--json",
+        "runtime-control",
+        "SKILL: check startup brief before edits",
+        "--session-id",
+        "trace_session",
+    )
+
+    result = _ams(
+        root,
+        "--json",
+        "runtime-trace",
+        "record",
+        "--control-id",
+        control["control_id"],
+        "--command",
+        "codex",
+        "--command-arg=--version",
+        "--exit-code",
+        "0",
+    )
+
+    assert result["control_id"] == control["control_id"]
+    assert result["runtime_control_status"] == "allow"
+    assert result["final_outcome"] == "success"
+    assert result["observed_exit_code"] == 0
+    assert result["downstream_invoked"] is True
+    assert result["proposed_atom_count"] == 1
+    assert (root / "runtime-trace-runs.jsonl").exists()
+    assert (root / "runtime-trace-latest.json").exists()
+    assert (root / "runtime-trace-latest.md").exists()
+
+    dashboard = _ams(root, "--json", "dashboard")
+    assert dashboard["latest_runtime_trace"]["trace_id"] == result["trace_id"]
+    trace = CEM(root).store.get_trace(result["trace_id"])
+    assert trace.final_outcome == "success"
+    assert trace.environment["runtime_control_id"] == control["control_id"]
+    atom = CEM(root).store.get_atom(result["proposed_atom_ids"][0])
+    assert atom.source_trace_ids == [result["trace_id"]]
+    assert atom.source_spans[0].text == "check startup brief before edits"
+
+
+def test_ams_cli_runtime_trace_rejects_missing_control_receipt(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+
+    process = _ams_process(
+        root,
+        "--json",
+        "runtime-trace",
+        "record",
+        "--control-id",
+        "control_missing",
+        "--command",
+        "codex",
+        "--exit-code",
+        "0",
+    )
+
+    assert process.returncode == 2
+    assert "Runtime control receipt not found" in process.stderr
+    assert not (root / "runtime-trace-latest.json").exists()
+
+
 def test_ams_guarded_command_enforces_block_before_downstream_command(tmp_path):
     powershell = shutil.which("powershell")
     if os.name != "nt" or powershell is None:
@@ -677,6 +746,9 @@ def test_ams_guarded_command_enforces_block_before_downstream_command(tmp_path):
 
     assert process.returncode == 12
     assert "AMS_RUNTIME_CONTROL_EXIT: 12" in process.stdout
+    latest_trace = json.loads((root / "runtime-trace-latest.json").read_text(encoding="utf-8"))
+    assert latest_trace["final_outcome"] == "failure"
+    assert latest_trace["downstream_invoked"] is False
     assert not sentinel.exists()
 
 
@@ -718,7 +790,53 @@ def test_ams_guarded_command_runs_downstream_command_when_allowed(tmp_path):
 
     assert process.returncode == 0, process.stderr
     assert "AMS_RUNTIME_CONTROL_EXIT: 0" in process.stdout
+    latest_trace = json.loads((root / "runtime-trace-latest.json").read_text(encoding="utf-8"))
+    assert latest_trace["final_outcome"] == "success"
+    assert latest_trace["downstream_invoked"] is True
     assert sentinel.exists()
+
+
+def test_ams_guarded_command_quietly_records_runtime_trace(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    env = os.environ.copy()
+    env["AMS_ROOT"] = str(root)
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(ROOT),
+            "-Prompt",
+            "continue building Agentic Memory System with verification",
+            "-Quiet",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            "echo RAW_OK",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert process.stdout.strip() == "RAW_OK"
+    latest_trace = json.loads((root / "runtime-trace-latest.json").read_text(encoding="utf-8"))
+    assert latest_trace["final_outcome"] == "success"
+    assert latest_trace["observed_exit_code"] == 0
 
 
 def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):

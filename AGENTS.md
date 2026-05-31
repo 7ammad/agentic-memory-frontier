@@ -14,7 +14,7 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 - Canonical acceptance lock: `PRODUCT-LOCK.md`.
 - Current phase: **AMS Primary Runtime Adoption**.
 - Current status: active, not complete.
-- Current next gap: add automatic real trace intake from ordinary Codex work.
+- Current next gap: add aging and maintenance checks as a product surface.
 - Current live rails: `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`.
 
 ## Historical Design State (2026-05-26)
@@ -25,7 +25,7 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 - **D** ACS protocol design (A2A v1.0-compatible relay topology, signed envelopes, 5-message vocab, Jeffreys×Codex escalation, replay protection, 3 phases, 10-test acceptance battery) — DONE + VERIFIED (4 codex passes, 11 patches, READY)
 
 **Historical design state:** all 4 sub-projects were design-complete on 2026-05-26.
-**Current runtime state:** implementation is active on AMS Primary Runtime Adoption. `PRODUCT-LOCK.md` is the canonical acceptance lock; the live rails are `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`. The current open gap is automatic real trace intake from ordinary Codex work; governed-run close/finalize and memory-surface reconciliation are live.
+**Current runtime state:** implementation is active on AMS Primary Runtime Adoption. `PRODUCT-LOCK.md` is the canonical acceptance lock; the live rails are `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`. The current open gap is aging and maintenance as a product surface; automatic runtime trace intake, governed-run close/finalize, and memory-surface reconciliation are live.
 
 ## To continue right now
 

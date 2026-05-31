@@ -30,7 +30,7 @@ from .local_memory import (
     retrieve_brief,
     run_eval,
 )
-from .models import StrictModel, new_id, utc_now
+from .models import AgentTrace, StrictModel, TraceTurn, new_id, utc_now
 
 MigrationAction = Literal["pin", "remember", "skip"]
 MonitorStatus = Literal["pass", "fail"]
@@ -180,6 +180,29 @@ class RuntimeControlRun(StrictModel):
     evidence_ids: list[str]
     block_reasons: list[str]
     runtime_exit_code: int
+
+
+class RuntimeTraceRun(StrictModel):
+    trace_id: str
+    generated_at: datetime = Field(default_factory=utc_now)
+    root: str
+    control_id: str
+    runtime_control_status: StartupStatus
+    startup_brief_id: str
+    governed_run_id: str | None
+    monitor_id: str
+    session_id: str
+    task_description: str
+    domain_scope: str | None
+    task_family: str | None
+    command: str
+    command_args: list[str]
+    downstream_invoked: bool
+    observed_exit_code: int
+    final_outcome: Literal["success", "failure", "partial", "unknown"]
+    proposed_atom_count: int
+    proposed_atom_ids: list[str]
+    source_turn_ids: list[str]
 
 
 class MonitorRun(StrictModel):
@@ -381,6 +404,7 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_startup_brief": _load_json(root / "startup-brief-latest.json"),
         "latest_governed_run": _load_json(root / "governed-run-latest.json"),
         "latest_runtime_control": _load_json(root / "runtime-control-latest.json"),
+        "latest_runtime_trace": _load_json(root / "runtime-trace-latest.json"),
     }
 
 
@@ -574,6 +598,118 @@ def runtime_control(
     return run
 
 
+def record_runtime_trace(
+    root: Path | None = None,
+    *,
+    control_id: str,
+    command: str,
+    command_args: list[str] | None = None,
+    observed_exit_code: int,
+    started_at: datetime | None = None,
+    ended_at: datetime | None = None,
+) -> RuntimeTraceRun:
+    root = _root(root)
+    init_memory(root)
+    command_args = command_args or []
+    command = command.strip()
+    if not command:
+        raise ValueError("Runtime trace command must not be empty.")
+
+    control = _load_runtime_control_run(root, control_id)
+    downstream_invoked = control.status == "allow"
+    final_outcome: Literal["success", "failure", "partial", "unknown"] = (
+        "success" if downstream_invoked and observed_exit_code == 0 else "failure"
+    )
+    session_id = control.session_id or control.governed_run_id or control.control_id
+    task_id = control.governed_run_id or control.control_id
+    trace_started_at = started_at or control.generated_at
+    trace_ended_at = ended_at or utc_now()
+    control_summary = (
+        f"AMS_RUNTIME_CONTROL: {control.status} {control.control_id}; "
+        f"startup_brief={control.startup_brief_id}; "
+        f"governed_run={control.governed_run_id}; monitor={control.monitor_id}"
+    )
+    command_summary = (
+        f"COMMAND: {command}"
+        + (f" {' '.join(command_args)}" if command_args else "")
+        + f"\nINVOKED: {downstream_invoked}\nEXIT_CODE: {observed_exit_code}"
+    )
+    trace = AgentTrace(
+        session_id=session_id,
+        agent_id="codex",
+        task_id=task_id,
+        started_at=trace_started_at,
+        ended_at=trace_ended_at,
+        turns=[
+            TraceTurn(
+                index=0,
+                timestamp=control.generated_at,
+                role="user",
+                content=control.task_description,
+            ),
+            TraceTurn(
+                index=1,
+                timestamp=control.generated_at,
+                role="system",
+                content=control_summary,
+            ),
+            TraceTurn(
+                index=2,
+                timestamp=trace_ended_at,
+                role="tool" if downstream_invoked else "environment",
+                content=command_summary,
+                tool_name=Path(command).name,
+                tool_input={"command": command, "args": command_args},
+                tool_output={"exit_code": observed_exit_code, "invoked": downstream_invoked},
+            ),
+        ],
+        final_outcome=final_outcome,
+        outcome_score=1.0 if final_outcome == "success" else 0.0,
+        environment={
+            "domain": control.domain_scope or AMS_DOMAIN_SCOPE,
+            "cwd": control.cwd,
+            "trace_source": "ams-guarded-command",
+            "runtime_control_id": control.control_id,
+            "runtime_control_status": control.status,
+            "startup_brief_id": control.startup_brief_id,
+            "governed_run_id": control.governed_run_id,
+            "monitor_id": control.monitor_id,
+            "evidence_ids": control.evidence_ids,
+            "block_reasons": control.block_reasons,
+            "command": command,
+            "command_args": command_args,
+            "observed_exit_code": observed_exit_code,
+            "downstream_invoked": downstream_invoked,
+        },
+    )
+    cem = CEM(root)
+    cem.ingest_trace(trace)
+    atoms = cem.propose_memories(trace.trace_id)
+    run = RuntimeTraceRun(
+        trace_id=trace.trace_id,
+        root=str(root),
+        control_id=control.control_id,
+        runtime_control_status=control.status,
+        startup_brief_id=control.startup_brief_id,
+        governed_run_id=control.governed_run_id,
+        monitor_id=control.monitor_id,
+        session_id=session_id,
+        task_description=control.task_description,
+        domain_scope=control.domain_scope,
+        task_family=control.task_family,
+        command=command,
+        command_args=command_args,
+        downstream_invoked=downstream_invoked,
+        observed_exit_code=observed_exit_code,
+        final_outcome=final_outcome,
+        proposed_atom_count=len(atoms),
+        proposed_atom_ids=[atom.atom_id for atom in atoms],
+        source_turn_ids=[turn.turn_id for turn in trace.turns],
+    )
+    _write_runtime_trace_records(root, run)
+    return run
+
+
 def memory_surface_report(
     root: Path | None = None,
     *,
@@ -675,14 +811,14 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS product lock: kernel, MCP bridge, startup gate, hook wrappers, memory surface reconciliation, and governed-run close/finalize are live"
+            "AMS product lock: kernel, MCP bridge, startup gate, hook wrappers, memory surface reconciliation, governed-run close/finalize, and automatic runtime trace intake are live"
         ),
         current_phase="AMS Primary Runtime Adoption",
         status="active",
-        next_step="add automatic real trace intake from ordinary Codex work",
+        next_step="add aging and maintenance checks as a product surface",
         ready_for_next_phase=False,
         open_followups=[
-            "add real trace intake from ordinary Codex work",
+            "add aging and maintenance checks as a product surface",
         ],
     )
 
@@ -807,6 +943,26 @@ def _write_runtime_control_records(root: Path, run: RuntimeControlRun) -> None:
     (root / "runtime-control-latest.md").write_text(_render_runtime_control_markdown(run), encoding="utf-8")
 
 
+def _write_runtime_trace_records(root: Path, run: RuntimeTraceRun) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "runtime-trace-runs.jsonl", run.model_dump(mode="json"))
+    _write_json(root / "runtime-trace-latest.json", run.model_dump(mode="json"))
+    (root / "runtime-trace-latest.md").write_text(_render_runtime_trace_markdown(run), encoding="utf-8")
+
+
+def _load_runtime_control_run(root: Path, control_id: str) -> RuntimeControlRun:
+    runs_path = root / "runtime-control-runs.jsonl"
+    if not runs_path.exists():
+        raise ValueError(f"Runtime control receipt not found: {control_id}")
+    for line in reversed(runs_path.read_text(encoding="utf-8").splitlines()):
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if payload.get("control_id") == control_id:
+            return RuntimeControlRun.model_validate(payload)
+    raise ValueError(f"Runtime control receipt not found: {control_id}")
+
+
 def _render_migration_markdown(run: MigrationRun) -> str:
     lines = [
         "# AMS Migration Latest",
@@ -928,6 +1084,31 @@ def _render_runtime_control_markdown(run: RuntimeControlRun) -> str:
         lines.extend(["", "## Block Reasons", ""])
         for reason in run.block_reasons:
             lines.append(f"- `{reason}`")
+    return "\n".join(lines) + "\n"
+
+
+def _render_runtime_trace_markdown(run: RuntimeTraceRun) -> str:
+    lines = [
+        "# AMS Runtime Trace Latest",
+        "",
+        f"- trace_id: `{run.trace_id}`",
+        f"- control_id: `{run.control_id}`",
+        f"- runtime_control_status: `{run.runtime_control_status}`",
+        f"- final_outcome: `{run.final_outcome}`",
+        f"- observed_exit_code: `{run.observed_exit_code}`",
+        f"- downstream_invoked: `{run.downstream_invoked}`",
+        f"- startup_brief_id: `{run.startup_brief_id}`",
+        f"- governed_run_id: `{run.governed_run_id}`",
+        f"- monitor_id: `{run.monitor_id}`",
+        f"- session_id: `{run.session_id}`",
+        f"- command: `{run.command}`",
+        f"- command_args: `{len(run.command_args)}`",
+        f"- proposed_atoms: `{run.proposed_atom_count}`",
+    ]
+    if run.proposed_atom_ids:
+        lines.extend(["", "## Proposed Atoms", ""])
+        for atom_id in run.proposed_atom_ids:
+            lines.append(f"- `{atom_id}`")
     return "\n".join(lines) + "\n"
 
 

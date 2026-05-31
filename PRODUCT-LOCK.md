@@ -188,11 +188,11 @@ Built and verified:
 - correction capture core and hook wrappers;
 - default Codex entrypoint wrapping through AMS runtime control;
 - legacy `codex-memory` and native Codex memory reconciled under AMS as secondary inputs;
-- governed-run close/finalize records with observational influence events.
+- governed-run close/finalize records with observational influence events;
+- automatic runtime trace intake from ordinary guarded Codex work.
 
 Not yet accepted:
 
-- continuous real trace intake from ordinary Codex work;
 - aging and maintenance as a first-class product surface;
 - external operator install/run proof.
 
