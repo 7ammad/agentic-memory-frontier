@@ -22,13 +22,13 @@ Accepted as built:
 - action-brief retrieval;
 - verification probes and baseline evals;
 - local CLI, monitor, dashboard, startup gate, and MCP bridge;
-- correction capture core and hook wrappers.
+- correction capture core and hook wrappers;
+- default Codex entrypoint wrapping through AMS runtime control;
+- legacy memory surface reconciliation: `ams-memory` primary, `codex-memory` secondary, native Codex memory applied as secondary import source;
+- governed-run close/finalize records with observed outcomes and observational influence events.
 
 Not accepted yet:
 
-- primary Codex runtime lock;
-- governed-run receipts on every serious run;
-- default Codex entrypoint wired through the AMS guarded launcher;
 - continuous trace intake from ordinary Codex work;
 - aging and maintenance product surface;
 - fresh operator setup proof.
@@ -99,6 +99,8 @@ Work:
   exits are advisory and do not stop the turn/tool;
 - DONE: add `scripts/ams-guarded-command.ps1`, which refuses to invoke the
   downstream command when AMS blocks.
+- DONE: add and run `scripts/install-ams-codex-entrypoint.ps1`, which backs up
+  the npm Codex shims and routes default Codex launch through AMS.
 
 Acceptance:
 
@@ -106,10 +108,12 @@ Acceptance:
 - correction prompt records event and enforceably stops continuation;
 - pre-tool/tool execution is denied until explicit resume;
 - tests and smoke evidence cannot pass A6 on hook-failure output alone.
+- default-entrypoint smoke blocks missing-memory and correction cases before raw
+  Codex runs.
 
 Remaining adoption work:
 
-- wire the guarded launcher into the default Codex entrypoint.
+- add automatic real trace intake from ordinary Codex work.
 
 ### Step 5. Real Trace Intake
 
@@ -134,16 +138,15 @@ Close the loop after work finishes.
 
 Work:
 
-- record whether the action brief was followed;
-- record outcome and failure/success signal;
-- link outcome to the brief and governed-run receipt;
-- keep observed outcome separate from verified lift.
+- DONE: record outcome and failure/success signal;
+- DONE: link outcome to the startup brief, action brief, influence id, and governed-run receipt;
+- DONE: keep observed outcome separate from verified lift via observational influence events.
 
 Acceptance:
 
-- a completed run has an influence record;
-- audit can show which memory affected the action;
-- reports do not overclaim causal lift from observation alone.
+- DONE: a completed run has an influence record;
+- DONE: dashboard reports the closed governed run;
+- DONE: tests prove close/finalize is idempotent and cannot fake-close receipts with no action-brief link.
 
 ### Step 7. Aging And Maintenance
 

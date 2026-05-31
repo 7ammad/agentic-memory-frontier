@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from cem_core import CEM
 from cem_core import operations
 from cem_core.local_memory import _active_product_directive_content
 
@@ -267,6 +268,56 @@ def test_ams_cli_migration_apply_is_idempotent(tmp_path):
     assert len(cards["cards"]) == 1
 
 
+def test_ams_cli_memory_surfaces_reconcile_legacy_and_codex_memory(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = _legacy_memory_base(tmp_path)
+    config_path = _codex_config(tmp_path, root)
+
+    migration = _ams(root, "--json", "migrate", "apply", "--memory-base", str(memory_base))
+    report = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
+    surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+
+    assert migration["applied"] is True
+    assert report["reconciled"] is True
+    assert surfaces["ams-memory"]["role"] == "primary"
+    assert surfaces["ams-memory"]["status"] == "pass"
+    assert surfaces["codex-memory"]["role"] == "secondary"
+    assert surfaces["codex-memory"]["status"] == "pass"
+    assert surfaces["native-codex-memory"]["role"] == "secondary_import_source"
+    assert surfaces["native-codex-memory"]["status"] == "pass"
+
+
+def test_ams_cli_memory_surfaces_warn_until_legacy_migration_applied(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = _legacy_memory_base(tmp_path)
+    config_path = _codex_config(tmp_path, root)
+
+    report = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
+    surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+
+    assert report["reconciled"] is False
+    assert surfaces["ams-memory"]["status"] == "pass"
+    assert surfaces["codex-memory"]["role"] == "secondary"
+    assert surfaces["native-codex-memory"]["status"] == "warn"
+    assert "latest applied AMS migration" in surfaces["native-codex-memory"]["detail"]
+
+
 def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     root = tmp_path / "ams"
 
@@ -292,9 +343,10 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert monitor["phase"]["current_phase"] == "AMS Primary Runtime Adoption"
     assert (
         monitor["phase"]["next_step"]
-        == "wire AMS guarded launcher into the default Codex entrypoint"
+        == "add automatic real trace intake from ordinary Codex work"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
+    assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
     assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
     assert (root / "monitor-runs.jsonl").exists()
     assert (root / "monitor-latest.json").exists()
@@ -359,7 +411,7 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["other_directive_count"] == 0
     assert dashboard["phase"]["completed_through"].startswith("AMS product lock")
     assert dashboard["phase"]["ready_for_next_phase"] is False
-    assert any("primary startup source" in item for item in dashboard["phase"]["open_followups"])
+    assert any("real trace intake" in item for item in dashboard["phase"]["open_followups"])
 
 
 def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
@@ -397,6 +449,8 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
 
     assert result["status"] == "allow"
     assert result["governed_run_id"].startswith("run_")
+    assert result["action_brief_id"].startswith("brief_")
+    assert result["influence_id"].startswith("influence_")
     assert result["monitor_id"].startswith("monitor_")
     assert result["estimated_tokens"] <= result["limits"]["max_tokens"]
     assert result["required_directives"] == {
@@ -418,12 +472,99 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
     assert dashboard["latest_startup_brief"]["brief_id"] == result["brief_id"]
     assert dashboard["latest_governed_run"]["receipt_id"] == result["governed_run_id"]
     assert dashboard["latest_governed_run"]["startup_brief_id"] == result["brief_id"]
+    assert dashboard["latest_governed_run"]["action_brief_id"] == result["action_brief_id"]
+    assert dashboard["latest_governed_run"]["influence_id"] == result["influence_id"]
     assert dashboard["latest_governed_run"]["monitor_id"] == result["monitor_id"]
     assert dashboard["latest_governed_run"]["evidence_ids"] == result["evidence_ids"]
     assert dashboard["latest_governed_run"]["closed"] is False
     assert dashboard["latest_governed_run"]["outcome"] is None
     assert dashboard["latest_governed_run"]["finalized_at"] is None
     assert dashboard["latest_governed_run"]["influence_ids"] == []
+
+
+def test_ams_cli_governed_run_close_records_outcome_and_influence(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+
+    startup = _ams(
+        root,
+        "--json",
+        "startup-brief",
+        "continue building Agentic Memory System with verification",
+        "--domain",
+        "agentic-memory-system",
+    )
+    closed = _ams(
+        root,
+        "--json",
+        "governed-run",
+        "close",
+        "--receipt-id",
+        startup["governed_run_id"],
+        "--outcome",
+        "success",
+        "--action-taken",
+        "ran focused and full pytest",
+        "--observed-post-brief-delta",
+        "0.25",
+    )
+    second_close = _ams(
+        root,
+        "--json",
+        "governed-run",
+        "close",
+        "--receipt-id",
+        startup["governed_run_id"],
+        "--outcome",
+        "failure",
+        "--action-taken",
+        "try to overwrite",
+    )
+    dashboard = _ams(root, "--json", "dashboard")
+    events = CEM(root).store.list_action_influence_events(startup["influence_id"])
+
+    assert closed["closed"] is True
+    assert closed["outcome"] == "success"
+    assert closed["finalized_at"] is not None
+    assert closed["influence_ids"] == [startup["influence_id"]]
+    assert second_close == closed
+    assert dashboard["latest_governed_run"]["receipt_id"] == startup["governed_run_id"]
+    assert dashboard["latest_governed_run"]["closed"] is True
+    assert dashboard["latest_governed_run"]["outcome"] == "success"
+    assert len(events) == 1
+    assert events[0].brief_id == startup["action_brief_id"]
+    assert events[0].outcome == "success"
+    assert events[0].counterfactual_method == "observational_no_counterfactual"
+
+
+def test_ams_cli_governed_run_close_fails_without_action_brief_link(tmp_path):
+    root = tmp_path / "ams"
+    receipt = operations.GovernedRunReceipt(
+        root=str(root),
+        cwd=str(ROOT),
+        status="allow",
+        startup_brief_id="brief_legacy",
+        monitor_id="monitor_legacy",
+        task_description="legacy governed run without action brief",
+        domain_scope="agentic-memory-system",
+        task_family=None,
+        evidence_ids=[],
+        block_reasons=[],
+    )
+    operations._write_governed_run_records(root, receipt)
+
+    process = _ams_process(
+        root,
+        "--json",
+        "governed-run",
+        "close",
+        "--outcome",
+        "success",
+    )
+
+    assert process.returncode == 2
+    assert "cannot close influence" in process.stderr
+    assert json.loads((root / "governed-run-latest.json").read_text(encoding="utf-8"))["closed"] is False
 
 
 def test_startup_brief_does_not_persist_dangling_governed_run_id_when_receipt_write_fails(tmp_path, monkeypatch):
@@ -858,3 +999,28 @@ def _legacy_memory_base(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return memory_base
+
+
+def _codex_config(tmp_path: Path, root: Path) -> Path:
+    config_path = tmp_path / "config.toml"
+    codex_db = tmp_path / "codex-memory" / "lancedb"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[mcp_servers.ams-memory]",
+                'command = "node"',
+                "",
+                "[mcp_servers.ams-memory.env]",
+                f"AMS_ROOT = {json.dumps(str(root))}",
+                "",
+                "[mcp_servers.codex-memory]",
+                'command = "node"',
+                "",
+                "[mcp_servers.codex-memory.env]",
+                f"CODEX_MEMORY_DB_PATH = {json.dumps(str(codex_db))}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path

@@ -4,6 +4,7 @@ param(
     [string]$Prompt,
     [Parameter(Mandatory = $true)]
     [string]$Command,
+    [switch]$Quiet,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$CommandArgs = @()
 )
@@ -19,8 +20,10 @@ if (-not (Test-Path $amsScript)) {
 $control = & python $amsScript runtime-control $Prompt --json
 $code = $LASTEXITCODE
 
-Write-Output "AMS_RUNTIME_CONTROL_EXIT: $code"
-if ($control) { Write-Output $control }
+if ((-not $Quiet) -or $code -ne 0) {
+    Write-Output "AMS_RUNTIME_CONTROL_EXIT: $code"
+    if ($control) { Write-Output $control }
+}
 
 if ($code -ne 0) {
     Write-Output "AMS_GUARD_BLOCKED: downstream command was not invoked"

@@ -122,5 +122,9 @@ Not verified as acceptable:
 - Codex blocking on `PreToolUse` while the resume gate is armed.
 
 Update: the enforceable AMS-owned path is now `ams runtime-control` plus
-`scripts/ams-guarded-command.ps1`. A6 remains partial until that guarded
-launcher is wired into the default Codex entrypoint.
+`scripts/ams-guarded-command.ps1`, and `scripts/install-ams-codex-entrypoint.ps1`
+now routes the default Codex shims through that guarded launcher. `ams
+memory-surfaces` also reconciles legacy `codex-memory` and native Codex memory
+as secondary inputs under AMS, and `ams governed-run close` finalizes observed
+outcomes/influence events. A6 remains partial until correction capture also
+feeds automatic trace intake.

@@ -15,13 +15,17 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added governed-run receipts to `startup-brief`: each run now records receipt id, startup brief id, monitor id, cwd, task description, evidence ids, status, and block reasons; dashboard exposes the latest governed run.
 - Added `docs/2026-05-31-codex-hook-runtime-smoke.md` with live Codex hook evidence.
 - Added `ams runtime-control` and `scripts/ams-guarded-command.ps1` as the enforceable AMS-owned runtime path: AMS records allow/block control receipts, and the guarded launcher refuses to invoke the downstream command when AMS blocks.
+- Added `scripts/install-ams-codex-entrypoint.ps1` to install, restore, and smoke-test AMS-wrapped Codex shims with `codex.ams-original*` backups.
+- Added `ams memory-surfaces` plus dashboard reporting for the active memory topology: `ams-memory` primary, `codex-memory` secondary, and native Codex memory accepted only after an applied AMS migration.
+- Added `ams governed-run close` to finalize governed-run receipts with observed outcome and an observational influence event linked to the startup/action brief.
 
 ### Changed
 
 - Locked product language to one line: **AMS**. Active source-of-truth docs now point to `PRODUCT-LOCK.md` for acceptance and avoid treating older internal labels as the product identity.
 - New bootstrap, migration, correction, README, TODO, and runtime-facing text now uses AMS product language. Legacy internal labels are recognized only for backwards-compatible parsing/classification.
 - Corrected the primary runtime adoption rail after live proof: Codex CLI 0.128.0 invokes command hooks but does not block on non-zero hook exits, so AMS now uses its own runtime-control/guarded-command path instead of another payload-shape check.
-- Advanced the active next step from command-hook enforcement replacement to wiring the AMS guarded launcher into the default Codex entrypoint.
+- Advanced the active next step from command-hook enforcement replacement through default Codex entrypoint wiring.
+- Advanced the active next step again after installing the default Codex shims, reconciling memory surfaces, and adding governed-run close/finalize; the current next rail is automatic real trace intake from ordinary Codex work.
 
 ### Fixed
 
@@ -29,12 +33,20 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 ### Verified
 
-- `python -m pytest` -> 184 passed.
-- `python scripts/ams.py monitor --deep` -> pass (`monitor_7ea1ffa4bffe4e8db97d8c6248559aa0`).
+- `python -m pytest` -> 190 passed.
+- `python scripts/ams.py monitor --deep` -> pass (`monitor_e712045689274d038a97036a81cbc943`).
 - `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow with a governed-run receipt and AMS-only active action text.
 - `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow (`control_21266e4ab3274b73972bfb84aadbd761`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached.
 - `codex exec` live hook smoke -> `UserPromptSubmit` payload includes `prompt` + `session_id`; `PreToolUse` is invoked before tools; non-zero command-hook exits are advisory in Codex CLI 0.128.0.
 - Focused AMS CLI verification -> `28 passed`, including the portable checkout-path canary and the blocked guarded-command canary that proves the downstream command is not invoked.
+- Focused Codex entrypoint installer verification -> `2 passed`; focused entrypoint + phase-status verification -> `3 passed`.
+- Real npm Codex shims installed with backups; PowerShell `codex --version`, `cmd /c codex --version`, and WSL `/mnt/c/Users/7amma/AppData/Roaming/npm/codex --version` all return `codex-cli 0.128.0`.
+- Fresh-root default-entrypoint smoke: `codex --version` with temp `AMS_ROOT` blocks before raw Codex runs (`control_253ccfd23f9e4db384cc39e8822af226`).
+- Correction default-entrypoint smoke: `codex.ps1 exec "we already said no scaffolding; stop and record this correction"` with temp `AMS_ROOT` blocks before raw Codex runs (`control_43d400ec00c3484899571952e5785889`).
+- `python scripts/ams.py memory-surfaces` -> reconciled; `ams-memory` primary, `codex-memory` secondary, native Codex memory secondary import source via `migration_8b2e1532c74b4cdd896d78d787d4e4d0`.
+- Focused memory-surface and phase-status canaries -> `4 passed`, including the failure case where native memory remains `warn` until migration is applied.
+- Focused governed-run close/finalize and phase-status canaries -> `4 passed`, including idempotent close and the failure case for receipts missing action-brief/influence ids.
+- Live `python scripts/ams.py governed-run close --receipt-id run_f24ec46f59b14b49aa204d5a75f3ee69 --outcome success ...` -> closed with `influence_ba6f90954fc14042965b163794b4fb95`; dashboard shows `closed=True outcome=success` and next step `add automatic real trace intake from ordinary Codex work`.
 
 ## 2026-05-30
 

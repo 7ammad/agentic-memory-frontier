@@ -69,11 +69,14 @@ Curate legacy Codex memory and run Monitor-0:
 ```powershell
 python scripts/ams.py migrate dry-run
 python scripts/ams.py migrate apply
+python scripts/ams.py memory-surfaces
 python scripts/ams.py monitor
 python scripts/ams.py monitor --deep
 python scripts/ams.py startup-brief "continue building Agentic Memory System" --domain agentic-memory-system
 python scripts/ams.py runtime-control "continue building Agentic Memory System" --domain agentic-memory-system
+python scripts/ams.py governed-run close --outcome success --action-taken "ran focused and full pytest"
 powershell -ExecutionPolicy Bypass -File scripts/ams-guarded-command.ps1 -Prompt "continue building Agentic Memory System" -Command python --version
+powershell -ExecutionPolicy Bypass -File scripts/install-ams-codex-entrypoint.ps1
 python scripts/ams.py correction capture "why are you building before planning" --affected-file package.json
 python scripts/ams.py correction gate
 python scripts/ams.py correction resume <event_id> --approved-by Hammad
@@ -109,17 +112,24 @@ correction-resume-gate.json
 correction-resume-runs.jsonl
 ```
 
-The dashboard reports three layers:
+`memory-surfaces` reports the active memory topology: `ams-memory` must be primary for the active AMS root, while `codex-memory` and native Codex memory are only accepted as secondary inputs after the legacy registry has an applied AMS migration.
+
+The dashboard reports four layers:
 
 - total records;
 - AMS-scoped records;
 - global Codex behavior records.
+- memory surface reconciliation status.
 
 It also prints the current phase and next step so the overnight monitor runs show where the build stands, not only whether the store is alive.
 
 `startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, enforces required startup directives, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns `allow` or `block`.
 
 `runtime-control` is the enforceable launcher-facing surface. It classifies the prompt, checks the correction resume gate, runs the startup brief, writes a runtime-control receipt, and exits non-zero on block. `scripts/ams-guarded-command.ps1` honors that exit code by refusing to invoke the downstream command when AMS blocks.
+
+`governed-run close` finalizes the latest or named governed-run receipt with an observed outcome. It links the startup brief, action brief, and influence id, writes an observational `ActionInfluenceEvent`, and keeps observed outcome separate from verified lift.
+
+`scripts/install-ams-codex-entrypoint.ps1` wires the default Codex shims (`codex.ps1`, `codex.cmd`, and Git Bash `codex`) through the guarded launcher. It writes `codex.ams-original*` backups beside the shims, supports `-Uninstall`, and honors `AMS_CODEX_BYPASS=1` as an emergency raw-Codex escape hatch.
 
 `correction capture` is the first Correction Capture Controller surface. It detects live correction signals, classifies the mistake, records affected files/actions, routes the correction to AMS directives, AMS experience records, and the project ledger where appropriate, opens a resume gate, and makes Monitor-0 fail visibly until `correction resume` clears the gate. The plan is in [docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md](docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md).
 

@@ -199,7 +199,7 @@ Full AMS kernel program (Approach C, eval-first), per `docs/2026-05-28-causal-ex
 
 ### 14. Primary Runtime Adoption
 
-The kernel, MCP bridge, startup gate, and hook wrappers are live. The remaining work is adoption: make AMS the primary governed startup source for Codex, not just a callable MCP/tool surface beside legacy memory.
+The kernel, MCP bridge, startup gate, hook wrappers, default Codex entrypoint wrapping, and memory-surface reconciliation are live. The remaining work is adoption: close governed runs with outcomes/influence, ingest traces from ordinary Codex work, and keep AMS the primary governed startup source.
 
 - [x] Lock `PRODUCT-LOCK.md` as the canonical product acceptance source.
 - [x] Start the execution plan from the product lock (`docs/2026-05-31-ams-product-lock-execution-plan.md`).
@@ -208,8 +208,10 @@ The kernel, MCP bridge, startup gate, and hook wrappers are live. The remaining 
 - [x] Attach `brief_id`, `monitor_id`, and evidence ids to governed-run receipts created by `startup-brief`; expose the latest receipt in dashboard output.
 - [x] Live runtime smoke: confirm the real Codex hook payload projection for `scripts/correction-hook-prompt.ps1` and `scripts/correction-hook-gate.ps1`. `UserPromptSubmit` sends `prompt` + `session_id`; the prompt wrapper maps them correctly. `PreToolUse` invokes the gate wrapper before tools. **Finding:** Codex CLI 0.128.0 command hooks report non-zero exits as hook failures but do not block the turn/tool; evidence recorded in `docs/2026-05-31-codex-hook-runtime-smoke.md`.
 - [x] Replace the Codex command-hook exit-code blocking assumption with an enforceable AMS runtime control path: `ams runtime-control` records allow/block receipts and `scripts/ams-guarded-command.ps1` refuses to invoke the downstream command when AMS blocks.
-- [ ] Wire the AMS guarded launcher into the default Codex entrypoint.
-- [ ] Reconcile legacy Codex memories, `codex-memory`, and `ams-memory` so AMS is the primary startup source.
+- [x] Wire the AMS guarded launcher into the default Codex entrypoint. `scripts/install-ams-codex-entrypoint.ps1` installed wrappers for `codex.ps1`, `codex.cmd`, and Git Bash `codex` with `codex.ams-original*` backups and `AMS_CODEX_BYPASS=1` escape hatch; live smoke proves missing memory and correction prompts block before raw Codex runs.
+- [x] Reconcile legacy Codex memories, `codex-memory`, and `ams-memory` so AMS is the primary startup source. `ams memory-surfaces` reports `ams-memory` as primary, `codex-memory` as secondary, and native Codex memory as an applied secondary import source; tests include a canary that fails until the legacy registry is actually migrated.
+- [x] Add governed-run close/finalize records for outcomes and influence. `ams governed-run close` finalizes receipts with observed outcome, links back to the startup/action brief, writes the observational influence event, and refuses to fake-close receipts missing action-brief/influence ids.
+- [ ] Add automatic real trace intake from ordinary Codex work.
 
 ## Historical Schedule Note
 

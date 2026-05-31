@@ -475,7 +475,7 @@ Entry format:
   - `CHANGELOG.md`
   - `TODO.md`
 - Verification: `python -m pytest` -> **172 passed**. Focused startup/dashboard/correction tests -> **7 passed**. `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** with `brief_6eda3208ffec47ffa0c69b276645b78d`, `run_c156c3cecbad4d42895e7754d69b5651`, and clean AMS-only active action text. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_e15b0880ae67480d8e463c8a8eabf63f`). `git diff --check` clean except Windows CRLF warnings.
-- Follow-up: Runtime-control path was added in LEDGER-20260531-026; next wire the guarded launcher as the default Codex entrypoint, reconcile legacy Codex memories under AMS as secondary input, and add a governed-run close/finalize path for outcomes and influence.
+- Follow-up: Runtime-control path was added in LEDGER-20260531-026, default-entrypoint wiring in LEDGER-20260531-028, memory-surface reconciliation in LEDGER-20260531-029, and governed-run close/finalize in LEDGER-20260531-030; next add real trace intake.
 
 ## LEDGER-20260531-025 - Live Codex command hooks are advisory, not blocking
 
@@ -497,13 +497,13 @@ Entry format:
   - `docs/2026-05-31-ams-review-prompts.md`
   - `CHANGELOG.md`
 - Verification: `codex exec` live smoke with temporary `AMS_ROOT` showed benign prompt allow/no event, correction prompt capture/gate-blocked but Codex continued with exit 0, and pre-armed `PreToolUse` gate failed but Codex still ran `pwd`. Wrapper regression test added for the live Codex payload shape.
-- Follow-up: Runtime-control path added in LEDGER-20260531-026; wire the guarded launcher into the default Codex entrypoint.
+- Follow-up: Runtime-control path added in LEDGER-20260531-026, default-entrypoint wiring in LEDGER-20260531-028, memory-surface reconciliation in LEDGER-20260531-029, and governed-run close/finalize in LEDGER-20260531-030; next add real trace intake.
 
 ## LEDGER-20260531-026 - Enforceable AMS runtime control path
 
 - Date: 2026-05-31
 - Type: implementation / verification
-- Status: active
+- Status: resolved by LEDGER-20260531-028 for default-entrypoint wiring
 - Source: TODO section 14 Primary Runtime Adoption and Product Lock A1/A4/A6.
 - Summary: Replaced the Codex command-hook blocking assumption with an AMS-owned runtime control path. `ams runtime-control` now classifies the prompt, opens the correction gate on live corrections, runs `startup-brief`, records a runtime-control receipt with prompt decision, gate decision, startup brief id, governed-run id, monitor id, evidence ids, and block reasons, and exits non-zero on block. `scripts/ams-guarded-command.ps1` invokes that control path before any downstream command and refuses to run the downstream command when AMS blocks.
 - Files:
@@ -518,7 +518,7 @@ Entry format:
   - `docs/2026-05-31-ams-review-prompts.md`
   - `CHANGELOG.md`
 - Verification: Focused AMS CLI suite -> **28 passed**, including the portable checkout-path canary and the blocked guarded-command canary that proves the downstream command is not invoked when AMS blocks. `python -m pytest` -> **184 passed**. Live `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** (`control_21266e4ab3274b73972bfb84aadbd761`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_7ea1ffa4bffe4e8db97d8c6248559aa0`).
-- Follow-up: Wire `scripts/ams-guarded-command.ps1` into the default Codex entrypoint, then reconcile legacy Codex memories under AMS as secondary input and add governed-run close/finalize records.
+- Follow-up: Default-entrypoint wiring added in LEDGER-20260531-028, memory-surface reconciliation in LEDGER-20260531-029, and governed-run close/finalize in LEDGER-20260531-030; next add real trace intake.
 
 ## LEDGER-20260531-027 - Greptile review-loop remediation
 
@@ -542,7 +542,84 @@ Entry format:
   - `tests/test_close_influence.py`
   - `tests/test_eval_protocol.py`
 - Verification: Focused AMS CLI suite -> **28 passed**. Full suite -> **184 passed**. `git diff --check` clean except Windows CRLF warnings. `python scripts/ams.py monitor --deep` -> **pass** (`monitor_7ea1ffa4bffe4e8db97d8c6248559aa0`). `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** (`control_21266e4ab3274b73972bfb84aadbd761`).
-- Follow-up: Push the active branch update and rerun Greptile on the PRs; do not claim Product Lock A1/A6 complete until the guarded launcher is the default Codex entrypoint.
+- Follow-up: Push the active branch update and rerun Greptile on the PRs; do not claim AMS fully complete until trace intake, aging, and fresh-operator proof are reconciled.
+
+## LEDGER-20260531-028 - Default Codex entrypoint wired through AMS
+
+- Date: 2026-05-31
+- Type: implementation / runtime adoption
+- Status: active
+- Source: TODO section 14 Primary Runtime Adoption and Product Lock A1/A4/A6.
+- Summary: Added `scripts/install-ams-codex-entrypoint.ps1` and installed it against the real npm Codex shims. The installer backs up `codex.ps1`, `codex.cmd`, and Git Bash `codex` as `codex.ams-original*`, writes AMS wrappers that call `scripts/ams-guarded-command.ps1`, supports `-Uninstall`, and preserves an emergency `AMS_CODEX_BYPASS=1` raw-Codex path. The default PowerShell, CMD, and Git Bash Codex shims now route through AMS runtime-control before raw Codex can run.
+- Files:
+  - `scripts/install-ams-codex-entrypoint.ps1`
+  - `scripts/ams-guarded-command.ps1`
+  - `tests/test_ams_entrypoint.py`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `tests/test_ams_cli.py`
+  - `AGENTS.md`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `README.md`
+  - `docs/2026-05-31-ams-product-lock-audit.md`
+  - `docs/2026-05-31-ams-product-lock-execution-plan.md`
+  - `docs/2026-05-31-ams-review-prompts.md`
+  - `CHANGELOG.md`
+- External files intentionally changed:
+  - `C:\Users\7amma\AppData\Roaming\npm\codex.ps1`
+  - `C:\Users\7amma\AppData\Roaming\npm\codex.cmd`
+  - `C:\Users\7amma\AppData\Roaming\npm\codex`
+  - backups: `codex.ams-original.ps1`, `codex.ams-original.cmd`, `codex.ams-original`
+- Verification: Temp-shim installer suite -> **2 passed** (allow invokes original shim, block prevents it, uninstall restores). Focused entrypoint + phase-status suite -> **3 passed**. Full `python -m pytest` -> **186 passed**. Real install created all three backups and wrappers. PowerShell `codex --version`, `cmd /c codex --version`, and WSL `/mnt/c/Users/7amma/AppData/Roaming/npm/codex --version` all return `codex-cli 0.128.0`; the WSL smoke caught and fixed a path-conversion bug in the shell shim. Fresh-root default-entrypoint smoke `codex --version` with temp `AMS_ROOT` blocked before raw Codex (`control_253ccfd23f9e4db384cc39e8822af226`). Correction default-entrypoint smoke `codex.ps1 exec "we already said no scaffolding; stop and record this correction"` with temp `AMS_ROOT` blocked before raw Codex (`control_43d400ec00c3484899571952e5785889`) and captured the correction. Live `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> **allow** (`control_53a55cf200884688b357e26b1d50eb05`). `python scripts/ams.py monitor --deep` -> **pass** (`monitor_20c70fbba00e4fc68c0516a018055ddf`). Global `python scripts/ams.py correction gate` remained **clear**.
+- Follow-up: Memory-surface reconciliation resolved in LEDGER-20260531-029 and governed-run close/finalize resolved in LEDGER-20260531-030; next add real trace intake.
+
+## LEDGER-20260531-029 - Memory surfaces reconciled under AMS
+
+- Date: 2026-05-31
+- Type: implementation / runtime adoption
+- Status: active
+- Source: TODO section 14 Primary Runtime Adoption and Product Lock A1/A4.
+- Summary: Added `ams memory-surfaces` and dashboard memory-surface reporting so the active topology is explicit and testable. The report treats `ams-memory` as primary only when `~/.codex/config.toml` points at the active AMS root, treats `codex-memory` as a secondary bridge input, and treats native Codex memory as a secondary import source only after the latest applied AMS migration points at that registry. Phase status now records memory surface reconciliation as live and advances the next rail to governed-run close/finalize records for outcomes and influence.
+- Files:
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/cli.py`
+  - `tests/test_ams_cli.py`
+  - `AGENTS.md`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `README.md`
+  - `CHANGELOG.md`
+  - `docs/2026-05-31-ams-product-lock-audit.md`
+  - `docs/2026-05-31-ams-product-lock-execution-plan.md`
+  - `docs/2026-05-31-ams-review-prompts.md`
+  - `docs/2026-05-31-codex-hook-runtime-smoke.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: Focused memory-surface and phase-status suite -> **4 passed**. Full `python -m pytest` -> **188 passed**. Live `python scripts/ams.py memory-surfaces` -> **reconciled** (`ams-memory` primary, `codex-memory` secondary, native Codex memory secondary import source via `migration_8b2e1532c74b4cdd896d78d787d4e4d0`). Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_9d466f3c7e4c4f54b69e671cfdff91ba`). Live `python scripts/ams.py dashboard` shows `memory_surfaces: reconciled` and next step `add governed-run close/finalize records for outcomes and influence`. Global `python scripts/ams.py correction gate` remained **clear**.
+- Follow-up: Governed-run close/finalize resolved in LEDGER-20260531-030; next add automatic real trace intake from ordinary Codex work.
+
+## LEDGER-20260531-030 - Governed runs close with outcome and influence
+
+- Date: 2026-05-31
+- Type: implementation / runtime adoption
+- Status: active
+- Source: TODO section 14 Primary Runtime Adoption and Product Lock A5.
+- Summary: Added `ams governed-run close` so AMS can finalize a governed-run receipt after work finishes. New startup/runtime receipts carry the startup brief id, action brief id, pending influence id, monitor id, and evidence ids. Closing a governed run records the observed outcome, finalization timestamp, and an observational `ActionInfluenceEvent` through the existing kernel `close_influence` path. Closing is idempotent, and AMS refuses to fake-close a receipt that lacks action-brief/influence ids.
+- Files:
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/cli.py`
+  - `tests/test_ams_cli.py`
+  - `AGENTS.md`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `README.md`
+  - `CHANGELOG.md`
+  - `docs/2026-05-31-ams-product-lock-audit.md`
+  - `docs/2026-05-31-ams-product-lock-execution-plan.md`
+  - `docs/2026-05-31-ams-review-prompts.md`
+  - `docs/2026-05-31-codex-hook-runtime-smoke.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: Focused governed-run close/finalize and phase-status suite -> **4 passed**. Full `python -m pytest` -> **190 passed**. Live `python scripts/ams.py runtime-control "continue AMS primary runtime adoption close finalize smoke" --domain agentic-memory-system` -> **allow** (`control_62c6f9cef6484ac186636c6bc8169836`, governed run `run_f24ec46f59b14b49aa204d5a75f3ee69`). Live `python scripts/ams.py governed-run close --receipt-id run_f24ec46f59b14b49aa204d5a75f3ee69 --outcome success ...` -> **closed** with `influence_ba6f90954fc14042965b163794b4fb95`. Live `python scripts/ams.py monitor --deep` -> **pass** (`monitor_e712045689274d038a97036a81cbc943`). Live dashboard shows `closed=True outcome=success` and next step `add automatic real trace intake from ordinary Codex work`. Global `python scripts/ams.py correction gate` remained **clear**.
+- Follow-up: Add automatic real trace intake from ordinary Codex work.
 
 ## LEDGER-CORRECTION-20260530-ee8e14de - scope trimming
 
@@ -579,8 +656,10 @@ Entry format:
 - ~~Record `brief_id`, `monitor_id`, and evidence ids for every governed agent run, not only session-start gate output.~~ **RESOLVED PARTIAL (LEDGER-024):** `startup-brief` now writes governed-run receipts with brief, monitor, evidence, cwd, task, status, and block reasons; still need the global Codex runtime proof that every serious run invokes the AMS startup path.
 - ~~Live PS-wrapper runtime smoke (§12): confirm real Codex payload field names.~~ **RESOLVED (LEDGER-025):** Codex `UserPromptSubmit` sends `prompt` and `session_id`; the prompt wrapper maps them correctly and `PreToolUse` invokes the gate wrapper.
 - ~~Codex hook enforcement gap: replace advisory command-hook failure with an enforceable AMS runtime control path.~~ **RESOLVED (LEDGER-026):** `ams runtime-control` records allow/block receipts and `scripts/ams-guarded-command.ps1` refuses to run the downstream command when AMS blocks.
-- Wire the AMS guarded launcher into the default Codex entrypoint.
-- Reconcile legacy Codex memories / `codex-memory` / `ams-memory` so AMS is the primary startup source, not just a parallel MCP surface.
+- ~~Wire the AMS guarded launcher into the default Codex entrypoint.~~ **RESOLVED (LEDGER-028):** real npm Codex shims now route through AMS runtime-control with backups and bypass escape hatch.
+- ~~Reconcile legacy Codex memories / `codex-memory` / `ams-memory` so AMS is the primary startup source, not just a parallel MCP surface.~~ **RESOLVED (LEDGER-029):** `ams memory-surfaces` reports `ams-memory` primary, `codex-memory` secondary, and native Codex memory as an applied secondary import source; dashboard exposes the reconciled state.
+- ~~Add governed-run close/finalize records for outcomes and influence.~~ **RESOLVED (LEDGER-030):** `ams governed-run close` finalizes the receipt, writes an observational influence event, and refuses old/dangling receipts without action-brief links.
+- Add automatic real trace intake from ordinary Codex work.
 - ~~Wire Correction Capture Controller into live agent runtime hooks beyond the CLI surface.~~ **RESOLVED (LEDGER-021):** runtime-agnostic `correction_hooks.py` core + `correction hook-prompt`/`hook-gate` CLI + two PowerShell wrappers; Monitor-0 single-source-of-truth bridge test; human-approval-only resume preserved.
 - ~~Add latency budget enforcement to the startup controller.~~ **RESOLVED (LEDGER-020):** `within_latency_budget` + the pre-registered `RETRIEVAL_LATENCY_BUDGET_MS` now enforce a p95 budget on the CEM retrieval read path (the exact hot path the startup brief shares via `retrieve_brief` -> `retrieve_action_brief`), gated in CI through the Phase 4 exam report and the composite readiness gate.
 - ~~**Phase 5 hardening — two latent defensive consistency nits surfaced by PR#4's 5/5 re-review:**~~ **RESOLVED (LEDGER-020):** both `_supersede_stale_cards` (was: skip only `"superseded"`) and `vertical_loop` `active_card_count` (was: `deactivated_at is None`) now use the shared module-level `card_is_inactive` predicate; a predicate unit test covers all five states and a behavioural canary proves the supersession nit would have clobbered an already-inactive card.

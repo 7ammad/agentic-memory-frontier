@@ -185,13 +185,13 @@ Built and verified:
 - action-brief retrieval with auditable scoring;
 - verification probes, negative controls, and baseline evals;
 - local CLI, monitor, dashboard, startup gate, and MCP bridge;
-- correction capture core and hook wrappers.
+- correction capture core and hook wrappers;
+- default Codex entrypoint wrapping through AMS runtime control;
+- legacy `codex-memory` and native Codex memory reconciled under AMS as secondary inputs;
+- governed-run close/finalize records with observational influence events.
 
 Not yet accepted:
 
-- AMS as the primary Codex memory path;
-- default Codex entrypoint wired through the AMS guarded launcher;
-- governed-run receipts for every serious run;
 - continuous real trace intake from ordinary Codex work;
 - aging and maintenance as a first-class product surface;
 - external operator install/run proof.
@@ -203,9 +203,9 @@ Work proceeds in this order. Do not skip ahead to platform features.
 1. Lock this document as the product acceptance source.
 2. Make Codex start through AMS as primary memory.
 3. Add governed-run receipts everywhere: `brief_id`, `monitor_id`, evidence ids.
-4. Wire the AMS guarded launcher into the default Codex entrypoint.
-5. Add real trace intake from ordinary work.
-6. Close the influence loop for governed runs.
+4. Reconcile legacy Codex memory surfaces under AMS as secondary inputs.
+5. Close the influence loop for governed runs.
+6. Add real trace intake from ordinary work.
 7. Add aging and maintenance checks.
 8. Package the local operator path.
 9. Re-run frontier evals against the accepted product path.

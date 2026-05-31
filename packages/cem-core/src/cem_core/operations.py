@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tomllib
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -83,6 +84,24 @@ class RecordScopeSummary(StrictModel):
     other_directive_count: int
 
 
+class MemorySurface(StrictModel):
+    name: str
+    role: Literal["primary", "secondary", "secondary_import_source", "unconfigured"]
+    status: Literal["pass", "warn", "fail"]
+    configured: bool
+    source_path: str | None
+    detail: str
+
+
+class MemorySurfaceReport(StrictModel):
+    generated_at: datetime = Field(default_factory=utc_now)
+    root: str
+    config_path: str
+    memory_base: str
+    reconciled: bool
+    surfaces: list[MemorySurface]
+
+
 class PhaseStatus(StrictModel):
     completed_through: str
     current_phase: str
@@ -105,6 +124,8 @@ class StartupBriefRun(StrictModel):
     root: str
     status: StartupStatus
     governed_run_id: str | None = None
+    action_brief_id: str | None = None
+    influence_id: str | None = None
     monitor_id: str
     task_description: str
     domain_scope: str | None
@@ -126,6 +147,8 @@ class GovernedRunReceipt(StrictModel):
     cwd: str
     status: StartupStatus
     startup_brief_id: str
+    action_brief_id: str | None = None
+    influence_id: str | None = None
     monitor_id: str
     task_description: str
     domain_scope: str | None
@@ -344,12 +367,14 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
     root = _root(root)
     init_memory(root)
     scope = record_scope_summary(root)
+    surfaces = memory_surface_report(root)
     return {
         "root": str(root),
         "card_count": scope.total_card_count,
         "atom_count": scope.total_atom_count,
         "directive_count": scope.total_directive_count,
         "scope": scope.model_dump(mode="json"),
+        "memory_surfaces": surfaces.model_dump(mode="json"),
         "phase": phase_status().model_dump(mode="json"),
         "latest_migration": _load_json(root / "migration-latest.json"),
         "latest_monitor": _load_json(root / "monitor-latest.json"),
@@ -384,6 +409,8 @@ def startup_brief(
     experience_actions = brief["recommended_next_actions"][len(brief["directives"]) :]
     recommended_actions = _cap_items_by_token_budget(directive_actions + experience_actions, max_tokens)
     evidence_ids = ([directive["directive_id"] for directive in directives] + brief["experience"]["evidence_links"])[:max_evidence]
+    action_brief_id = brief["experience"].get("brief_id")
+    influence_id = brief["experience"].get("influence_id")
 
     action_text = "\n".join(recommended_actions).lower()
     required_directives = {
@@ -403,6 +430,8 @@ def startup_brief(
         root=str(root),
         status="block" if block_reasons else "allow",
         governed_run_id=receipt_id,
+        action_brief_id=action_brief_id,
+        influence_id=influence_id,
         monitor_id=monitor.run_id,
         task_description=description,
         domain_scope=domain_scope,
@@ -427,6 +456,8 @@ def startup_brief(
         cwd=str(Path.cwd().resolve()),
         status=run.status,
         startup_brief_id=run.brief_id,
+        action_brief_id=action_brief_id,
+        influence_id=influence_id,
         monitor_id=monitor.run_id,
         task_description=description,
         domain_scope=domain_scope,
@@ -437,6 +468,48 @@ def startup_brief(
     _write_governed_run_records(root, receipt)
     _write_startup_brief_records(root, run)
     return run
+
+
+def close_governed_run(
+    root: Path | None = None,
+    *,
+    receipt_id: str | None = None,
+    outcome: Literal["success", "failure", "partial", "unknown"],
+    action_taken: str | None = None,
+    observed_post_brief_delta: float | None = None,
+    baseline_comparison: str | None = None,
+) -> GovernedRunReceipt:
+    root = _root(root)
+    receipt = _load_governed_run_receipt(root, receipt_id)
+    if receipt.closed:
+        return receipt
+
+    influence_ids = list(receipt.influence_ids)
+    if receipt.status == "allow":
+        if not receipt.action_brief_id or not receipt.influence_id:
+            raise ValueError(
+                f"governed run {receipt.receipt_id} cannot close influence: missing action_brief_id or influence_id"
+            )
+        event = CEM(root).close_influence(
+            receipt.action_brief_id,
+            action_taken=action_taken,
+            outcome=outcome,
+            observed_post_brief_delta=observed_post_brief_delta,
+            baseline_comparison=baseline_comparison,
+        )
+        if event.influence_id not in influence_ids:
+            influence_ids.append(event.influence_id)
+
+    closed = receipt.model_copy(
+        update={
+            "closed": True,
+            "outcome": outcome,
+            "finalized_at": utc_now(),
+            "influence_ids": influence_ids,
+        }
+    )
+    _write_governed_run_records(root, closed)
+    return closed
 
 
 def runtime_control(
@@ -501,6 +574,83 @@ def runtime_control(
     return run
 
 
+def memory_surface_report(
+    root: Path | None = None,
+    *,
+    config_path: Path | None = None,
+    memory_base: Path | None = None,
+) -> MemorySurfaceReport:
+    root = _root(root)
+    config_path = (config_path or (Path.home() / ".codex" / "config.toml")).expanduser().resolve()
+    memory_base = (memory_base or (Path.home() / ".codex" / "memories")).expanduser().resolve()
+    config = _load_toml(config_path)
+    servers = config.get("mcp_servers", {}) if isinstance(config.get("mcp_servers", {}), dict) else {}
+    ams_server = servers.get("ams-memory") if isinstance(servers.get("ams-memory"), dict) else None
+    codex_server = servers.get("codex-memory") if isinstance(servers.get("codex-memory"), dict) else None
+    latest_migration = _load_json(root / "migration-latest.json")
+    legacy_registry = memory_base / "MEMORY.md"
+    migration_matches_legacy = bool(
+        latest_migration
+        and latest_migration.get("applied") is True
+        and _same_path(latest_migration.get("source_path"), legacy_registry)
+    )
+
+    ams_root = _server_env_path(ams_server, "AMS_ROOT")
+    ams_matches_root = ams_root is not None and _same_path(str(ams_root), root)
+    ams_surface = MemorySurface(
+        name="ams-memory",
+        role="primary" if ams_matches_root else "unconfigured",
+        status="pass" if ams_matches_root else "fail",
+        configured=ams_server is not None,
+        source_path=str(ams_root) if ams_root else None,
+        detail=(
+            "configured as primary AMS MCP for this root"
+            if ams_matches_root
+            else "missing or points at a different AMS root"
+        ),
+    )
+
+    codex_surface = MemorySurface(
+        name="codex-memory",
+        role="secondary" if codex_server is not None and ams_matches_root else "unconfigured",
+        status="pass" if codex_server is not None and ams_matches_root else "warn",
+        configured=codex_server is not None,
+        source_path=_server_env_string(codex_server, "CODEX_MEMORY_DB_PATH"),
+        detail=(
+            "configured only as secondary legacy/bridge input; AMS guarded startup is primary"
+            if codex_server is not None and ams_matches_root
+            else "not configured or AMS primary root is not established"
+        ),
+    )
+
+    native_surface = MemorySurface(
+        name="native-codex-memory",
+        role="secondary_import_source" if legacy_registry.exists() else "unconfigured",
+        status="pass" if migration_matches_legacy else ("warn" if legacy_registry.exists() else "pass"),
+        configured=legacy_registry.exists(),
+        source_path=str(legacy_registry) if legacy_registry.exists() else None,
+        detail=(
+            f"latest applied migration imports this registry via {latest_migration['run_id']}"
+            if migration_matches_legacy and latest_migration
+            else (
+                "legacy registry exists but latest applied AMS migration does not point at it"
+                if legacy_registry.exists()
+                else "legacy registry not present"
+            )
+        ),
+    )
+
+    surfaces = [ams_surface, codex_surface, native_surface]
+    reconciled = ams_surface.status == "pass" and codex_surface.role == "secondary" and native_surface.status == "pass"
+    return MemorySurfaceReport(
+        root=str(root),
+        config_path=str(config_path),
+        memory_base=str(memory_base),
+        reconciled=reconciled,
+        surfaces=surfaces,
+    )
+
+
 def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
     root = _root(root)
     cards = list_memory(root, kind="cards")["cards"]
@@ -525,16 +675,14 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS product lock: kernel, MCP bridge, startup gate, and hook wrappers are live"
+            "AMS product lock: kernel, MCP bridge, startup gate, hook wrappers, memory surface reconciliation, and governed-run close/finalize are live"
         ),
         current_phase="AMS Primary Runtime Adoption",
         status="active",
-        next_step="wire AMS guarded launcher into the default Codex entrypoint",
+        next_step="add automatic real trace intake from ordinary Codex work",
         ready_for_next_phase=False,
         open_followups=[
-            "wire AMS guarded launcher into the default Codex entrypoint",
-            "add governed-run close/finalize records for outcomes and influence",
-            "reconcile legacy Codex memories, codex-memory, and ams-memory so AMS is the primary startup source",
+            "add real trace intake from ordinary Codex work",
         ],
     )
 
@@ -633,6 +781,25 @@ def _write_governed_run_records(root: Path, receipt: GovernedRunReceipt) -> None
     (root / "governed-run-latest.md").write_text(_render_governed_run_markdown(receipt), encoding="utf-8")
 
 
+def _load_governed_run_receipt(root: Path, receipt_id: str | None) -> GovernedRunReceipt:
+    if receipt_id is None:
+        payload = _load_json(root / "governed-run-latest.json")
+        if payload is None:
+            raise ValueError("No governed run receipt exists to close.")
+        return GovernedRunReceipt.model_validate(payload)
+
+    runs_path = root / "governed-run-runs.jsonl"
+    if not runs_path.exists():
+        raise ValueError(f"Governed run receipt not found: {receipt_id}")
+    for line in reversed(runs_path.read_text(encoding="utf-8").splitlines()):
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if payload.get("receipt_id") == receipt_id:
+            return GovernedRunReceipt.model_validate(payload)
+    raise ValueError(f"Governed run receipt not found: {receipt_id}")
+
+
 def _write_runtime_control_records(root: Path, run: RuntimeControlRun) -> None:
     root.mkdir(parents=True, exist_ok=True)
     _append_jsonl(root / "runtime-control-runs.jsonl", run.model_dump(mode="json"))
@@ -692,6 +859,8 @@ def _render_startup_brief_markdown(run: StartupBriefRun) -> str:
         f"- brief_id: `{run.brief_id}`",
         f"- status: `{run.status}`",
         f"- governed_run_id: `{run.governed_run_id}`",
+        f"- action_brief_id: `{run.action_brief_id}`",
+        f"- influence_id: `{run.influence_id}`",
         f"- monitor_id: `{run.monitor_id}`",
         f"- phase: `{run.phase.current_phase}`",
         f"- task: {run.task_description}",
@@ -720,6 +889,8 @@ def _render_governed_run_markdown(receipt: GovernedRunReceipt) -> str:
         f"- receipt_id: `{receipt.receipt_id}`",
         f"- status: `{receipt.status}`",
         f"- startup_brief_id: `{receipt.startup_brief_id}`",
+        f"- action_brief_id: `{receipt.action_brief_id}`",
+        f"- influence_id: `{receipt.influence_id}`",
         f"- monitor_id: `{receipt.monitor_id}`",
         f"- cwd: `{receipt.cwd}`",
         f"- task: {receipt.task_description}",
@@ -868,3 +1039,32 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_toml(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return tomllib.loads(path.read_text(encoding="utf-8"))
+
+
+def _server_env_string(server: dict[str, Any] | None, name: str) -> str | None:
+    if not server:
+        return None
+    env = server.get("env")
+    if not isinstance(env, dict):
+        return None
+    value = env.get(name)
+    return str(value) if value is not None else None
+
+
+def _server_env_path(server: dict[str, Any] | None, name: str) -> Path | None:
+    value = _server_env_string(server, name)
+    if value is None:
+        return None
+    return Path(value).expanduser().resolve()
+
+
+def _same_path(left: str | Path | None, right: str | Path | None) -> bool:
+    if left is None or right is None:
+        return False
+    return Path(left).expanduser().resolve() == Path(right).expanduser().resolve()

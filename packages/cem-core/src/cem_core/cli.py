@@ -28,7 +28,9 @@ from .local_memory import (
 from .operations import (
     apply_codex_memory_migration,
     build_codex_memory_migration_run,
+    close_governed_run,
     dashboard_status,
+    memory_surface_report,
     run_monitor,
     runtime_control,
     startup_brief,
@@ -157,6 +159,15 @@ def build_parser() -> argparse.ArgumentParser:
     migrate_apply.add_argument("--memory-base", type=Path, help="Legacy Codex memory base. Defaults to ~/.codex/memories.")
     migrate_apply.set_defaults(handler=_cmd_migrate_apply)
 
+    surfaces_parser = subparsers.add_parser(
+        "memory-surfaces",
+        parents=[json_parent],
+        help="Report which memory surfaces are primary versus secondary under AMS.",
+    )
+    surfaces_parser.add_argument("--config-path", type=Path, help="Codex config.toml path. Defaults to ~/.codex/config.toml.")
+    surfaces_parser.add_argument("--memory-base", type=Path, help="Legacy Codex memory base. Defaults to ~/.codex/memories.")
+    surfaces_parser.set_defaults(handler=_cmd_memory_surfaces)
+
     monitor_parser = subparsers.add_parser("monitor", parents=[json_parent], help="Run AMS Monitor-0 checks.")
     monitor_parser.add_argument("--deep", action="store_true", help="Also run the synthetic corruption eval.")
     monitor_parser.set_defaults(handler=_cmd_monitor)
@@ -186,6 +197,33 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_control_parser.add_argument("--session-id", help="Runtime session id.")
     runtime_control_parser.add_argument("--affected-file", action="append", default=[], help="Affected file path.")
     runtime_control_parser.set_defaults(handler=_cmd_runtime_control)
+
+    governed_parser = subparsers.add_parser(
+        "governed-run",
+        parents=[json_parent],
+        help="Close governed AMS run receipts.",
+    )
+    governed_subparsers = governed_parser.add_subparsers(dest="governed_command", required=True)
+    governed_close_parser = governed_subparsers.add_parser(
+        "close",
+        parents=[json_parent],
+        help="Finalize a governed run with observed outcome and influence evidence.",
+    )
+    governed_close_parser.add_argument("--receipt-id", help="Receipt id. Defaults to the latest governed run.")
+    governed_close_parser.add_argument(
+        "--outcome",
+        required=True,
+        choices=["success", "failure", "partial", "unknown"],
+        help="Observed outcome.",
+    )
+    governed_close_parser.add_argument("--action-taken", help="Action performed after reading the brief.")
+    governed_close_parser.add_argument(
+        "--observed-post-brief-delta",
+        type=float,
+        help="Observed post-brief delta. Observational only, not verified lift.",
+    )
+    governed_close_parser.add_argument("--baseline-comparison", help="Optional baseline comparison note.")
+    governed_close_parser.set_defaults(handler=_cmd_governed_run_close)
 
     correction_parser = subparsers.add_parser(
         "correction",
@@ -322,6 +360,14 @@ def _cmd_migrate_apply(args: argparse.Namespace) -> dict[str, Any]:
     return apply_codex_memory_migration(args.root, memory_base=args.memory_base).model_dump(mode="json")
 
 
+def _cmd_memory_surfaces(args: argparse.Namespace) -> dict[str, Any]:
+    return memory_surface_report(
+        args.root,
+        config_path=args.config_path,
+        memory_base=args.memory_base,
+    ).model_dump(mode="json")
+
+
 def _cmd_monitor(args: argparse.Namespace) -> dict[str, Any]:
     return run_monitor(args.root, deep=args.deep).model_dump(mode="json")
 
@@ -347,6 +393,17 @@ def _cmd_runtime_control(args: argparse.Namespace) -> dict[str, Any]:
         task_family=args.task_family,
         session_id=args.session_id,
         affected_files=args.affected_file,
+    ).model_dump(mode="json")
+
+
+def _cmd_governed_run_close(args: argparse.Namespace) -> dict[str, Any]:
+    return close_governed_run(
+        args.root,
+        receipt_id=args.receipt_id,
+        outcome=args.outcome,
+        action_taken=args.action_taken,
+        observed_post_brief_delta=args.observed_post_brief_delta,
+        baseline_comparison=args.baseline_comparison,
     ).model_dump(mode="json")
 
 
@@ -444,6 +501,8 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
         _emit_correction_hook(payload)
     elif "control_id" in payload and "runtime_exit_code" in payload:
         _emit_runtime_control(payload)
+    elif "receipt_id" in payload and "startup_brief_id" in payload and "closed" in payload:
+        _emit_governed_run(payload)
     elif "brief_id" in payload and "monitor_id" in payload:
         _emit_startup_brief(payload)
     elif "event_id" in payload and "route_targets" in payload:
@@ -468,6 +527,8 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
             print(f"{directive['directive_id']} :: {directive['content']}")
     elif "pin_count" in payload and "remember_count" in payload:
         _emit_migration(payload)
+    elif "memory_base" in payload and "surfaces" in payload:
+        _emit_memory_surfaces(payload)
     elif "checks" in payload and "status" in payload:
         _emit_monitor(payload)
     elif "latest_monitor" in payload:
@@ -554,6 +615,18 @@ def _emit_migration(payload: dict[str, Any]) -> None:
         print(f"- {item['action']}: {item['content']}")
 
 
+def _emit_memory_surfaces(payload: dict[str, Any]) -> None:
+    status = "reconciled" if payload["reconciled"] else "not-reconciled"
+    print(f"memory_surfaces: {status}")
+    print(f"config: {payload['config_path']}")
+    print(f"memory_base: {payload['memory_base']}")
+    for surface in payload["surfaces"]:
+        print(
+            f"- {surface['status']}: {surface['name']} "
+            f"role={surface['role']} configured={surface['configured']} :: {surface['detail']}"
+        )
+
+
 def _emit_monitor(payload: dict[str, Any]) -> None:
     print(f"monitor: {payload['status']} {payload['run_id']}")
     scope = payload.get("scope")
@@ -578,6 +651,10 @@ def _emit_startup_brief(payload: dict[str, Any]) -> None:
     print(f"startup_brief: {payload['status']} {payload['brief_id']}")
     if payload.get("governed_run_id"):
         print(f"governed_run: {payload['governed_run_id']}")
+    if payload.get("action_brief_id"):
+        print(f"action_brief: {payload['action_brief_id']}")
+    if payload.get("influence_id"):
+        print(f"influence: {payload['influence_id']}")
     print(f"monitor: {payload['monitor_id']}")
     print(f"phase: {payload['phase']['current_phase']} ({payload['phase']['status']})")
     print(f"tokens: {payload['estimated_tokens']} / {payload['limits']['max_tokens']}")
@@ -607,6 +684,18 @@ def _emit_runtime_control(payload: dict[str, Any]) -> None:
         print("block_reasons:")
         for reason in payload["block_reasons"]:
             print(f"- {reason}")
+
+
+def _emit_governed_run(payload: dict[str, Any]) -> None:
+    status = "closed" if payload["closed"] else "open"
+    print(f"governed_run: {status} {payload['receipt_id']}")
+    print(f"outcome: {payload['outcome']}")
+    print(f"startup_brief: {payload['startup_brief_id']}")
+    if payload.get("action_brief_id"):
+        print(f"action_brief: {payload['action_brief_id']}")
+    if payload.get("influence_id"):
+        print(f"influence: {payload['influence_id']}")
+    print(f"influence_records: {len(payload['influence_ids'])}")
 
 
 def _emit_correction_hook(payload: dict[str, Any]) -> None:
@@ -672,6 +761,10 @@ def _emit_dashboard(payload: dict[str, Any]) -> None:
         )
         print(f"global_behavior: {scope['global_behavior_directive_count']} directives")
         print(f"other_scope: {scope['other_directive_count']} directives")
+    memory_surfaces = payload.get("memory_surfaces")
+    if memory_surfaces:
+        status = "reconciled" if memory_surfaces["reconciled"] else "not-reconciled"
+        print(f"memory_surfaces: {status}")
     latest_monitor = payload.get("latest_monitor")
     latest_migration = payload.get("latest_migration")
     if latest_monitor:
@@ -690,7 +783,10 @@ def _emit_dashboard(payload: dict[str, Any]) -> None:
         print("latest_startup_brief: none")
     latest_governed_run = payload.get("latest_governed_run")
     if latest_governed_run:
-        print(f"latest_governed_run: {latest_governed_run['status']} {latest_governed_run['receipt_id']}")
+        print(
+            f"latest_governed_run: {latest_governed_run['status']} {latest_governed_run['receipt_id']} "
+            f"closed={latest_governed_run['closed']} outcome={latest_governed_run['outcome']}"
+        )
     else:
         print("latest_governed_run: none")
     latest_runtime_control = payload.get("latest_runtime_control")
