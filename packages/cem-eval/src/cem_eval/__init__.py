@@ -74,6 +74,7 @@ from .synthetic_corruption import (
     run_synthetic_corruption_eval,
     workflow_report_row_from_run,
 )
+from .vertical_loop import VerticalLoopReport, run_vertical_loop
 from .workflow_gotchas import (
     WorkflowGotchaAttempt,
     WorkflowGotchaDemoResult,
@@ -109,6 +110,7 @@ __all__ = [
     "MemoryArenaTask",
     "SyntheticEvalReport",
     "SyntheticEvalResult",
+    "VerticalLoopReport",
     "WorkflowGotchaAttempt",
     "WorkflowGotchaDemoResult",
     "WorkflowReportRow",
@@ -132,6 +134,7 @@ __all__ = [
     "run_memoryarena_cem0_eval",
     "run_memoryarena_cem0_eval_from_dataset",
     "run_synthetic_corruption_eval",
+    "run_vertical_loop",
     "run_workflow_gotcha_demo",
     "score_halumem_extraction",
     "score_halumem_reference_upper_bound",

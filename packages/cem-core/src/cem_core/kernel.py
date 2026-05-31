@@ -6,6 +6,8 @@ from .contradiction import ContradictionDetector
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .models import (
     ActionBrief,
+    ActionBriefRecord,
+    ActionInfluenceEvent,
     AgentTrace,
     ExperienceAtom,
     ExperienceCard,
@@ -13,6 +15,7 @@ from .models import (
     TaskContext,
     TraceReceipt,
     VerificationResult,
+    new_id,
     utc_now,
 )
 from .storage import CEMStore, SQLiteStore
@@ -120,26 +123,80 @@ class CEM:
         return card
 
     def retrieve_action_brief(self, task: TaskContext, *, max_cards: int = 5) -> ActionBrief:
-        cards = [card for card in self.store.list_cards() if self._card_in_scope(card, task)]
+        in_scope = [card for card in self.store.list_cards() if self._card_in_scope(card, task)]
         scored = sorted(
-            ((score_card(card, task), card) for card in cards),
+            ((score_card(card, task), card) for card in in_scope),
             key=lambda item: item[0],
             reverse=True,
         )
-        selected = [card for score, card in scored if score > 0][:max_cards]
-        confidence = max((card.confidence_score for card in selected), default=0.0)
-        return ActionBrief(
+        selected = [(score, card) for score, card in scored if score > 0][:max_cards]
+        selected_cards = [card for _, card in selected]
+        confidence = max((card.confidence_score for card in selected_cards), default=0.0)
+        score_breakdown = {
+            card.card_id: {"lexical_overlap": float(score)} for score, card in selected
+        }
+        if selected_cards:
+            expected_delta: float | None = confidence
+            delta_source = "observational_unverified"
+        else:
+            expected_delta = None
+            delta_source = "none"
+        influence_id = new_id("influence")
+        brief = ActionBrief(
             task_id=task.task_id,
-            applicable_card_ids=[card.card_id for card in selected],
-            why_applicable=[f"matched task terms with '{card.title}'" for card in selected],
-            preconditions_to_check=[item for card in selected for item in card.check_first],
-            recommended_next_actions=[item for card in selected for item in card.do],
-            risks_and_failure_modes=[item for card in selected for item in card.do_not],
+            applicable_card_ids=[card.card_id for card in selected_cards],
+            why_applicable=[f"matched task terms with '{card.title}'" for card in selected_cards],
+            preconditions_to_check=[item for card in selected_cards for item in card.check_first],
+            recommended_next_actions=[item for card in selected_cards for item in card.do],
+            risks_and_failure_modes=[item for card in selected_cards for item in card.do_not],
             stale_or_contested_memory_ids_to_ignore=[],
-            evidence_links=[atom_id for card in selected for atom_id in card.evidence_atom_ids],
+            evidence_links=[
+                atom_id for card in selected_cards for atom_id in card.evidence_atom_ids
+            ],
             confidence_score=confidence,
-            expected_action_delta=None,
+            expected_action_delta=expected_delta,
+            influence_id=influence_id,
+            scorer_version=SCORER_VERSION,
+            expected_action_delta_source=delta_source,
+            score_breakdown_by_card=score_breakdown,
         )
+        self.store.save_action_brief_record(
+            ActionBriefRecord(
+                brief_id=brief.brief_id,
+                task_id=task.task_id,
+                candidate_card_ids=[card.card_id for card in in_scope],
+                selected_card_ids=brief.applicable_card_ids,
+                score_breakdown_by_card=score_breakdown,
+                scorer_version=SCORER_VERSION,
+                expected_action_delta_source=delta_source,
+                influence_id=influence_id,
+            )
+        )
+        return brief
+
+    def close_influence(
+        self,
+        brief_id: str,
+        *,
+        action_taken: str | None = None,
+        outcome: str = "unknown",
+        observed_post_brief_delta: float | None = None,
+        counterfactual_method: str | None = None,
+        baseline_comparison: str | None = None,
+    ) -> ActionInfluenceEvent:
+        record = self.store.get_action_brief_record(brief_id)
+        event = ActionInfluenceEvent(
+            influence_id=record.influence_id,
+            brief_id=brief_id,
+            task_id=record.task_id,
+            action_taken=action_taken,
+            outcome=outcome,
+            observed_post_brief_delta=observed_post_brief_delta,
+            counterfactual_method=counterfactual_method or "observational_no_counterfactual",
+            baseline_comparison=baseline_comparison,
+        )
+        self.store.save_action_influence_event(event)
+        return event
 
     def _card_in_scope(self, card: ExperienceCard, task: TaskContext) -> bool:
         if card.valid_from is not None and card.valid_from > task.current_time:
@@ -238,6 +295,9 @@ class CEM:
 def _title(content: str) -> str:
     cleaned = " ".join(content.split())
     return cleaned[:80]
+
+
+SCORER_VERSION = "lexical_overlap_v0"
 
 
 def score_card(card: ExperienceCard, task: TaskContext) -> int:

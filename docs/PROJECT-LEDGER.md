@@ -236,6 +236,26 @@ Entry format:
 - Verification: `python -m pytest` -> 82 passed (21 new Phase 0 tests, including failure canaries for the promotion bug, the audit status, the MMA success bar, the leakage guard, and the no-fake-green guard). `python -m compileall -q packages scripts tests`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1` (SESSION_GATE_PASS), and `git diff --check` all clean.
 - Follow-up: Execute Phase 1 (full vertical skeleton: trace -> atom -> card -> action brief -> influence event with real persisted state at every hop, no stubs), then Phases 2-5 (grounded consolidation + verification; action-value retrieval; MMA + baseline ladder exam; hardening).
 
+## LEDGER-20260529-012 - CEM-1 Phase 1 full vertical skeleton landed and verified
+
+- Date: 2026-05-29
+- Type: verification
+- Status: resolved
+- Source: Standing user directive to build the full CEM program end-to-end with no ghost coding / no fake-green; Phase 1 per `docs/2026-05-29-cem-1-phase-1-vertical-skeleton-plan.md` (round-2 phase sequencing).
+- Summary: Built the first real end-to-end loop on persisted objects, no stubs. (1) `retrieve_action_brief` now enriches the brief with `influence_id`, `scorer_version`, a per-card `score_breakdown_by_card`, and a sourced `expected_action_delta` (`observational_unverified` when cards are selected, `none`/`None` when not) and persists an `ActionBriefRecord` on every call. (2) Added `close_influence(brief_id, ...)` writing an observational `ActionInfluenceEvent` (defaults `counterfactual_method="observational_no_counterfactual"`); it never promotes a card or sets `measured_lift` (observational/causal firewall held). (3) Added `cem_eval/vertical_loop.py` (`run_vertical_loop` + `VerticalLoopReport`) driving ingest -> propose -> validate -> promote -> retrieve -> close on two seeded skills, computing MMA via the locked protocol with the leakage guard wired (`inject_leakage` negative control). (4) Added `scripts/run_cem_vertical_loop.py` as a real CLI consumer. Report counts are real store queries, not loop counters. First loop: MMA 1.0, n=2, CI [1.0, 1.0] - the toy skeleton smoke, explicitly NOT the Phase 4 baseline-ladder exam. Scorer deliberately kept `lexical_overlap_v0` (action-value scorer is Phase 3).
+- Files:
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-eval/src/cem_eval/vertical_loop.py`
+  - `packages/cem-eval/src/cem_eval/__init__.py`
+  - `scripts/run_cem_vertical_loop.py`
+  - `tests/test_action_brief_record.py`
+  - `tests/test_close_influence.py`
+  - `tests/test_vertical_loop.py`
+  - `tests/test_run_cem_vertical_loop_script.py`
+  - `docs/2026-05-29-cem-1-phase-1-vertical-skeleton-plan.md`
+- Verification: `python -m pytest` -> 91 passed (9 new Phase 1 tests). Three failure canaries hand-verified break -> fail -> revert -> pass: untagged action-delta (`test_brief_never_presents_untagged_delta`), `close_influence` never verifies a card (`test_close_influence_never_verifies_a_card`), and vertical-loop leakage-bites (`test_vertical_loop_leakage_guard_bites`, self-proving via `pytest.raises`). Independent verifier subagent returned PHASE 1 VERIFIED across 6 checks: real-green (91/91, exit 0), script runs end-to-end (`brief_record_count=2`, `influence_event_count=2`, `card_count=2`), MMA computed not hardcoded (sensitivity check `[0.5,1.0]` vs `[0.0,0.0]` -> 0.75), canaries substantive, every new symbol has a real caller (no ghost code), and no Phase 2/3 scope leak (`scorer_version` uniformly `lexical_overlap_v0`; `probe_verified`/`heldout_eval` appear only as enum literals and a canary assertion). `python -m compileall`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1`, and `git diff --check` all clean.
+- Follow-up: Execute Phase 2 (grounded consolidation + the evidence-gated verification loop: probes -> results -> verified promotion), then Phases 3-5.
+
 ## Open Follow-Ups
 
 - Add latency budget enforcement to the startup controller.

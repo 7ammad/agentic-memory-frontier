@@ -15,6 +15,9 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added `packages/cem-eval/src/cem_eval/eval_protocol.py`: the locked Marginal Memory Advantage metric (paired delta + 95% CI), the 10-baseline ladder (`human_runbook` flagged ceiling), the >=5pp lexical-overlap margin, and a leakage guard.
 - Added `tests/test_no_fake_green_guard.py`: a static AST guard that fails new literal-bool health checks (the two `operations.py` offenders pinned as tracked debt).
 - Added `docs/2026-05-28-cem-1-phase-0-contract-lock-plan.md` (Phase 0 implementation plan).
+- Completed **Phase 1 (full vertical skeleton)**: a real end-to-end `trace -> atom -> validate -> candidate card -> action brief -> influence event` loop on persisted SQLite objects, no stubs. `retrieve_action_brief` now persists an `ActionBriefRecord` and emits a sourced `expected_action_delta` (`observational_unverified` when cards are selected, otherwise `none`); `close_influence` writes an observational `ActionInfluenceEvent` that never promotes a card or sets `measured_lift`.
+- Added `packages/cem-eval/src/cem_eval/vertical_loop.py` (`run_vertical_loop` + `VerticalLoopReport`) and `scripts/run_cem_vertical_loop.py` as a real CLI consumer. Report counts come from real store queries; the runner enforces the leakage guard. First loop: MMA 1.0, n=2, CI [1.0, 1.0] (toy skeleton smoke, not the Phase 4 exam). Scorer stays `lexical_overlap_v0` (the action-value scorer is Phase 3).
+- Added `docs/2026-05-29-cem-1-phase-1-vertical-skeleton-plan.md` (Phase 1 implementation plan).
 
 ### Changed
 
@@ -22,8 +25,9 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 ### Verification
 
-- `python -m pytest` -> 82 passed (21 new Phase 0 tests, including failure canaries for the promotion bug, the audit status, the MMA success bar, the leakage guard, and the no-fake-green guard).
-- `python -m compileall -q packages scripts tests`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1`, and `git diff --check` all clean.
+- **Phase 0:** `python -m pytest` -> 82 passed (21 new Phase 0 tests, including failure canaries for the promotion bug, the audit status, the MMA success bar, the leakage guard, and the no-fake-green guard).
+- **Phase 1:** `python -m pytest` -> 91 passed (9 new Phase 1 tests, including failure canaries for untagged action-delta, `close_influence` never verifying a card, and the vertical-loop leakage guard). An independent verifier subagent confirmed real-green, all three canaries bite (break -> fail -> revert -> pass), no ghost code (every new symbol has a real caller), and no Phase 2/3 scope leak (MMA computed not hardcoded; `scorer_version` uniformly `lexical_overlap_v0`).
+- `python -m compileall -q packages scripts tests`, `python scripts/run_cem_vertical_loop.py`, `python scripts/run_synthetic_eval.py`, `scripts/session-start-gate.ps1`, and `git diff --check` all clean.
 
 ## 2026-05-28
 
