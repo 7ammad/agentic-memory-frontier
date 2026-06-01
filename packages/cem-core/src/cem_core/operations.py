@@ -655,10 +655,13 @@ def startup_brief(
     influence_id = brief["experience"].get("influence_id")
 
     action_text = "\n".join(recommended_actions).lower()
+    requires_ams_bootstrap_directives = domain_scope in (None, AMS_DOMAIN_SCOPE)
     required_directives = {
-        "waki_boundary": "waki" in action_text,
-        "verification_rule": "pytest" in action_text and "synthetic" in action_text,
-        "todo_rule": "todo.md" in action_text,
+        "waki_boundary": True if not requires_ams_bootstrap_directives else "waki" in action_text,
+        "verification_rule": True
+        if not requires_ams_bootstrap_directives
+        else "pytest" in action_text and "synthetic" in action_text,
+        "todo_rule": True if not requires_ams_bootstrap_directives else "todo.md" in action_text,
     }
     block_reasons: list[str] = []
     if monitor.status != "pass":

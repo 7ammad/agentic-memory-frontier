@@ -671,6 +671,31 @@ def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):
     assert dashboard["latest_governed_run"]["influence_ids"] == []
 
 
+def test_ams_cli_startup_brief_for_waki_does_not_surface_ams_workspace_boundary(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+
+    result = _ams(
+        root,
+        "--json",
+        "startup-brief",
+        "continue Waki PR review work",
+        "--domain",
+        "Waki",
+        "--max-cards",
+        "1",
+    )
+
+    action_text = "\n".join(result["recommended_next_actions"])
+    assert result["status"] == "allow"
+    assert "Never read or write files under C:\\Dev\\Builds\\Waki" not in action_text
+    assert result["required_directives"] == {
+        "waki_boundary": True,
+        "verification_rule": True,
+        "todo_rule": True,
+    }
+
+
 def test_ams_cli_governed_run_close_records_outcome_and_influence(tmp_path):
     root = tmp_path / "ams"
     _seed_runtime_control_root(root)

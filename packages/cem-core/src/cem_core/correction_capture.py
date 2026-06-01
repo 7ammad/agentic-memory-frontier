@@ -154,11 +154,11 @@ _CATEGORY_PATTERNS: dict[CorrectionCategory, tuple[str, ...]] = {
         r"\bkept doing\b",
     ),
     "approval_gate_violation": (
-        r"\bapproval\b",
-        r"\bapproved\b",
-        r"\bwithout asking\b",
-        r"\bpermission\b",
-        r"\bgate\b",
+        r"\bcrossed (?:an? )?(?:approval|human|resume)? ?gate\b",
+        r"\bbypass(?:ed|ing)? (?:the )?(?:approval|human|resume)? ?gate\b",
+        r"\b(?:approval|human|resume) gate\b.*\b(?:violat|cross|bypass|ignor)",
+        r"\bwithout (?:explicit )?(?:approval|permission|asking)\b",
+        r"\b(?:acted|started|changed|ran|continued|built|implemented|pushed|committed|deleted|edited|modified)\b.{0,80}\bwithout (?:asking|approval|permission)\b",
     ),
 }
 

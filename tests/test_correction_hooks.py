@@ -31,6 +31,12 @@ from cem_core.correction_hooks import (
 
 BLOCKING_PROMPT = "we already said no to that"  # matches repeated_drift
 BENIGN_PROMPT = "list the files in the kernel package"  # matches no category
+CODEX_REVIEW_PROMPT = (
+    "codex review --base phase-3-source-universe Focus on lib/engine/intelligence-job.ts "
+    "(evaluateIntelligenceJobReadiness, sourceKind) and the run-record shareability wiring. "
+    "The readiness verdict now gates qa.shareable / the raw-data-job-ready hard gate. "
+    "Enumerate EVERY remaining fail-open or contract-conformance gap."
+)
 
 
 def _check_status(run, name: str) -> str:
@@ -77,6 +83,16 @@ def test_hook_user_prompt_benign_allows_with_no_event_and_clear_gate(tmp_path):
     assert decision.event_id is None
     assert decision.gate_status == "clear"
     assert decision.hook_exit_code == HOOK_EXIT_ALLOW
+    assert not _event_log_path(_root(tmp_path)).exists()
+
+
+def test_codex_review_prompt_with_hard_gate_is_not_a_correction(tmp_path):
+    assert classify_correction(CODEX_REVIEW_PROMPT) == []
+    decision = hook_on_user_prompt_submit(tmp_path, CODEX_REVIEW_PROMPT)
+    assert decision.decision == "allow"
+    assert decision.categories == []
+    assert decision.event_id is None
+    assert decision.gate_status == "clear"
     assert not _event_log_path(_root(tmp_path)).exists()
 
 

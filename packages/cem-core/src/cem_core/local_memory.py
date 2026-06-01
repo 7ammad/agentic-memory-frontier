@@ -15,6 +15,7 @@ from .models import AgentTrace, StrictModel, TaskContext, TraceTurn, new_id, utc
 MemoryKind = Literal["fact", "preference", "instruction", "skill", "failure", "hypothesis"]
 MemoryOutcome = Literal["success", "failure", "partial", "unknown"]
 ListKind = Literal["cards", "atoms", "directives"]
+AMS_DOMAIN_SCOPE = "agentic-memory-system"
 
 MARKER_BY_KIND: dict[MemoryKind, str] = {
     "fact": "FACT",
@@ -239,6 +240,7 @@ def bootstrap_codex(root: Path | None, *, workspace: Path) -> dict[str, Any]:
             content,
             source=str(source),
             scope="workspace",
+            domain_scope=AMS_DOMAIN_SCOPE,
         )
         for content, source in directive_specs
     ]
@@ -416,6 +418,8 @@ def _directive_matches(
     task_family: str | None,
 ) -> bool:
     if directive.domain_scope is None and directive.task_family is None:
+        if directive.scope == "workspace" and _is_agentic_memory_system_source(directive.source):
+            return domain_scope == AMS_DOMAIN_SCOPE or "agentic memory system" in description.lower()
         return True
     if directive.domain_scope is not None and directive.domain_scope == domain_scope:
         return True
@@ -427,6 +431,11 @@ def _directive_matches(
     if directive.task_family and directive.task_family.replace("-", " ") in haystack:
         return True
     return _has_directive_token_overlap(directive, description)
+
+
+def _is_agentic_memory_system_source(source: str) -> bool:
+    normalized = source.replace("\\", "/").lower()
+    return "/agentic memory system/" in normalized
 
 
 def _active_product_directive_content(content: str) -> str:
