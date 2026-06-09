@@ -165,3 +165,19 @@ def test_action_decision_point_persists_receipts_through_cem():
     assert receipt.verdict == "steer"
     assert store.get_action_decision_receipt(receipt.receipt_id) == receipt
     assert store.get_runtime_interception_boundary(receipt.boundary_id).interceptable is True
+
+
+def test_cem_decision_then_reasoning_control_keeps_silent_steer_quiet():
+    store = InMemoryStore()
+    cem = CEM(store=store)
+    invariant = _invariant()
+    decision = _decision("scope general behavior failure as project-specific")
+    store.save_behavior_invariant(invariant)
+
+    decision_receipt = cem.decide_action(decision, boundaries=[_interceptable_boundary()])
+    reasoning_receipt = cem.control_reasoning(decision_receipt)
+
+    assert decision_receipt.verdict == "steer"
+    assert reasoning_receipt.ams_effect == "changed_action"
+    assert reasoning_receipt.user_visible is False
+    assert store.get_reasoning_control_receipt(reasoning_receipt.reasoning_receipt_id) == reasoning_receipt

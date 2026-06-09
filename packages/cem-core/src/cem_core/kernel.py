@@ -18,6 +18,7 @@ from .models import (
     ExperienceAtom,
     ExperienceCard,
     MemoryAudit,
+    ReasoningControlReceipt,
     SituationMatch,
     TaskContext,
     TraceReceipt,
@@ -159,6 +160,25 @@ class CEM:
         from .policy import ActionDecisionPoint
 
         return ActionDecisionPoint(self).decide(decision, boundaries=boundaries)
+
+    def control_reasoning(
+        self,
+        receipt: ActionDecisionReceipt,
+        *,
+        requested_verdict: str | None = None,
+        downgrade_reason: str | None = None,
+        downgrade_authority: str | None = None,
+    ) -> ReasoningControlReceipt:
+        from .reasoning import ReasoningController
+
+        control = ReasoningController().control(
+            receipt,
+            requested_verdict=requested_verdict,
+            downgrade_reason=downgrade_reason,
+            downgrade_authority=downgrade_authority,
+        )
+        self.store.save_reasoning_control_receipt(control)
+        return control
 
     def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
         """Bidirectionally link active cards whose claims conflict without a

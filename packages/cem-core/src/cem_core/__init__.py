@@ -19,6 +19,7 @@ from .extractor import DeterministicExtractor, MemoryExtractor
 from .kernel import CEM, card_is_inactive
 from .matching import SituationMatcher
 from .policy import ActionDecisionPoint, PolicyBindingLayer
+from .reasoning import ReasoningController
 from .models import (
     ActionBrief,
     ActionBriefRecord,
@@ -33,6 +34,7 @@ from .models import (
     ExperienceCard,
     ExperienceGraphRecord,
     MemoryAudit,
+    ReasoningControlReceipt,
     RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
@@ -86,6 +88,8 @@ __all__ = [
     "InMemoryStore",
     "MultiAgentTrustPolicy",
     "PolicyBindingLayer",
+    "ReasoningController",
+    "ReasoningControlReceipt",
     "RuntimeInterceptionBoundary",
     "SharedTraceEnvelope",
     "SharedTraceImportReceipt",

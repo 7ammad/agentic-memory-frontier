@@ -200,6 +200,7 @@ PolicyVerdict = Literal[
     "degraded_allow",
 ]
 BoundaryStatus = Literal["interceptable", "non_interceptable", "unknown"]
+AMSEffect = Literal["none", "changed_action", "blocked_action", "visible_intervention", "override"]
 
 
 class BehaviorInvariant(StrictModel):
@@ -317,6 +318,39 @@ class ActionDecisionReceipt(StrictModel):
             "boundary_id": self.boundary_id,
             "match_ids": self.match_ids,
             "source_ids": self.source_ids,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class ReasoningControlReceipt(StrictModel):
+    reasoning_receipt_id: str = Field(default_factory=lambda: new_id("reasoning"))
+    action_receipt_id: str
+    original_verdict: PolicyVerdict
+    final_verdict: PolicyVerdict
+    ams_effect: AMSEffect
+    matched_experience_ids: list[str] = Field(default_factory=list)
+    authority: ApplicableAuthority | None = None
+    user_visible: bool
+    receipt_available: bool = True
+    downgrade_allowed: bool = False
+    override_receipt_required: bool = False
+    summary: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "reasoning_receipt_id": self.reasoning_receipt_id,
+            "action_receipt_id": self.action_receipt_id,
+            "original_verdict": self.original_verdict,
+            "final_verdict": self.final_verdict,
+            "ams_effect": self.ams_effect,
+            "matched_experience_ids": self.matched_experience_ids,
+            "authority": self.authority,
+            "user_visible": self.user_visible,
+            "receipt_available": self.receipt_available,
+            "downgrade_allowed": self.downgrade_allowed,
+            "override_receipt_required": self.override_receipt_required,
             "evidence_ids": self.evidence_ids,
         }
 

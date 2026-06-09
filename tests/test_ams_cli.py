@@ -419,11 +419,11 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 11
     assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 6 - Reasoning controller and under-the-hood UX"
+    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 7 - Supersession and active forgetting"
     assert monitor["phase"]["status"] == "active"
     assert (
         monitor["phase"]["next_step"]
-        == "implement V2 asymmetric reasoning rules, downgrade receipts, silent steering behavior, and ask/block/override UX"
+        == "implement V2 SupersessionLedger, active forgetting path, stale invariant demotion, and owner override handling"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
@@ -431,7 +431,7 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert "aging and maintenance" not in monitor["phase"]["next_step"]
     assert monitor["phase"]["ready_for_next_phase"] is False
     assert monitor["phase"]["open_followups"] == [
-        "V2 Phase 6 reasoning-controller and under-the-hood UX implementation are pending",
+        "V2 Phase 7 supersession and active-forgetting implementation are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
     assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
@@ -728,10 +728,10 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
     assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 6 - Reasoning controller and under-the-hood UX"
+    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 7 - Supersession and active forgetting"
     assert dashboard["phase"]["ready_for_next_phase"] is False
     assert dashboard["phase"]["open_followups"] == [
-        "V2 Phase 6 reasoning-controller and under-the-hood UX implementation are pending",
+        "V2 Phase 7 supersession and active-forgetting implementation are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
 

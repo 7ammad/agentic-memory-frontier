@@ -14,6 +14,7 @@ from .models import (
     ExperienceAtom,
     ExperienceCard,
     ExperienceGraphRecord,
+    ReasoningControlReceipt,
     RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
@@ -68,6 +69,9 @@ class CEMStore(Protocol):
     def save_runtime_interception_boundary(self, boundary: RuntimeInterceptionBoundary) -> None: ...
     def get_runtime_interception_boundary(self, boundary_id: str) -> RuntimeInterceptionBoundary: ...
     def list_runtime_interception_boundaries(self) -> list[RuntimeInterceptionBoundary]: ...
+    def save_reasoning_control_receipt(self, receipt: ReasoningControlReceipt) -> None: ...
+    def get_reasoning_control_receipt(self, receipt_id: str) -> ReasoningControlReceipt: ...
+    def list_reasoning_control_receipts(self) -> list[ReasoningControlReceipt]: ...
 
 
 class SQLiteStore:
@@ -177,6 +181,14 @@ class SQLiteStore:
                     action_kind TEXT NOT NULL,
                     runtime_surface TEXT NOT NULL,
                     interceptable INTEGER NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS reasoning_control_receipts (
+                    reasoning_receipt_id TEXT PRIMARY KEY,
+                    action_receipt_id TEXT NOT NULL,
+                    original_verdict TEXT NOT NULL,
+                    final_verdict TEXT NOT NULL,
+                    user_visible INTEGER NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -570,6 +582,39 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM runtime_interception_boundaries ORDER BY rowid").fetchall()
         return [RuntimeInterceptionBoundary.model_validate_json(row[0]) for row in rows]
 
+    def save_reasoning_control_receipt(self, receipt: ReasoningControlReceipt) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO reasoning_control_receipts(
+                    reasoning_receipt_id, action_receipt_id, original_verdict, final_verdict, user_visible, payload
+                ) VALUES(?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    receipt.reasoning_receipt_id,
+                    receipt.action_receipt_id,
+                    receipt.original_verdict,
+                    receipt.final_verdict,
+                    1 if receipt.user_visible else 0,
+                    receipt.model_dump_json(),
+                ),
+            )
+
+    def get_reasoning_control_receipt(self, receipt_id: str) -> ReasoningControlReceipt:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM reasoning_control_receipts WHERE reasoning_receipt_id = ?",
+                (receipt_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Reasoning control receipt not found: {receipt_id}")
+        return ReasoningControlReceipt.model_validate_json(row[0])
+
+    def list_reasoning_control_receipts(self) -> list[ReasoningControlReceipt]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM reasoning_control_receipts ORDER BY rowid").fetchall()
+        return [ReasoningControlReceipt.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -591,6 +636,7 @@ class InMemoryStore:
         self._situation_matches: dict[str, str] = {}
         self._action_decision_receipts: dict[str, str] = {}
         self._runtime_interception_boundaries: dict[str, str] = {}
+        self._reasoning_control_receipts: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -795,4 +841,19 @@ class InMemoryStore:
         return [
             RuntimeInterceptionBoundary.model_validate_json(payload)
             for payload in self._runtime_interception_boundaries.values()
+        ]
+
+    def save_reasoning_control_receipt(self, receipt: ReasoningControlReceipt) -> None:
+        self._reasoning_control_receipts[receipt.reasoning_receipt_id] = receipt.model_dump_json()
+
+    def get_reasoning_control_receipt(self, receipt_id: str) -> ReasoningControlReceipt:
+        payload = self._reasoning_control_receipts.get(receipt_id)
+        if payload is None:
+            raise KeyError(f"Reasoning control receipt not found: {receipt_id}")
+        return ReasoningControlReceipt.model_validate_json(payload)
+
+    def list_reasoning_control_receipts(self) -> list[ReasoningControlReceipt]:
+        return [
+            ReasoningControlReceipt.model_validate_json(payload)
+            for payload in self._reasoning_control_receipts.values()
         ]

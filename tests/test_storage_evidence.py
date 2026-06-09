@@ -8,6 +8,7 @@ from cem_core.models import (
     DecisionIntent,
     ExperienceAttribution,
     ExperienceGraphRecord,
+    ReasoningControlReceipt,
     RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
@@ -193,6 +194,29 @@ def test_runtime_interception_boundary_roundtrip_in_both_backends(tmp_path):
 
         assert store.get_runtime_interception_boundary(boundary.boundary_id) == boundary
         assert store.list_runtime_interception_boundaries() == [boundary]
+
+
+def test_reasoning_control_receipt_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        receipt = ReasoningControlReceipt(
+            action_receipt_id="receipt_1",
+            original_verdict="block",
+            final_verdict="override_allowed",
+            ams_effect="override",
+            matched_experience_ids=["invariant_1"],
+            authority="owner_instruction",
+            user_visible=True,
+            receipt_available=True,
+            downgrade_allowed=True,
+            override_receipt_required=True,
+            summary="Downgrade allowed by owner instruction.",
+            evidence_ids=["receipt_1", "invariant_1"],
+        )
+
+        store.save_reasoning_control_receipt(receipt)
+
+        assert store.get_reasoning_control_receipt(receipt.reasoning_receipt_id) == receipt
+        assert store.list_reasoning_control_receipts() == [receipt]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):

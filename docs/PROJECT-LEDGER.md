@@ -382,6 +382,54 @@ Entry format:
 - Follow-up: Start V2 Phase 6: implement asymmetric reasoning rules, downgrade
   receipts, silent steering behavior, and ask/block/override UX.
 
+## LEDGER-20260610-008 - AMS V2 Phase 6 reasoning controller completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 6 and V2 plan acceptance for asymmetric reasoning
+  rules, downgrade receipts, silent steering behavior, and ask/block/override
+  UX.
+- Summary: Completed V2 Phase 6. Added `ReasoningControlReceipt`,
+  `ReasoningController`, and `CEM.control_reasoning()`. Silent steering remains
+  under the hood and user-invisible. Block/ask/override outcomes become visible
+  receipts. Escalation is easy, while block/ask/steer downgrades are rejected
+  unless the request is an explicit `override_allowed` with a reason and
+  owner/system/developer authority. Reasoning receipts persist compact audit
+  summaries and do not expose raw hidden reasoning.
+- Files:
+  - `packages/cem-core/src/cem_core/reasoning.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_reasoning_controller.py`
+  - `tests/test_policy_binding.py`
+  - `tests/test_storage_evidence.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_reasoning_controller.py -q` failed because
+  `ReasoningControlReceipt` did not exist. Green proof:
+  `python -m pytest tests/test_reasoning_controller.py -q` -> **passed**.
+  `python -m pytest tests/test_storage_evidence.py::test_reasoning_control_receipt_roundtrip_in_both_backends -q`
+  -> **passed**.
+  `python -m pytest tests/test_policy_binding.py tests/test_reasoning_controller.py -q`
+  -> **passed**. Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Live `python scripts/ams.py monitor --json` reports current
+  phase `AMS V2 Phase 7 - Supersession and active forgetting`; live startup
+  brief for Phase 6 completion returns `status=allow` and the Phase 7 next step.
+  `git diff --check` -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 7: implement SupersessionLedger, active forgetting,
+  stale invariant demotion, and owner override handling.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

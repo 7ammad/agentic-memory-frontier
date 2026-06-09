@@ -36,6 +36,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `ActionDecisionReceipt`, `PolicyBindingLayer`, `ActionDecisionPoint`,
   persisted runtime boundary maps, persisted decision receipts, and
   `CEM.decide_action()` for pre-action verdicts.
+- Added AMS V2 Phase 6 reasoning control: `ReasoningControlReceipt`,
+  `ReasoningController`, `CEM.control_reasoning()`, constrained downgrade rules,
+  visible override/block receipts, silent-steer UX, and persisted reasoning
+  control receipts.
 
 ### Changed
 
@@ -46,13 +50,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   invariants, procedural skill memory, situation matching, policy binding,
   action decision points, reasoning control, under-the-hood inference receipts,
   supersession, multi-agent governance, and the V2 eval battery.
-- Updated monitor/dashboard phase status so AMS V2 Phase 6 is the active rail
-  after Phase 5 action decision point and policy binding.
+- Updated monitor/dashboard phase status so AMS V2 Phase 7 is the active rail
+  after Phase 6 reasoning controller and under-the-hood UX.
 
 ### Next
 
-- Start AMS V2 Phase 6: asymmetric reasoning rules, downgrade receipts, silent
-  steering behavior, and ask/block/override UX.
+- Start AMS V2 Phase 7: SupersessionLedger, active forgetting path, stale
+  invariant demotion, and owner override handling.
 
 ### Verified
 
@@ -169,6 +173,28 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `AMS V2 Phase 6 - Reasoning controller and under-the-hood UX`.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 5 action decision point completion and Phase 6 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 6 next step.
+- Phase 6 red->green proof:
+  `python -m pytest tests/test_reasoning_controller.py -q` failed before
+  implementation because `ReasoningControlReceipt` did not exist, then passed
+  after adding reasoning control.
+- Phase 6 focused checks:
+  `python -m pytest tests/test_reasoning_controller.py -q` -> passed.
+- Reasoning receipt storage:
+  `python -m pytest tests/test_storage_evidence.py::test_reasoning_control_receipt_roundtrip_in_both_backends -q`
+  -> passed.
+- Policy-to-reasoning chain:
+  `python -m pytest tests/test_policy_binding.py tests/test_reasoning_controller.py -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 7 - Supersession and active forgetting`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 6 reasoning controller completion and Phase 7 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 7 next step.
 
 ## 2026-06-09
 

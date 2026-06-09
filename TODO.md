@@ -106,7 +106,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
 - [x] Phase 5 - Action decision point and policy binding: intercept
       consequential decisions and return allow, steer, warn, ask, block,
       override, or degraded-allow verdicts.
-- [ ] Phase 6 - Reasoning controller and under-the-hood UX: allow reasoning with
+- [x] Phase 6 - Reasoning controller and under-the-hood UX: allow reasoning with
       experience while preventing silent rationalization past confirmed
       mistakes; surface concise inference receipts instead of raw hidden
       reasoning.
