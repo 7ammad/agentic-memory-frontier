@@ -9,8 +9,11 @@
 # Fail-closed: any non-zero exit means DENY. Mirrors session-start-gate.ps1; takes no
 # stdin and captures STDOUT ONLY (no `2>&1`). Branches on $LASTEXITCODE, not on JSON.
 #
-# [UNVERIFIED] The Claude Code / Codex PreToolUse exit-code + stdout contract must be
-# confirmed by a live runtime smoke test before this hook is trusted in production.
+# [VERIFIED 2026-05-31] Codex CLI 0.128 invokes PreToolUse before shell tools, but
+# a non-zero command-hook exit is reported as "hook failed" and the tool still
+# runs. Keep this as a gate decision surface for runtimes that enforce command
+# hooks; do not treat it as Codex blocking until an enforceable runtime path is
+# added.
 param(
     [string]$Workspace = "C:\Dev\Builds\Agentic Memory System"
 )

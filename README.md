@@ -1,22 +1,22 @@
-# Agentic Memory Frontier
+# Agentic Memory System
 
-Research and build workspace for Causal Experience Memory.
+Research and build workspace for AMS.
+
+Canonical product acceptance lock: [PRODUCT-LOCK.md](PRODUCT-LOCK.md).
+
+Canonical idea source of truth: [IDEA.md](IDEA.md).
 
 The core thesis:
 
 > Memory is not storage. Memory is verified experience that improves future action.
 
-CEM-0 is the first kernel: it ingests agent traces, extracts typed candidate memories, validates them before storage, quarantines bad memories, promotes verified experience cards, and returns action briefs instead of raw memory dumps.
+AMS ingests agent traces, extracts typed candidate memories, validates them before storage, quarantines bad memories, promotes verified experience cards, and returns action briefs instead of raw memory dumps.
 
-Current build focus:
+AMS v1 acceptance status: complete as of the terminal operator proof on
+2026-06-01. Post-v1 work should be named as a new phase, not appended as another
+hidden "one more thing" to the v1 TODO.
 
-- write-path quality;
-- source-grounded Experience Atoms;
-- contradiction and stale-memory quarantine;
-- auditability and provenance;
-- evals that compare against unvalidated memory baselines.
-
-The default extractor and contradiction detector are deterministic strategies for reproducible CEM-0 fixtures. They are replaceable kernel interfaces, not the final reasoning layer.
+The default extractor and contradiction detector are deterministic strategies for reproducible AMS V0 fixtures. They are replaceable kernel interfaces, not the final reasoning layer.
 
 The public foundation is in [research/2026-05-27-plan-1-causal-experience-memory-foundation.md](research/2026-05-27-plan-1-causal-experience-memory-foundation.md).
 
@@ -26,7 +26,7 @@ The active build queue is in [TODO.md](TODO.md). Codex should update it and cont
 
 ## Use It Now
 
-AMS v1 is the first usable local memory surface for Codex. It uses CEM-0 for learned experience and keeps explicit directives separate so project rules do not get laundered as learned memories.
+AMS v1 is the first usable local memory surface for Codex. It keeps learned experience and explicit directives separate so project rules do not get laundered as learned memories.
 
 Initialize a local memory root:
 
@@ -65,9 +65,14 @@ Curate legacy Codex memory and run Monitor-0:
 ```powershell
 python scripts/ams.py migrate dry-run
 python scripts/ams.py migrate apply
+python scripts/ams.py memory-surfaces
 python scripts/ams.py monitor
 python scripts/ams.py monitor --deep
 python scripts/ams.py startup-brief "continue building Agentic Memory System" --domain agentic-memory-system
+python scripts/ams.py runtime-control "continue building Agentic Memory System" --domain agentic-memory-system
+python scripts/ams.py governed-run close --outcome success --action-taken "ran focused and full pytest"
+powershell -ExecutionPolicy Bypass -File scripts/ams-guarded-command.ps1 -Prompt "continue building Agentic Memory System" -Command python --version
+powershell -ExecutionPolicy Bypass -File scripts/install-ams-codex-entrypoint.ps1
 python scripts/ams.py correction capture "why are you building before planning" --affected-file package.json
 python scripts/ams.py correction gate
 python scripts/ams.py correction resume <event_id> --approved-by Hammad
@@ -94,29 +99,49 @@ monitor-latest.md
 startup-brief-runs.jsonl
 startup-brief-latest.json
 startup-brief-latest.md
+runtime-control-runs.jsonl
+runtime-control-latest.json
+runtime-control-latest.md
 correction-events.jsonl
 correction-latest.json
 correction-resume-gate.json
 correction-resume-runs.jsonl
+governed-run-runs.jsonl
+governed-run-latest.json
+runtime-trace-runs.jsonl
+runtime-trace-latest.json
+runtime-trace-latest.md
+maintenance-runs.jsonl
+maintenance-latest.json
+maintenance-latest.md
 ```
 
-The dashboard reports three layers:
+`memory-surfaces` reports the active memory topology: `ams-memory` must be primary for the active AMS root, while `codex-memory` and native Codex memory are only accepted as secondary inputs after the legacy registry has an applied AMS migration.
+
+The dashboard reports four layers:
 
 - total records;
-- AMS/CEM-scoped records;
+- AMS-scoped records;
 - global Codex behavior records.
+- memory surface reconciliation status.
 
 It also prints the current phase and next step so the overnight monitor runs show where the build stands, not only whether the store is alive.
 
-`startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, enforces required startup directives, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns `allow` or `block`.
+`startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, reports required startup directive presence, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns memory-readiness status. Missing, stale, contradicted, or failed memory returns `degraded` with warnings; it does not block fresh owner-directed work.
 
-`correction capture` is the first Correction Capture Controller surface. It detects live correction signals, classifies the mistake, records affected files/actions, routes the correction to directives/CEM/project ledger where appropriate, opens a resume gate, and makes Monitor-0 fail visibly until `correction resume` clears the gate. The plan is in [docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md](docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md).
+`runtime-control` is the enforceable launcher-facing surface. It classifies the prompt, checks the correction resume gate, runs the startup brief, writes a runtime-control receipt, preserves startup degraded warnings, and exits non-zero only on a runtime-control/action-safety block. `scripts/ams-guarded-command.ps1` honors that exit code by refusing to invoke the downstream command when runtime-control blocks.
+
+`governed-run close` finalizes the latest or named governed-run receipt with an observed outcome. It links the startup brief, action brief, and influence id, writes an observational `ActionInfluenceEvent`, and keeps observed outcome separate from verified lift.
+
+`scripts/install-ams-codex-entrypoint.ps1` wires the default Codex shims (`codex.ps1`, `codex.cmd`, and Git Bash `codex`) through the guarded launcher. It writes `codex.ams-original*` backups beside the shims, supports `-Uninstall`, and honors `AMS_CODEX_BYPASS=1` as an emergency raw-Codex escape hatch.
+
+`correction capture` is the first Correction Capture Controller surface. It detects live correction signals, classifies the mistake, records affected files/actions, routes the correction to AMS directives, AMS experience records, and the project ledger where appropriate, opens a resume gate, and makes Monitor-0 fail visibly until `correction resume` clears the gate. The plan is in [docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md](docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md).
 
 The current V0 benchmark report is in [docs/cem-0-benchmark-report.md](docs/cem-0-benchmark-report.md).
 
-The external benchmark decision is in [docs/cem-0-external-benchmark-decision.md](docs/cem-0-external-benchmark-decision.md). CEM-0 now has a local HaluMem dataset adapter for JSON/JSONL exports, but it does not claim a real HaluMem score yet.
+The external benchmark decision is in [docs/cem-0-external-benchmark-decision.md](docs/cem-0-external-benchmark-decision.md). AMS V0 has a local HaluMem dataset adapter for JSON/JSONL exports, but it does not claim a real HaluMem score yet.
 
-## CEM-0 Quick Smoke
+## AMS V0 Quick Smoke
 
 Run the current synthetic corruption eval:
 
@@ -333,16 +358,37 @@ Current expected signal:
 }
 ```
 
-The markdown report includes baseline rows, a CEM-0 row, CEM-0-vs-baseline deltas, extraction quality, contradiction detection, memory harm, action influence, latency, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
+The markdown report includes baseline rows, an AMS V0 row, AMS-vs-baseline deltas, extraction quality, contradiction detection, memory harm, action influence, latency, a held-out workflow section, an audit coverage section, and action-brief utility columns for relevance recall, pollution rate, scoped-memory suppression, expired-memory suppression, evidence consolidation, max support, and audit completeness.
 
 Latency fields are emitted as `p95_write_latency_ms` and `p95_retrieval_latency_ms` under each run's metrics. Values are local-run dependent.
 
-Token accounting fields are emitted as `tokens_per_write` and `tokens_per_retrieval`. CEM-0 currently uses deterministic regex token accounting for the marker-based fixture, not vendor billing tokens.
+Token accounting fields are emitted as `tokens_per_write` and `tokens_per_retrieval`. AMS V0 currently uses deterministic regex token accounting for the marker-based fixture, not vendor billing tokens.
 
 Run tests:
 
 ```powershell
 python -m pytest
+```
+
+## Terminal Operator Proof
+
+Run the complete local operator proof from a fresh AMS root:
+
+```powershell
+python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final
+```
+
+This one command initializes a fresh root, bootstraps documented AMS directives,
+seeds one learned operator lesson, applies the legacy-memory migration, verifies
+`ams-memory` as the primary memory surface, retrieves a bounded startup brief,
+runs maintenance review, runs Monitor-0 deep checks, audits a real card, closes
+the governed run with outcome `success`, and reruns the Phase 4 frontier eval.
+
+Expected terminal signal:
+
+```text
+AMS_OPERATOR_PROOF_PASS
+frontier_eval=PASS margin=75.0pp
 ```
 
 ## HaluMem Adapter Smoke
@@ -353,15 +399,15 @@ Inspect a local HaluMem JSON or JSONL export:
 python scripts/run_halumem_adapter.py path\to\halumem.json
 ```
 
-The adapter normalizes users, sessions, dialogue, memory points, update links, and QA evidence into CEM-0 evaluation records. It also emits exact-match extraction scoring fields for candidate memories: precision, recall, F1, hallucinated count, omitted count, update recall, and QA evidence recall.
+The adapter normalizes users, sessions, dialogue, memory points, update links, and QA evidence into AMS evaluation records. It also emits exact-match extraction scoring fields for candidate memories: precision, recall, F1, hallucinated count, omitted count, update recall, and QA evidence recall.
 
-Run CEM-0's current write path against a local HaluMem export:
+Run the current AMS write path against a local HaluMem export:
 
 ```powershell
 python scripts/run_halumem_cem0_eval.py path\to\halumem.json
 ```
 
-The CEM-backed runner ingests HaluMem sessions as traces, proposes atoms, validates and promotes them, then scores both proposed candidates and final trusted memory against HaluMem reference memory points.
+The AMS-backed runner ingests HaluMem sessions as traces, proposes atoms, validates and promotes them, then scores both proposed candidates and final trusted memory against HaluMem reference memory points.
 
 ## MemoryArena Adapter Smoke
 
@@ -373,13 +419,13 @@ python scripts/run_memoryarena_adapter.py path\to\memoryarena.json --domain bund
 
 The adapter normalizes ordered `questions`, `answers`, and optional `backgrounds` into multi-subtask task records. It emits progress score and task success rate, matching MemoryArena's action-coupled evaluation shape without claiming a full benchmark result yet.
 
-Run CEM-0 Action Brief scoring against a local MemoryArena export:
+Run AMS Action Brief scoring against a local MemoryArena export:
 
 ```powershell
 python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
-The CEM-backed runner ingests MemoryArena tasks as traces, validates promoted experience, retrieves action briefs for each task, and scores the recommended actions against expected subtask answers.
+The AMS-backed runner ingests MemoryArena tasks as traces, validates promoted experience, retrieves action briefs for each task, and scores the recommended actions against expected subtask answers.
 
 ## LongMemEval-V2 Adapter Smoke
 
@@ -391,17 +437,17 @@ python scripts/run_longmemeval_v2_adapter.py path\to\longmemeval-v2
 
 The adapter expects `questions.jsonl`, `trajectories.jsonl`, and optional `haystacks/*.json`. It normalizes questions, browser/workflow trajectories, state screenshots, haystack maps, exact answer scoring, haystack-member retrieval scoring, and trajectory-to-`AgentTrace` conversion.
 
-Run CEM-0 Action Brief scoring against a local LongMemEval-V2 dataset root:
+Run AMS Action Brief scoring against a local LongMemEval-V2 dataset root:
 
 ```powershell
 python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
 ```
 
-The CEM-backed runner ingests trajectories as traces, validates promoted experience, retrieves action briefs for each question, and scores both exact answer output and haystack-member trajectory retrieval.
+The AMS-backed runner ingests trajectories as traces, validates promoted experience, retrieves action briefs for each question, and scores both exact answer output and haystack-member trajectory retrieval.
 
 ## External Benchmark Report
 
-Combine saved JSON outputs from the CEM-backed external runners:
+Combine saved JSON outputs from the AMS-backed external runners:
 
 ```powershell
 python scripts/run_external_benchmark_report.py --halumem-result halumem.json --memoryarena-result memoryarena.json --longmemeval-v2-result longmemeval.json --markdown
@@ -411,23 +457,23 @@ The report object normalizes runner outputs into one table with proposed/trusted
 
 ## Storage Backends
 
-CEM-0 storage is now behind a small backend protocol. The default remains persistent SQLite + JSONL via `CEM("tmp/cem-run")`; tests and eval fixtures can use `CEM(store=InMemoryStore())`.
+AMS storage is now behind a small backend protocol. The default remains persistent SQLite + JSONL via the kernel API; tests and eval fixtures can use the in-memory store.
 
 The storage slice is documented in [docs/cem-0-storage-backends.md](docs/cem-0-storage-backends.md). It is backend-agnostic kernel wiring, not MCP integration or a hosted memory platform.
 
 ## MCP Tool Bridge
 
-CEM-0 exposes a minimal stdio MCP tool bridge over the kernel API:
+AMS exposes a minimal stdio MCP tool bridge over the kernel API:
 
 ```powershell
 python scripts/run_cem_mcp_stdio.py --root tmp\cem-mcp
 ```
 
-The bridge supports `initialize`, `tools/list`, and `tools/call` for CEM write-path and action-brief tools. It is documented in [docs/cem-0-mcp-integration.md](docs/cem-0-mcp-integration.md).
+The bridge supports `initialize`, `tools/list`, and `tools/call` for AMS write-path and action-brief tools. It is documented in [docs/cem-0-mcp-integration.md](docs/cem-0-mcp-integration.md).
 
 ## Multi-Agent Shared Experience
 
-CEM-0 now has a small shared-trace envelope for multi-agent experience intake:
+AMS now has a small shared-trace envelope for multi-agent experience intake:
 
 ```powershell
 python scripts/run_cem_import_shared_trace.py envelope.json --root tmp\cem-shared --trusted-agent-id agent-alpha

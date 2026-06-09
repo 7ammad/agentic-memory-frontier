@@ -41,6 +41,29 @@ def test_close_influence_writes_observational_event(tmp_path):
     assert len(stored) == 1 and stored[0].outcome == "success"
 
 
+def test_close_influence_is_idempotent_per_brief(tmp_path):
+    cem = CEM(tmp_path)
+    brief, _ = _brief(cem)
+
+    first = cem.close_influence(
+        brief.brief_id,
+        action_taken="set assignment_group",
+        outcome="success",
+        observed_post_brief_delta=0.2,
+    )
+    second = cem.close_influence(
+        brief.brief_id,
+        action_taken="set assignee",
+        outcome="failure",
+        observed_post_brief_delta=-0.2,
+    )
+
+    stored = cem.store.list_action_influence_events(brief.influence_id)
+    assert len(stored) == 1
+    assert second == first
+    assert stored[0].outcome == "success"
+
+
 def test_close_influence_never_verifies_a_card(tmp_path):
     # Failure canary: a post-brief outcome is observational, never causal — it
     # must not promote or set measured lift on any card.

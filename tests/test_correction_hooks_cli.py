@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import shutil
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -20,6 +24,8 @@ from cem_core.correction_hooks import (
     HOOK_EXIT_GATE_BLOCKED,
     HOOK_EXIT_PARSE_ERROR,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(argv, stdin_text, monkeypatch):
@@ -60,6 +66,72 @@ def test_hook_prompt_cli_allows_with_unknown_runtime_keys(tmp_path, monkeypatch,
     out = json.loads(capsys.readouterr().out)  # stdout is pure JSON
     assert out["decision"] == "allow"
     assert not _event_log_path(_root(tmp_path)).exists()
+
+
+def test_hook_prompt_cli_accepts_live_codex_prompt_payload_without_wrapper(tmp_path, monkeypatch, capsys):
+    payload = {
+        "session_id": "019e7d48-f0b9-7a60-8d1a-03ec4b4a62de",
+        "turn_id": "019e7d48-f3a0-7ee3-b72a-8aafe7e8f603",
+        "transcript_path": None,
+        "cwd": str(REPO_ROOT),
+        "hook_event_name": "UserPromptSubmit",
+        "model": "gpt-5.5",
+        "permission_mode": "bypassPermissions",
+        "prompt": "we already said no scaffolding; stop and record this correction",
+    }
+
+    code = _run(["--root", str(tmp_path), "correction", "hook-prompt", "--json"], json.dumps(payload), monkeypatch)
+    assert code == HOOK_EXIT_BLOCK
+    out = json.loads(capsys.readouterr().out)
+    assert out["decision"] == "block"
+    event = json.loads((_root(tmp_path) / "correction-latest.json").read_text(encoding="utf-8"))
+    assert event["user_text"] == payload["prompt"]
+    assert event["session_id"] == payload["session_id"]
+
+
+def test_prompt_wrapper_maps_live_codex_user_prompt_payload(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        pytest.skip("PowerShell runtime wrapper smoke is Windows-only")
+
+    root = tmp_path / "ams"
+    payload = {
+        "session_id": "019e7d48-f0b9-7a60-8d1a-03ec4b4a62de",
+        "turn_id": "019e7d48-f3a0-7ee3-b72a-8aafe7e8f603",
+        "transcript_path": None,
+        "cwd": str(REPO_ROOT),
+        "hook_event_name": "UserPromptSubmit",
+        "model": "gpt-5.5",
+        "permission_mode": "bypassPermissions",
+        "prompt": "we already said no scaffolding; stop and record this correction",
+    }
+    env = os.environ.copy()
+    env["AMS_ROOT"] = str(root)
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(REPO_ROOT / "scripts" / "correction-hook-prompt.ps1"),
+            "-Workspace",
+            str(REPO_ROOT),
+        ],
+        input=json.dumps(payload),
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+        env=env,
+        cwd=REPO_ROOT,
+        timeout=30,
+    )
+
+    assert process.returncode == HOOK_EXIT_BLOCK
+    event = json.loads((root / "correction-latest.json").read_text(encoding="utf-8"))
+    assert event["user_text"] == payload["prompt"]
+    assert event["session_id"] == payload["session_id"]
 
 
 def test_hook_prompt_cli_blocks_on_correction(tmp_path, monkeypatch, capsys):

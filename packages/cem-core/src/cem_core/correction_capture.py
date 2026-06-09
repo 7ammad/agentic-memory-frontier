@@ -24,6 +24,8 @@ CorrectionCategory = Literal[
 ]
 CorrectionRouteTarget = Literal[
     "ams_directive",
+    "ams_candidate_experience_atom",
+    # Legacy route name kept only so old correction ledgers remain readable.
     "cem_candidate_experience_atom",
     "project_ledger_entry",
     "stale_or_contradicted_memory",
@@ -152,11 +154,11 @@ _CATEGORY_PATTERNS: dict[CorrectionCategory, tuple[str, ...]] = {
         r"\bkept doing\b",
     ),
     "approval_gate_violation": (
-        r"\bapproval\b",
-        r"\bapproved\b",
-        r"\bwithout asking\b",
-        r"\bpermission\b",
-        r"\bgate\b",
+        r"\bcrossed (?:an? )?(?:approval|human|resume)? ?gate\b",
+        r"\bbypass(?:ed|ing)? (?:the )?(?:approval|human|resume)? ?gate\b",
+        r"\b(?:approval|human|resume) gate\b.*\b(?:violat|cross|bypass|ignor)",
+        r"\bwithout (?:explicit )?(?:approval|permission|asking)\b",
+        r"\b(?:acted|started|changed|ran|continued|built|implemented|pushed|committed|deleted|edited|modified)\b.{0,80}\bwithout (?:asking|approval|permission)\b",
     ),
 }
 
@@ -263,7 +265,9 @@ def resume_correction(
 ) -> CorrectionResumeReceipt:
     root = _root(root)
     gate = correction_gate_status(root)
-    if gate.status == "blocked" and gate.active_event_id != event_id:
+    if gate.status != "blocked":
+        raise ValueError("Correction resume gate is not blocked; no active correction to resume.")
+    if gate.active_event_id != event_id:
         raise ValueError(f"Correction resume gate is blocked by {gate.active_event_id}, not {event_id}.")
 
     cleared = CorrectionGate(status="clear")
@@ -340,10 +344,10 @@ def _apply_routes(root: Path, event: CorrectionEvent, *, project_ledger: Path | 
             )
         )
 
-    if "cem_candidate_experience_atom" in event.route_targets:
+    if "ams_candidate_experience_atom" in event.route_targets or "cem_candidate_experience_atom" in event.route_targets:
         remembered = remember_experience(
             root,
-            _cem_failure_content(event),
+            _ams_failure_content(event),
             kind="failure",
             outcome="failure",
             domain_scope=event.domain_scope,
@@ -355,7 +359,7 @@ def _apply_routes(root: Path, event: CorrectionEvent, *, project_ledger: Path | 
         ids.extend(str(card["card_id"]) for card in remembered["promoted_cards"])
         routes.append(
             CorrectionRoute(
-                target="cem_candidate_experience_atom",
+                target="ams_candidate_experience_atom",
                 status="written",
                 detail=(
                     f"{remembered['proposed_count']} proposed, "
@@ -419,7 +423,7 @@ def _route_targets(
 ) -> list[CorrectionRouteTarget]:
     targets: list[CorrectionRouteTarget] = [
         "ams_directive",
-        "cem_candidate_experience_atom",
+        "ams_candidate_experience_atom",
         "project_ledger_entry",
     ]
     if "memory_miss" in categories or "repeated_drift" in categories or stale_memory_ids:
@@ -452,13 +456,14 @@ def _directive_content(event: CorrectionEvent) -> str:
     category_text = ", ".join(event.categories)
     return (
         f"When a live user correction is detected ({category_text}), stop the active lane, "
-        "name the mistake plainly, record affected files/actions, route the event to AMS/CEM/project ledger "
+        "name the mistake plainly, record affected files/actions, route the event to AMS directives, "
+        "AMS experience records, and the project ledger "
         "as appropriate, and require explicit resume approval before continuing. "
         f"Latest trigger: {event.mistake}"
     )
 
 
-def _cem_failure_content(event: CorrectionEvent) -> str:
+def _ams_failure_content(event: CorrectionEvent) -> str:
     affected = ""
     if event.affected_files:
         affected = " Affected files: " + ", ".join(event.affected_files) + "."

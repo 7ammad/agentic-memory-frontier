@@ -2,7 +2,22 @@
 
 This is the project root. **Never write or read files under `C:\Dev\Builds\Waki`** — that's a different project, picked by accident in an earlier session.
 
-## State (as of 2026-05-26 — session 2 end, ALL DESIGN COMPLETE)
+Canonical product acceptance lock: `PRODUCT-LOCK.md`.
+Canonical idea source of truth: `IDEA.md`.
+Product line: AMS.
+
+Thesis: *Memory is not storage. Memory is verified experience that improves future action.*
+
+## Current State (as of 2026-05-31 — AMS Primary Runtime Adoption)
+
+- Product line: **AMS**.
+- Canonical acceptance lock: `PRODUCT-LOCK.md`.
+- Current phase: **AMS v1 Accepted**.
+- Current status: complete for AMS v1.
+- Current next gap: none for AMS v1. Future work must be opened as a named post-v1 phase or a regression fix.
+- Current live rails: `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`.
+
+## Historical Design State (2026-05-26)
 
 - **A** Deep technical review of SuperClaude memory MCP — DONE + VERIFIED
 - **B** SuperClaude memory v0.3 upgrade spec (P0+P1 cut, 5 phases) — DONE + VERIFIED
@@ -10,7 +25,7 @@ This is the project root. **Never write or read files under `C:\Dev\Builds\Waki`
 - **D** ACS protocol design (A2A v1.0-compatible relay topology, signed envelopes, 5-message vocab, Jeffreys×Codex escalation, replay protection, 3 phases, 10-test acceptance battery) — DONE + VERIFIED (4 codex passes, 11 patches, READY)
 
 **Historical design state:** all 4 sub-projects were design-complete on 2026-05-26.
-**Current runtime state:** implementation work started on 2026-05-27; read `sessions/2026-05-27-session-handoff.md` for live status, especially the SC/ACS identity-mismatch blocker.
+**Current runtime state:** AMS v1 is accepted. `PRODUCT-LOCK.md` is the canonical acceptance lock; the live rails are `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`. Terminal proof: `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final` passes fresh-root setup, primary AMS memory surface reconciliation, startup brief, maintenance review, Monitor-0 deep, audit, governed-run close, and Phase 4 frontier eval.
 
 ## To continue right now
 
@@ -24,7 +39,7 @@ This is the project root. **Never write or read files under `C:\Dev\Builds\Waki`
 
 ## Critical rules (locked from prior session)
 
-**HARDGATE — autonomous build loop (CEM-1 Phases 3-5, mirrors `CLAUDE.md`):** Finish the CEM-1 build as ONE self-paced session (not a manual multi-session fan-out): next unchecked `TODO.md` item -> full build (no MVP/distillation/stubs; TDD + a failure canary that bites) -> `python -m pytest` green -> commit -> continue. Each slice ships as a minimal single-surface PR to `staging` and runs the Greptile review-loop to 5/5 (stop rule: ~5 turns / stuck at 4/5 -> human). Self-pace external review waits with the `/loop` dynamic engine (`ScheduleWakeup`). **Stop before merge — merging is the user's call.** Full contract: `docs/WORKFLOW.md`. (Note: the rest of this file is stale 2026-05-26 A/B/C/D context; the live rail is `TODO.md` + `CLAUDE.md`.)
+**HARDGATE - autonomous AMS build loop (mirrors `CLAUDE.md`):** Finish the AMS build as ONE self-paced session (not a manual multi-session fan-out): next unchecked `TODO.md` item -> full build (no MVP/distillation/stubs; TDD + a failure canary that bites) -> `python -m pytest` green -> commit -> continue. Each slice ships as a minimal single-surface PR to `staging` and runs the Greptile review-loop to 5/5 (stop rule: ~5 turns / stuck at 4/5 -> human). Self-pace external review waits with the `/loop` dynamic engine (`ScheduleWakeup`). **Stop before merge - merging is the user's call.** Full contract: `docs/WORKFLOW.md`. (Note: the rest of this file is stale 2026-05-26 A/B/C/D context; the live rail is `TODO.md` + `CLAUDE.md`.)
 
 1. **Mandatory verification between sub-projects.** After every deliverable: dispatch codex strict-review (Step 6 of the `dual-counsel` skill). Loop until READY. Never accept PATCH-FIRST as done.
 2. **Sub-projects in strict sequence**: B → C → D, one at a time.

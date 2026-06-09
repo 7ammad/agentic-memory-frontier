@@ -77,8 +77,8 @@ def marginal_memory_advantage(
 
 
 def mma_passes(result: MMAResult) -> bool:
-    """Success bar (spec section 9): MMA > 0 AND lower 95% CI > 0."""
-    return result.mma > 0.0 and result.ci_low > 0.0
+    """Success bar (spec section 9): n>=2, MMA > 0, and lower 95% CI > 0."""
+    return result.n >= 2 and result.mma > 0.0 and result.ci_low > 0.0
 
 
 def assert_no_leakage(*, memory_source_ids: set[str], held_out_answer_ids: set[str]) -> None:

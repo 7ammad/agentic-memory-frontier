@@ -15,6 +15,7 @@ from .models import AgentTrace, StrictModel, TaskContext, TraceTurn, new_id, utc
 MemoryKind = Literal["fact", "preference", "instruction", "skill", "failure", "hypothesis"]
 MemoryOutcome = Literal["success", "failure", "partial", "unknown"]
 ListKind = Literal["cards", "atoms", "directives"]
+AMS_DOMAIN_SCOPE = "agentic-memory-system"
 
 MARKER_BY_KIND: dict[MemoryKind, str] = {
     "fact": "FACT",
@@ -209,7 +210,7 @@ def bootstrap_codex(root: Path | None, *, workspace: Path) -> dict[str, Any]:
             workspace / "AGENTS.md",
         ),
         (
-            "Keep the active thesis centered on Causal Experience Memory: memory is verified experience that improves future action.",
+            "Keep AMS centered on verified experience that improves future action, not commodity memory storage.",
             workspace / "README.md",
         ),
         (
@@ -221,7 +222,7 @@ def bootstrap_codex(root: Path | None, *, workspace: Path) -> dict[str, Any]:
             workspace / "TODO.md",
         ),
         (
-            "Do not claim state-of-the-art for CEM-0 or AMS v1.",
+            "Do not claim state-of-the-art for AMS.",
             workspace / "TODO.md",
         ),
         (
@@ -229,7 +230,7 @@ def bootstrap_codex(root: Path | None, *, workspace: Path) -> dict[str, Any]:
             workspace / "README.md",
         ),
         (
-            "Capture live user corrections immediately: stop the active lane, name the mistake, record affected files/actions, route the event to AMS/CEM/project ledger as appropriate, and require explicit resume before continuing.",
+            "Capture live user corrections immediately: stop the active lane, name the mistake, record affected files/actions, route the event to AMS directives, AMS experience records, and the project ledger as appropriate, and require explicit resume before continuing.",
             workspace / "README.md",
         ),
     ]
@@ -239,6 +240,7 @@ def bootstrap_codex(root: Path | None, *, workspace: Path) -> dict[str, Any]:
             content,
             source=str(source),
             scope="workspace",
+            domain_scope=AMS_DOMAIN_SCOPE,
         )
         for content, source in directive_specs
     ]
@@ -276,15 +278,32 @@ def retrieve_brief(
         for directive in _load_directives(root)
         if directive.active and _directive_matches(directive, description, domain_scope, task_family)
     ]
-    directive_rows = [directive.model_dump(mode="json") for directive in directives]
-    recommended_actions = [directive.content for directive in directives] + experience.recommended_next_actions
-    evidence_links = [directive.directive_id for directive in directives] + experience.evidence_links
+    directive_rows: list[dict[str, Any]] = []
+    evidence_links: list[str] = []
+    seen_directives: set[str] = set()
+    for directive in directives:
+        row = directive.model_dump(mode="json")
+        row["content"] = _active_product_directive_content(str(row["content"]))
+        dedupe_key = row["content"]
+        if dedupe_key in seen_directives:
+            continue
+        seen_directives.add(dedupe_key)
+        directive_rows.append(row)
+        evidence_links.append(directive.directive_id)
+    evidence_links.extend(experience.evidence_links)
+    experience_actions = [_active_product_directive_content(action) for action in experience.recommended_next_actions]
+    experience_row = experience.model_dump(mode="json")
+    experience_row["recommended_next_actions"] = experience_actions
+    experience_row["why_applicable"] = [
+        _active_product_directive_content(reason) for reason in experience_row["why_applicable"]
+    ]
+    recommended_actions = [directive["content"] for directive in directive_rows] + experience_actions
     return {
         "root": str(root),
         "task_id": task_id,
         "description": description,
         "directives": directive_rows,
-        "experience": experience.model_dump(mode="json"),
+        "experience": experience_row,
         "recommended_next_actions": recommended_actions,
         "preconditions_to_check": experience.preconditions_to_check,
         "evidence_links": evidence_links,
@@ -399,6 +418,8 @@ def _directive_matches(
     task_family: str | None,
 ) -> bool:
     if directive.domain_scope is None and directive.task_family is None:
+        if directive.scope == "workspace" and _is_agentic_memory_system_source(directive.source):
+            return domain_scope == AMS_DOMAIN_SCOPE or "agentic memory system" in description.lower()
         return True
     if directive.domain_scope is not None and directive.domain_scope == domain_scope:
         return True
@@ -410,6 +431,48 @@ def _directive_matches(
     if directive.task_family and directive.task_family.replace("-", " ") in haystack:
         return True
     return _has_directive_token_overlap(directive, description)
+
+
+def _is_agentic_memory_system_source(source: str) -> bool:
+    normalized = source.replace("\\", "/").lower()
+    return "/agentic memory system/" in normalized
+
+
+def _active_product_directive_content(content: str) -> str:
+    """Render legacy directive rows in current AMS product language."""
+    rewrites = {
+        "Keep the active thesis centered on Causal Experience Memory: memory is verified experience that improves future action.": (
+            "Keep AMS centered on verified experience that improves future action, not commodity memory storage."
+        ),
+        "Do not claim state-of-the-art for CEM-0 or AMS v1.": "Do not claim state-of-the-art for AMS.",
+        "Capture live user corrections immediately: stop the active lane, name the mistake, record affected files/actions, route the event to AMS/CEM/project ledger as appropriate, and require explicit resume before continuing.": (
+            "Capture live user corrections immediately: stop the active lane, name the mistake, record affected files/actions, route the event to AMS directives, AMS experience records, and the project ledger as appropriate, and require explicit resume before continuing."
+        ),
+        "Keep Agentic Memory System centered on Causal Experience Memory, not commodity memory storage.": (
+            "Keep AMS centered on verified experience that improves future action, not commodity memory storage."
+        ),
+        "Do not let MCP, database, dashboard, or platform work outrun the CEM proof and usable operator loop.": (
+            "Do not let MCP, database, dashboard, or platform work outrun the AMS proof and usable operator loop."
+        ),
+        "run pytest and synthetic eval before claiming CEM or AMS memory changes are complete": (
+            "run pytest and synthetic eval before claiming AMS memory changes are complete"
+        ),
+        "Do not import stale CEM-0 snapshot counts from the legacy Codex memory registry.": (
+            "Do not import stale historical snapshot counts from the legacy Codex memory registry."
+        ),
+    }
+    updated = rewrites.get(content, content)
+    replacements = {
+        "AMS/CEM": "AMS",
+        "CEM or AMS": "AMS",
+        "Causal Experience Memory": "AMS",
+        "CEM-0": "AMS V0",
+        "CEM-1": "AMS",
+        "CEM proof": "AMS proof",
+    }
+    for old, new in replacements.items():
+        updated = updated.replace(old, new)
+    return updated
 
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")

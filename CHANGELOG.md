@@ -4,6 +4,141 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-06-09
+
+### Fixed
+
+- Corrected the startup-control architecture so Monitor-0 failures and missing required memory become `degraded` non-blocking startup/runtime status by default instead of `block`. Explicit blocking is reserved for the separate runtime-control/action-safety lane.
+- Added `degraded_reasons` to startup briefs, governed-run receipts, and runtime-control receipts so memory infrastructure warnings remain auditable without becoming command authority.
+- Updated `scripts/session-start-gate.ps1` to allow `degraded` startup briefs while printing the degraded reasons.
+- Moved active correction resume enforcement out of startup memory readiness and kept it in `runtime-control` through the explicit correction gate decision.
+- Converted startup-brief infrastructure exceptions into `runtime-control` degraded reasons so guarded commands continue unless runtime-control returns an explicit action-safety `block`.
+- Converted `scripts/session-start-gate.ps1` from a hard startup gate into a warning surface: missing `ams.py`, startup-brief command failure, malformed output, unknown status, or startup `block` now report `SESSION_GATE_DEGRADED` and exit 0.
+- Converted `scripts/ams-guarded-command.ps1` missing-`ams.py` handling from fail-closed to degraded/non-blocking so an absent AMS script cannot stop an unrelated owner command.
+- Superseded stale live AMS card `card_3b90d70eb3ac475286cc96cb59646011`, which still claimed safety-critical missing directives could block, and recorded replacement card `card_db1b028bfc664fa097f2dd7f01598d92`.
+
+### Verified
+
+- Red proof before implementation: focused regression tests failed because monitor failure returned `block`, runtime-control exited `12`, and no `degraded_reasons` field existed.
+- Green proof after implementation: `python -m pytest tests/test_ams_cli.py -k "startup_brief_degrades_unreconciled_memory_surfaces or runtime_control_does_not_block_unrelated_owner_task_on_monitor_failure or startup_brief_degrades_when_required_memory_is_missing"` -> `3 passed`.
+- Follow-up correction proof: `python -m pytest tests/test_ams_cli.py -k "startup_brief_degrades_when_required_memory_is_missing or correction_capture_records_plan_first_violation_and_blocks_resume"` -> `2 passed`.
+- Final review remediation proof: `python -m pytest tests/test_ams_cli.py -k "startup_brief_infrastructure_fails or runtime_control_infrastructure_fails or unknown_startup_status or startup_brief_command_failure"` -> `4 passed`.
+- Missing-`ams.py` red->green proof: temporarily restored the old fail-closed launcher behavior, then `python -m pytest tests/test_ams_cli.py -k "guarded_command_runs_downstream_when_ams_script_is_missing"` failed; restored the fix and the same command passed.
+- Final focused regression group: `python -m pytest tests/test_ams_cli.py -k "guarded_command_runs_downstream_when_ams_script_is_missing or runtime_control_infrastructure_fails or unknown_startup_status or startup_brief_command_failure or startup_brief_infrastructure_fails"` -> `5 passed`.
+- Broader affected suite: `python -m pytest tests/test_ams_cli.py -k "startup_brief or runtime_control or runtime_trace or guarded_command or session_start_gate or monitor"` -> `24 passed`.
+- Full suite: `python -m pytest` -> `211 passed`.
+- `python scripts/run_synthetic_eval.py` -> pass with false-memory resistance `1.0`, contradiction precision/recall `1.0`, and false quarantine rate `0.0`.
+- Fresh operator proof: `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-monitor-degraded-fix` -> `AMS_OPERATOR_PROOF_PASS`.
+- Live session gate on the current global root -> `SESSION_GATE_DEGRADED`, allowed with `monitor_failed:*` warning.
+- Live MTM incident replay from `C:\Dev\MTM Final AI approach\MTM OS\mtm-os`: `startup-brief "Review third meeting transcript, Claude analysis, and low-quality voice-note transcription options" --domain mtm-os --json` -> `status=degraded`, `block_reasons=[]`, `degraded_reasons=["monitor_failed:*"]`.
+- Live AMS retrieval check no longer surfaces the stale missing-directives blocking card; audit shows `card_3b90d70eb3ac475286cc96cb59646011` as `promotion_status=superseded`.
+- Independent Codex review found two issues: active correction gates were degraded and degraded trace/close surfaces lacked tests. Both were fixed. Re-review then found session-start could still fail-closed on unknown startup status; that was fixed with a degrade/allow PowerShell regression. Later review found a missing-`ams.py` fail-closed launcher path plus stale docs; both were fixed. Final independent re-review reported no actionable findings, with the caveat that its read-only sandbox could not run tests. Local final affected suite passed (`24 passed`) and full suite passed (`211 passed`).
+- `git diff --check` -> clean aside from expected Windows CRLF warnings.
+
+## 2026-06-01
+
+### Added
+
+- Added `scripts/run_ams_operator_proof.py`, the terminal AMS v1 operator proof. It creates a fresh local AMS root, seeds only documented inputs, reconciles `ams-memory` as primary, retrieves a startup brief, runs maintenance and Monitor-0 deep checks, audits a real card, closes the governed run with outcome success, and reruns the Phase 4 frontier eval.
+- Added `tests/test_ams_operator_proof.py` so the fresh-root operator path cannot silently become documentation-only.
+
+### Changed
+
+- Froze the AMS v1 terminal scope in `TODO.md`: A1-A9 are listed once, all checked, and no new TODO item may be added to redefine AMS v1 as "really done." Future work must be post-v1 or a regression fix.
+- Updated dashboard/monitor phase status to `AMS v1 Accepted`, `ready_for_next_phase=True`, and no open follow-ups.
+- Updated `PRODUCT-LOCK.md`, `README.md`, `AGENTS.md`, `CLAUDE.md`, and the product-lock audit to reflect AMS v1 acceptance.
+
+### Verified
+
+- `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final` -> `AMS_OPERATOR_PROOF_PASS`; startup `brief_f3a88b2624454ddd886505de39e407f6`; monitor `monitor_17adf0c7bc9f4d84a906210bce318d0f`; maintenance items `0`; audit `card_264bed74b7a346dfbb0d3898aef1c8f8`; governed run `run_946ba867b16947438ac0a50919b66619 outcome=success`; frontier eval `PASS margin=75.0pp`.
+- `python -m pytest tests/test_ams_operator_proof.py -q` -> `1 passed`.
+- Focused operator proof/status canaries -> `3 passed`.
+- `python scripts/ams.py monitor --deep` -> pass (`monitor_f62d9107b19941959a79caceda35c264`) with phase `AMS v1 Accepted`, next `none - AMS v1 terminal acceptance contract is complete`.
+- `python -m pytest` -> `203 passed`.
+
+## 2026-05-31
+
+### Added
+
+- Added `PRODUCT-LOCK.md` as the canonical AMS product acceptance lock: product line, scope, acceptance criteria, current status, planning order, and completion rule.
+- Added `docs/2026-05-31-ams-product-lock-execution-plan.md` to map the product lock into the first planning moves without redefining scope.
+- Added `docs/2026-05-31-ams-product-lock-audit.md` with pass/partial/fail status for Product Lock criteria A1-A9.
+- Added `docs/2026-05-31-ams-review-prompts.md` with a Greptile PR review request and optional Codex review preflight prompt.
+- Added governed-run receipts to `startup-brief`: each run now records receipt id, startup brief id, monitor id, cwd, task description, evidence ids, status, and block reasons; dashboard exposes the latest governed run.
+- Added `docs/2026-05-31-codex-hook-runtime-smoke.md` with live Codex hook evidence.
+- Added `ams runtime-control` and `scripts/ams-guarded-command.ps1` as the enforceable AMS-owned runtime path: AMS records launcher control receipts, and the guarded launcher refuses to invoke the downstream command when runtime-control/action-safety blocks.
+- Added `scripts/install-ams-codex-entrypoint.ps1` to install, restore, and smoke-test AMS-wrapped Codex shims with `codex.ams-original*` backups.
+- Added `ams memory-surfaces` plus dashboard reporting for the active memory topology: `ams-memory` primary, `codex-memory` secondary, and native Codex memory accepted only after an applied AMS migration.
+- Added `ams governed-run close` to finalize governed-run receipts with observed outcome and an observational influence event linked to the startup/action brief.
+- Added `ams runtime-trace record` and automatic guarded-command trace capture: ordinary AMS-guarded Codex work now writes real `AgentTrace` records, proposes marker-backed memory candidates with source spans, persists `runtime-trace-latest`, and exposes the latest trace in the dashboard.
+- Added `ams maintenance review` as the AMS aging/maintenance product surface: expired active cards, stale active cards, active contradiction links, inactive card counts, and stale pending atoms are reported with operator review actions; reports persist to `maintenance-runs.jsonl`, `maintenance-latest.json`, and `maintenance-latest.md`; dashboard exposes `latest_maintenance`.
+
+### Changed
+
+- Locked product language to one line: **AMS**. Active source-of-truth docs now point to `PRODUCT-LOCK.md` for acceptance and avoid treating older internal labels as the product identity.
+- New bootstrap, migration, correction, README, TODO, and runtime-facing text now uses AMS product language. Legacy internal labels are recognized only for backwards-compatible parsing/classification.
+- Corrected the primary runtime adoption rail after live proof: Codex CLI 0.128.0 invokes command hooks but does not block on non-zero hook exits, so AMS now uses its own runtime-control/guarded-command path instead of another payload-shape check.
+- Advanced the active next step from command-hook enforcement replacement through default Codex entrypoint wiring.
+- Advanced the active next step again after installing the default Codex shims, reconciling memory surfaces, adding governed-run close/finalize, wiring automatic runtime trace intake, and adding maintenance review; the current next rail is packaging the local operator path.
+
+### Fixed
+
+- Addressed Greptile PR-loop safety findings that still applied in the live branch: governed-run receipts are written before startup briefs can claim them, receipt ids are generated before model construction, run-close/finalization fields are reserved on receipts, bootstrap AMS directive counting is no longer checkout-path-sensitive, live `prompt` hook payloads are accepted by the Python adapter on every platform, multi-atom card audits surface the latest validation decision, influence close is idempotent per brief, `SCORER_VERSION` has one source of truth, single-task MMA cannot pass the confidence gate, and correction resume cannot mint phantom receipts when the gate is already clear.
+- Addressed Codex review's WSL shim finding: when the generated Git Bash/WSL `codex` shim converts `basedir` to a Windows path, it now prefers `powershell.exe` before Linux `pwsh`, preventing Linux PowerShell from receiving an unusable `C:\...` script path.
+- Addressed Codex review's primary-runtime findings at the time: Monitor-0 gated on memory-surface reconciliation, and AMS directive scoping matched the acronym on token boundaries instead of substring-matching unrelated words like `teams`, `params`, or `diagrams`. The Monitor-0 startup-block behavior was superseded on 2026-06-09 by degraded/non-blocking startup memory readiness.
+- Addressed Codex review's maintenance/reconciliation findings: memory-surface reconciliation now reads the latest applied migration even after a later dry-run, and maintenance review skips atoms already referenced by cards so promoted evidence is not mislabeled as stale pending work.
+- Addressed Codex review's guarded-launch finding: an allowed guarded command that fails to launch now records a failed runtime trace with exit code 127 before the wrapper exits, so automatic runtime trace intake covers missing executable/path failures.
+- Addressed Codex review's installer-backup finding: reinstalling AMS over a fresh non-wrapped Codex shim now refreshes `codex.ams-original*` backups, so wrappers and uninstall restore the current raw shim rather than a stale pre-upgrade backup.
+- Addressed Codex review's guarded-persistence findings: quiet guarded invocations now surface AMS trace-recording failures to stderr, and the guarded launcher closes the governed-run receipt after blocked, allowed, and downstream-launch-failure outcomes.
+- Addressed Codex review's monitor-surface findings: memory-surface reconciliation now accepts an `ams-memory` MCP `--root` arg or `CEM_ROOT` env value when `AMS_ROOT` is absent, and maintenance review flags active cards that have no validation freshness anchor.
+
+### Verified
+
+- `python -m pytest` -> 193 passed.
+- `python scripts/ams.py monitor --deep` -> pass (`monitor_c2f34660e7cf4f618f6a9c7cd4db24f4`).
+- `python scripts/ams.py startup-brief "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow with a governed-run receipt and AMS-only active action text.
+- `python scripts/ams.py runtime-control "continue AMS primary runtime adoption" --domain agentic-memory-system` -> allow (`control_21266e4ab3274b73972bfb84aadbd761`) with startup brief, governed-run, monitor, prompt decision, and gate decision attached.
+- `codex exec` live hook smoke -> `UserPromptSubmit` payload includes `prompt` + `session_id`; `PreToolUse` is invoked before tools; non-zero command-hook exits are advisory in Codex CLI 0.128.0.
+- Focused AMS CLI verification -> `28 passed`, including the portable checkout-path canary and the blocked guarded-command canary that proves the downstream command is not invoked.
+- Focused Codex entrypoint installer verification -> `2 passed`; focused entrypoint + phase-status verification -> `3 passed`.
+- Real npm Codex shims installed with backups; PowerShell `codex --version`, `cmd /c codex --version`, and WSL `/mnt/c/Users/7amma/AppData/Roaming/npm/codex --version` all return `codex-cli 0.128.0`.
+- Fresh-root default-entrypoint smoke: `codex --version` with temp `AMS_ROOT` blocks before raw Codex runs (`control_253ccfd23f9e4db384cc39e8822af226`).
+- Correction default-entrypoint smoke: `codex.ps1 exec "we already said no scaffolding; stop and record this correction"` with temp `AMS_ROOT` blocks before raw Codex runs (`control_43d400ec00c3484899571952e5785889`).
+- `python scripts/ams.py memory-surfaces` -> reconciled; `ams-memory` primary, `codex-memory` secondary, native Codex memory secondary import source via `migration_8b2e1532c74b4cdd896d78d787d4e4d0`.
+- Focused memory-surface and phase-status canaries -> `4 passed`, including the failure case where native memory remains `warn` until migration is applied.
+- Focused governed-run close/finalize and phase-status canaries -> `4 passed`, including idempotent close and the failure case for receipts missing action-brief/influence ids.
+- Live `python scripts/ams.py governed-run close --receipt-id run_f24ec46f59b14b49aa204d5a75f3ee69 --outcome success ...` -> closed with `influence_ba6f90954fc14042965b163794b4fb95`; dashboard showed `closed=True outcome=success`.
+- Focused runtime trace intake suite -> `9 passed`, including source-span candidate extraction, missing-control failure, blocked-command failure trace, and quiet raw output preservation.
+- Live guarded-command smoke -> `AMS_TRACE_SMOKE` printed cleanly while dashboard recorded `latest_runtime_trace: success trace_c33a54d6d6c84959bb9e3ec8a28d8ed3 atoms=1`; dashboard now reports next step `add aging and maintenance checks as a product surface`.
+- Codex review loop -> found one P2 in the generated WSL shell shim; fixed and verified with focused entrypoint/runtime tests (`5 passed`) and full `python -m pytest` (`193 passed`). Reinstalled the real npm Codex shims; PowerShell `codex --version` and WSL `/mnt/c/Users/7amma/AppData/Roaming/npm/codex --version` both return `codex-cli 0.128.0`.
+- Focused maintenance review suite -> `4 passed`, including expired/stale/contradicted/inactive report canaries, dashboard `latest_maintenance`, monitor blocking-risk visibility, and expired-record action-brief exclusion.
+- Surrounding AMS CLI/runtime suite -> `48 passed`.
+- Codex review loop -> found two primary-runtime findings: memory-surface reconciliation was dashboard-only, and AMS acronym scoping was substring-based. Both fixed with canaries.
+- Focused Codex-review remediation canaries -> `6 passed`.
+- Second Codex review loop -> found two P2 edge cases: dry-run migration invalidated reconciliation and promoted evidence atoms appeared pending in maintenance. Both fixed with canaries.
+- Focused second-pass remediation canaries -> `4 passed`.
+- Surrounding AMS CLI/runtime/entrypoint suite -> `57 passed`.
+- Full `python -m pytest` -> `202 passed`.
+- Live `powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1` -> pass (`brief_b9422ecd489343bbab353850312db302`, monitor `monitor_da9f21a012de4c3eb1b056270e4b6ef5`).
+- Live `python scripts/ams.py maintenance review` -> pass (`maintenance_cbdf5de418994987b92783f872dc84d4`) with 8 active cards, 0 inactive cards, 0 expired active, 0 stale active, 0 contradicted active, and no review items.
+- Live `python scripts/ams.py monitor --deep` -> pass (`monitor_3d8026c8efd2428b8d36102d3caad845`); `memory_surfaces_reconciled` passed, maintenance checks passed with `expired_active=0`, `stale_active=0`, `contradicted_active=0`, `inactive=0`, `stale_pending_atoms=0`, and deep synthetic eval passed.
+- Live `python scripts/ams.py dashboard` -> next step `package the local operator path`, latest monitor `monitor_3d8026c8efd2428b8d36102d3caad845`, and latest maintenance `maintenance_d23ab68f98d3446995673ae38ff2e76a items=0`.
+- Third Codex review loop -> found one P2 guarded-launch trace gap; fixed with a launch-failure canary. Focused guarded-command canaries -> `4 passed`.
+- Fourth Codex review loop -> found one P2 stale-backup installer gap; fixed with a reinstall/upgrade canary. Focused installer canaries -> `3 passed`.
+- Fifth Codex review loop -> found two P2 guarded-persistence gaps: quiet mode could hide trace-recording failures, and guarded runs could leave governed-run receipts open. Both fixed with canaries. Focused guarded-command persistence canaries -> `5 passed`.
+- Sixth Codex review loop -> found two P2 monitor-surface gaps: `ams-memory` configured only through MCP `--root` was falsely marked unreconciled, and active cards without freshness anchors could pass maintenance. Both fixed with canaries. Focused monitor-surface canaries -> `4 passed`.
+- Final Codex review loop -> no discrete actionable regressions; diff inspected against the merge base and full `python -m pytest -q` passed inside the review.
+
+## 2026-05-30
+
+### Fixed
+
+- Corrected the live phase status: dashboard/monitor no longer reports the already-resolved §12 hook-wiring work as the next active step. The active track is now **AMS Primary Runtime Adoption**.
+
+### Changed
+
+- Added the remaining primary-adoption rail to `TODO.md`: live Codex hook-payload smoke, governed-run brief/monitor/evidence ids, and reconciliation of legacy Codex memories / `codex-memory` / `ams-memory` so AMS becomes the primary startup source.
+
 ## 2026-05-29
 
 ### Added
@@ -57,10 +192,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 
 - Added `CHANGELOG.md` as the canonical human-readable change timeline.
 - Added `docs/PROJECT-LEDGER.md` as the deeper engineering ledger for decisions, gaps, mistakes, and verification state.
-- Added scoped dashboard/monitor status so AMS/CEM records are separated from global Codex behavior records.
+- Added scoped dashboard/monitor status so AMS records are separated from global Codex behavior records.
 - Added explicit current-phase and next-step output to `python scripts/ams.py dashboard` and monitor records.
-- Added `python scripts/ams.py startup-brief` as the first Memory Use Controller command with allow/block status, monitor linkage, evidence ids, scoped retrieval, and bounded output.
-- Wired `scripts/session-start-gate.ps1` through `startup-brief` so startup execution now blocks when required AMS memory is missing.
+- Added `python scripts/ams.py startup-brief` as the first Memory Use Controller command with startup status, monitor linkage, evidence ids, scoped retrieval, and bounded output. Its original allow/block status was superseded on 2026-06-09 by allow/degraded memory readiness.
+- Wired `scripts/session-start-gate.ps1` through `startup-brief` as a startup memory-readiness warning surface. Its original missing-memory blocking behavior was superseded on 2026-06-09; missing or failed memory now degrades instead of blocking owner-directed work.
 - Added `python scripts/ams.py correction ...` as the first Correction Capture Controller surface with live correction classification, affected file/action recording, directive/CEM/ledger routing, resume gate, and event ledgers.
 - Added `docs/2026-05-28-ams-v1.3-correction-capture-controller-plan.md` to make live correction capture part of AMS architecture instead of Vol.
 

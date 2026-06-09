@@ -8,6 +8,8 @@ PowerShell) is thin. Every test is RED-first and watched to fail for the right r
 """
 from __future__ import annotations
 
+import pytest
+
 from cem_core import operations
 from cem_core.correction_capture import (
     _event_log_path,
@@ -29,6 +31,12 @@ from cem_core.correction_hooks import (
 
 BLOCKING_PROMPT = "we already said no to that"  # matches repeated_drift
 BENIGN_PROMPT = "list the files in the kernel package"  # matches no category
+CODEX_REVIEW_PROMPT = (
+    "codex review --base phase-3-source-universe Focus on lib/engine/intelligence-job.ts "
+    "(evaluateIntelligenceJobReadiness, sourceKind) and the run-record shareability wiring. "
+    "The readiness verdict now gates qa.shareable / the raw-data-job-ready hard gate. "
+    "Enumerate EVERY remaining fail-open or contract-conformance gap."
+)
 
 
 def _check_status(run, name: str) -> str:
@@ -78,6 +86,16 @@ def test_hook_user_prompt_benign_allows_with_no_event_and_clear_gate(tmp_path):
     assert not _event_log_path(_root(tmp_path)).exists()
 
 
+def test_codex_review_prompt_with_hard_gate_is_not_a_correction(tmp_path):
+    assert classify_correction(CODEX_REVIEW_PROMPT) == []
+    decision = hook_on_user_prompt_submit(tmp_path, CODEX_REVIEW_PROMPT)
+    assert decision.decision == "allow"
+    assert decision.categories == []
+    assert decision.event_id is None
+    assert decision.gate_status == "clear"
+    assert not _event_log_path(_root(tmp_path)).exists()
+
+
 def test_hook_gate_denies_continuation_while_active(tmp_path):
     capture_correction(tmp_path, BLOCKING_PROMPT)
     decision = hook_on_pre_tool_use_gate(tmp_path)
@@ -113,6 +131,17 @@ def test_hook_resume_clears_gate_deny_to_allow_end_to_end(tmp_path):
     assert after.decision == "allow"
     assert after.gate_status == "clear"
     assert after.hook_exit_code == HOOK_EXIT_ALLOW
+
+
+def test_resume_correction_refuses_clear_gate_phantom_receipt(tmp_path):
+    event = capture_correction(tmp_path, BLOCKING_PROMPT)
+    resume_correction(tmp_path, event.event_id, approved_by="Hammad")
+
+    with pytest.raises(ValueError, match="not blocked"):
+        resume_correction(tmp_path, event.event_id, approved_by="Hammad")
+
+    resume_log = _root(tmp_path) / "correction-resume-runs.jsonl"
+    assert len(resume_log.read_text(encoding="utf-8").splitlines()) == 1
 
 
 def test_monitor0_bridge_hook_block_then_resume(tmp_path):

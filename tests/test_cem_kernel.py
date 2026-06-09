@@ -331,7 +331,8 @@ def test_repeated_evidence_reuses_experience_card(tmp_path):
     assert len(cem.store.list_cards()) == 1
     audit = cem.audit(second_card.card_id)
     assert audit.evidence_atom_count == 2
-    assert audit.validation_decision is None
+    assert audit.validation_decision is not None
+    assert audit.validation_decision.atom_id == second.atom_id
     assert audit.source_agent_ids == ["codex"]
     assert audit.source_session_ids == ["s1"]
     assert audit.confidence_score == second_card.confidence_score
