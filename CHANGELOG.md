@@ -4,6 +4,48 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-06-10
+
+### Added
+
+- Opened **AMS V2: Experience Enforcement Architecture** as the named post-v1
+  phase in `TODO.md`.
+- Added `docs/2026-06-10-ams-v2-experience-enforcement-plan.md` as the canonical
+  full-scope V2 execution plan.
+- Added `docs/2026-06-10-ams-v2-acceptance-contract.md` with the Phase 0
+  acceptance axes, seed corpus, false-block budget shape, red-test rule, and
+  receipt rule.
+
+### Changed
+
+- Locked the correction that the non-repeat enforcement kernel is part of AMS
+  V2, not a V1.5 downgrade or smaller substitute.
+- Expanded V2 scope to include experience graph and decision intent capture,
+  error/success attribution, authority and scope resolution, behavior
+  invariants, procedural skill memory, situation matching, policy binding,
+  action decision points, reasoning control, under-the-hood inference receipts,
+  supersession, multi-agent governance, and the V2 eval battery.
+- Updated monitor/dashboard phase status so AMS V2 Phase 1 is the active rail
+  after Phase 0 contract lock.
+
+### Next
+
+- Start AMS V2 Phase 1: decision-intent and experience-graph schema, with red
+  tests for missing expected outcome, authority, approval/experiment state,
+  runtime surface, and evidence ids.
+
+### Verified
+
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> `2 passed`.
+- Full AMS CLI test file: `python -m pytest tests/test_ams_cli.py -q` -> passed.
+- `git diff --check` passed with only expected Windows CRLF warnings.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 1 - Experience graph and decision intent`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 0 status wiring after contract lock" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 1 next step.
+
 ## 2026-06-09
 
 ### Fixed

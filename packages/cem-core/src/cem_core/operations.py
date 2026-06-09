@@ -1103,13 +1103,18 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS v1 product lock: kernel, MCP bridge, startup gate, guarded Codex runtime, memory surface reconciliation, governed-run close/finalize, automatic runtime trace intake, aging/maintenance review, fresh operator proof, and frontier eval rerun are complete"
+            "AMS v1 product lock is accepted; AMS V2 Phase 0 contract lock is complete with full-scope experience enforcement plan, acceptance contract, seed corpus, and no-trimming rule"
         ),
-        current_phase="AMS v1 Accepted",
-        status="complete",
-        next_step="none - AMS v1 terminal acceptance contract is complete",
-        ready_for_next_phase=True,
-        open_followups=[],
+        current_phase="AMS V2 Phase 1 - Experience graph and decision intent",
+        status="active",
+        next_step=(
+            "implement V2 decision-intent and experience-graph schema for expected outcome, authority, approval/experiment state, runtime surface, and evidence ids"
+        ),
+        ready_for_next_phase=False,
+        open_followups=[
+            "V2 Phase 1 implementation and red-test canaries are pending",
+            "V2 dashboard/operator proof remains pending until Phase 10",
+        ],
     )
 
 

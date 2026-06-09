@@ -40,27 +40,80 @@ Do not stop at "task complete" when the next unchecked item is clear.
 
 - `IDEA.md`
 - `PRODUCT-LOCK.md`
+- `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`
+- `docs/2026-06-10-ams-v2-acceptance-contract.md`
 - `research/2026-05-27-plan-1-causal-experience-memory-foundation.md`
 - `specs/2026-05-27-cem-0-memguard-kernel-spec.md`
 - `sessions/2026-05-27-cem-0-session-handoff.md`
 
-`PRODUCT-LOCK.md` defines what counts as product-complete. The old A/B/C/D work remains historical infrastructure context. The active dependency order is:
+`PRODUCT-LOCK.md` defines what counted as AMS v1 product-complete. The old
+A/B/C/D work remains historical infrastructure context. For post-v1 work, the
+active dependency order is AMS V2 Phase 0 through Phase 10 in the V2 plan:
 
 ```text
-Plan 1 foundation -> AMS write-path proof -> backend adapters -> MCP integration -> multi-agent protocol
+V2 contract -> experience graph -> attribution -> invariants/skills -> matching
+-> action decision -> reasoning UX -> supersession -> multi-agent governance
+-> V2 eval -> operator proof
 ```
 
-Backend adapters, MCP integration, and multi-agent protocol stay gated until the AMS proof is stronger.
+Older backend adapters and MCP integration remain infrastructure. They should be
+used only where they serve the V2 experience-enforcement proof.
 
 ## Guardrails
 
-- Stay on AMS write-path quality and eval strength.
-- Do not drift into MCP, database adapters, dashboards, or platform integrations before the proof work below is done.
-- Keep deterministic fixtures until the eval primitive is stronger.
+- Preserve the full AMS V2 scope; do not rename it, downgrade it, or trim it
+  into V1.5.
+- Keep every V2 subsystem tied to the experience-enforcement proof: behavior
+  changes under the hood, receipts prove why, and evals verify the result.
+- Do not drift into dashboard, database, MCP, or platform work unless it is
+  required for a listed V2 phase or acceptance test.
+- Keep deterministic fixtures and failure canaries until the V2 eval primitive
+  is stronger.
 - Do not claim state-of-the-art.
 - Never read or write `C:\Dev\Builds\Waki`.
 
 ## Ordered Build Queue
+
+### 15. AMS V2 Experience Enforcement Architecture
+
+AMS V2 is the named post-v1 phase. This is not V1.5 and not a smaller proof
+kernel. The non-repeat enforcement kernel is a core subsystem inside the full V2
+plan alongside reasoning, experience graph, procedural skill memory,
+supersession, multi-agent governance, under-the-hood inference receipts, and the
+V2 evaluation battery.
+
+Canonical plan: `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`.
+Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
+
+- [x] Phase 0 - V2 contract lock: accept the full V2 plan, add V2 acceptance
+      criteria, define the seed corpus, and lock the no-trimming rule.
+- [ ] Phase 1 - Experience graph and decision intent: capture expected outcome,
+      authority, approval/experiment state, runtime surface, and evidence ids
+      for consequential actions.
+- [ ] Phase 2 - Error and success attribution: classify mistake,
+      approved-experiment failure, acceptable tradeoff, success, and unresolved
+      outcomes, including owner-labeled seed cases.
+- [ ] Phase 3 - Invariants, skills, and authority scope: compile confirmed
+      mistakes into behavior invariants, confirmed successes into skill
+      candidates, and retrieve them through authority-ranked lanes.
+- [ ] Phase 4 - Situation matching: catch exact and paraphrased repeats while
+      suppressing valid neighbors according to the false-block budget.
+- [ ] Phase 5 - Action decision point and policy binding: intercept
+      consequential decisions and return allow, steer, warn, ask, block,
+      override, or degraded-allow verdicts.
+- [ ] Phase 6 - Reasoning controller and under-the-hood UX: allow reasoning with
+      experience while preventing silent rationalization past confirmed
+      mistakes; surface concise inference receipts instead of raw hidden
+      reasoning.
+- [ ] Phase 7 - Supersession and active forgetting: retire stale or wrong
+      invariants and skills through authority-ranked supersession.
+- [ ] Phase 8 - Multi-agent experience governance: share governed experience
+      across agents without scope pollution.
+- [ ] Phase 9 - V2 eval harness: run non-repeat, false-block,
+      approved-experiment, skill-transfer, supersession, multi-agent conflict,
+      and context-pollution evals.
+- [ ] Phase 10 - Operator proof and release lock: fresh-root V2 operator proof,
+      dashboard/monitor V2 status, review receipts, and product-lock update.
 
 ### 0. Foundation Lock
 

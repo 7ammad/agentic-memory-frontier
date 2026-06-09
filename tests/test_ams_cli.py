@@ -418,18 +418,22 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
 
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 11
-    assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock")
-    assert monitor["phase"]["current_phase"] == "AMS v1 Accepted"
+    assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
+    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 1 - Experience graph and decision intent"
+    assert monitor["phase"]["status"] == "active"
     assert (
         monitor["phase"]["next_step"]
-        == "none - AMS v1 terminal acceptance contract is complete"
+        == "implement V2 decision-intent and experience-graph schema for expected outcome, authority, approval/experiment state, runtime surface, and evidence ids"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
     assert "real trace intake" not in monitor["phase"]["next_step"]
     assert "aging and maintenance" not in monitor["phase"]["next_step"]
-    assert monitor["phase"]["ready_for_next_phase"] is True
-    assert monitor["phase"]["open_followups"] == []
+    assert monitor["phase"]["ready_for_next_phase"] is False
+    assert monitor["phase"]["open_followups"] == [
+        "V2 Phase 1 implementation and red-test canaries are pending",
+        "V2 dashboard/operator proof remains pending until Phase 10",
+    ]
     assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
     assert _check_status(monitor, "brief_has_correction_capture_rule") == "pass"
     assert _check_status(monitor, "maintenance_surface_present") == "pass"
@@ -723,9 +727,13 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["ams_directive_count"] == 11
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
-    assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock")
-    assert dashboard["phase"]["ready_for_next_phase"] is True
-    assert dashboard["phase"]["open_followups"] == []
+    assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
+    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 1 - Experience graph and decision intent"
+    assert dashboard["phase"]["ready_for_next_phase"] is False
+    assert dashboard["phase"]["open_followups"] == [
+        "V2 Phase 1 implementation and red-test canaries are pending",
+        "V2 dashboard/operator proof remains pending until Phase 10",
+    ]
 
 
 def test_ams_cli_startup_brief_allows_when_required_memory_is_present(tmp_path):

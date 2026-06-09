@@ -71,6 +71,51 @@ Entry format:
 - Verification: Red proof: `python -m pytest tests/test_ams_cli.py::test_ams_cli_memory_surfaces_reconcile_ams_only_when_native_memory_disabled -q` failed before the reconciliation fix because `report["reconciled"]` was `False`. Green proof: the same regression passed, including monitor-detail assertions for `codex-memory optional bridge unconfigured` and `native Codex memory disabled/import-only`; affected memory/startup/runtime cluster -> **6 passed**. Independent local `codex review --base staging` found one P2: AMS-only reconciliation could pass if native Codex Memories were not disabled but no `MEMORY.md` existed yet. Added `test_ams_cli_memory_surfaces_reject_ams_only_when_native_memory_not_disabled` and tightened reconciliation so AMS-only requires native disablement; focused memory-surface suite -> **5 passed**. Live config proof: TOML parse showed `features.memories=False`, `memories.generate_memories=False`, `memories.use_memories=False`, and `ams-memory.command=python`; `codex features list` showed `memories experimental false`; `codex mcp list` showed `ams-memory` enabled; direct MCP stdio initialize/tools-list returned the CEM tool list. Live AMS proof: `python scripts/ams.py memory-surfaces --json` -> `reconciled=true`, `ams-memory=primary/pass`, `codex-memory=unconfigured/warn`, and native Codex memory disabled/import-only; `python scripts/ams.py monitor --json` -> **pass** with the corrected memory-surface detail. Full `python -m pytest -q` passed. Fresh operator proof `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-ams-only-memory-p2` -> `AMS_OPERATOR_PROOF_PASS`, `memory_surfaces_reconciled=True`, monitor pass, maintenance pass, governed run closed success, frontier eval pass.
 - Follow-up: A new Codex run/restart may be needed for every live Codex MCP client to reload `C:\Users\7amma\.codex\config.toml`. Do not configure the old `codex-memory` bridge as a default dependency until it is made runnable and tested; keep it optional secondary import/bridge infrastructure.
 
+## LEDGER-20260610-001 - AMS V2 opened as full experience enforcement architecture
+
+- Date: 2026-06-10
+- Type: plan-update / correction
+- Status: active
+- Source: Owner correction after Codex repeatedly framed the next phase as
+  V1.5 or a smaller non-repeat kernel instead of the full AMS V2 build.
+- Summary: AMS V2 is now opened as the named post-v1 phase. The non-repeat
+  enforcement kernel remains mandatory, but it is a core subsystem inside the
+  full V2 architecture, not a downgrade or substitute. V2 includes experience
+  graph and decision intent capture, error/success attribution, authority and
+  scope resolution, behavior invariant compilation, procedural skill memory,
+  situation matching, policy binding, action decision points, reasoning control,
+  under-the-hood inference receipts, supersession/active forgetting,
+  multi-agent experience governance, and a V2 evaluation battery covering
+  non-repeat, false-block, approved-experiment exclusion, skill transfer,
+  supersession, context pollution, and multi-agent conflict. Phase 0 is locked:
+  the plan, acceptance contract, seed corpus, false-block budget shape,
+  dashboard/monitor V2 phase status, and no-trimming rule are in place.
+- Files:
+  - `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`
+  - `docs/2026-06-10-ams-v2-acceptance-contract.md`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `README.md`
+  - `AGENTS.md`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `tests/test_ams_cli.py`
+  - `docs/PROJECT-LEDGER.md`
+  - `CHANGELOG.md`
+- Verification: Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **2 passed**. Full AMS CLI test file
+  `python -m pytest tests/test_ams_cli.py -q` -> **passed**. `git diff --check`
+  passed with expected Windows CRLF warnings only. Live
+  `python scripts/ams.py monitor --json` reports current phase `AMS V2 Phase 1
+  - Experience graph and decision intent`. Live `python scripts/ams.py
+  startup-brief "verify AMS V2 Phase 0 status wiring after contract lock"
+  --domain codex-harness --json` returns `status=allow` and the V2 Phase 1 next
+  step. Governed runs `run_ceaef4a810034fe79e17c4b20a028df8` and
+  `run_c4352731e6964af6bded48049303f6f1` closed with outcome success.
+- Follow-up: Start V2 Phase 1: implement decision-intent and experience-graph
+  schema with red-test canaries for missing expected outcome, authority,
+  approval/experiment state, runtime surface, and evidence ids.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

@@ -1,7 +1,8 @@
 # AMS Product Lock
 
 Date locked: 2026-05-31
-Status: canonical product acceptance lock; AMS v1 accepted on 2026-06-01
+Status: canonical product acceptance lock; AMS v1 accepted on 2026-06-01; AMS
+V2 opened on 2026-06-10
 
 ## Product Line
 
@@ -205,6 +206,15 @@ Remaining AMS v1 gaps:
 
 - Nothing for AMS v1. Post-v1 work must be opened as a new named phase, not as a
   surprise continuation of this acceptance lock.
+
+Post-v1 phase opened:
+
+- AMS V2: Experience Enforcement Architecture.
+- Canonical plan: `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`.
+- Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
+- Scope lock: V2 is the full experience enforcement build. The non-repeat
+  enforcement kernel is included inside V2; it is not a V1.5 downgrade or
+  smaller substitute.
 
 ## Planning Order
 

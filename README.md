@@ -16,6 +16,15 @@ AMS v1 acceptance status: complete as of the terminal operator proof on
 2026-06-01. Post-v1 work should be named as a new phase, not appended as another
 hidden "one more thing" to the v1 TODO.
 
+Current post-v1 phase: **AMS V2: Experience Enforcement Architecture**.
+Canonical plan: [docs/2026-06-10-ams-v2-experience-enforcement-plan.md](docs/2026-06-10-ams-v2-experience-enforcement-plan.md).
+Acceptance contract: [docs/2026-06-10-ams-v2-acceptance-contract.md](docs/2026-06-10-ams-v2-acceptance-contract.md).
+
+V2 includes the non-repeat enforcement kernel as a core subsystem, not a V1.5
+downgrade. The target is an under-the-hood experience layer that changes future
+agent action before the user has to catch repeated mistakes, while preserving
+valid work and surfacing compact inference receipts when needed.
+
 The default extractor and contradiction detector are deterministic strategies for reproducible AMS V0 fixtures. They are replaceable kernel interfaces, not the final reasoning layer.
 
 The public foundation is in [research/2026-05-27-plan-1-causal-experience-memory-foundation.md](research/2026-05-27-plan-1-causal-experience-memory-foundation.md).
