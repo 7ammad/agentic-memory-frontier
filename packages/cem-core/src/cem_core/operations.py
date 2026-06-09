@@ -1186,16 +1186,16 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS v1 product lock is accepted; AMS V2 Phase 4 situation matching is complete for exact repeats, paraphrase repeats, valid neighbors, and skill preconditions"
+            "AMS v1 product lock is accepted; AMS V2 Phase 5 action decision point and policy binding are complete for matched invariants, skills, and runtime boundaries"
         ),
-        current_phase="AMS V2 Phase 5 - Action decision point and policy binding",
+        current_phase="AMS V2 Phase 6 - Reasoning controller and under-the-hood UX",
         status="active",
         next_step=(
-            "implement V2 pre-action decision point, policy verdicts, enforcement receipts, and runtime interception boundary map"
+            "implement V2 asymmetric reasoning rules, downgrade receipts, silent steering behavior, and ask/block/override UX"
         ),
         ready_for_next_phase=False,
         open_followups=[
-            "V2 Phase 5 action decision point and policy-binding implementation are pending",
+            "V2 Phase 6 reasoning-controller and under-the-hood UX implementation are pending",
             "V2 dashboard/operator proof remains pending until Phase 10",
         ],
     )

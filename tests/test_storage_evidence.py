@@ -2,11 +2,13 @@ import pytest
 
 from cem_core.models import (
     ActionBriefRecord,
+    ActionDecisionReceipt,
     ActionInfluenceEvent,
     BehaviorInvariant,
     DecisionIntent,
     ExperienceAttribution,
     ExperienceGraphRecord,
+    RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
     VerificationProbe,
@@ -152,6 +154,45 @@ def test_situation_match_roundtrip_in_both_backends(tmp_path):
 
         assert store.get_situation_match(match.match_id) == match
         assert store.list_situation_matches() == [match]
+
+
+def test_action_decision_receipt_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        receipt = ActionDecisionReceipt(
+            decision_id="decision_1",
+            original_action="repeat known mistake",
+            action_to_execute="use corrected action",
+            verdict="steer",
+            downstream_action_allowed=True,
+            user_visible=False,
+            boundary_status="interceptable",
+            boundary_id="boundary_1",
+            match_ids=["match_1"],
+            source_ids=["invariant_1"],
+            reason="silently steered known repeat to corrected action",
+            evidence_ids=["decision_1", "match_1", "invariant_1"],
+        )
+
+        store.save_action_decision_receipt(receipt)
+
+        assert store.get_action_decision_receipt(receipt.receipt_id) == receipt
+        assert store.list_action_decision_receipts() == [receipt]
+
+
+def test_runtime_interception_boundary_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        boundary = RuntimeInterceptionBoundary(
+            action_kind="decision",
+            runtime_surface="codex-desktop",
+            interceptable=True,
+            supported_verdicts=["allow", "steer", "block", "degraded_allow"],
+            evidence_ids=["boundary_1"],
+        )
+
+        store.save_runtime_interception_boundary(boundary)
+
+        assert store.get_runtime_interception_boundary(boundary.boundary_id) == boundary
+        assert store.list_runtime_interception_boundaries() == [boundary]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):

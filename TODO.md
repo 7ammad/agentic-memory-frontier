@@ -103,7 +103,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
       candidates, and retrieve them through authority-ranked lanes.
 - [x] Phase 4 - Situation matching: catch exact and paraphrased repeats while
       suppressing valid neighbors according to the false-block budget.
-- [ ] Phase 5 - Action decision point and policy binding: intercept
+- [x] Phase 5 - Action decision point and policy binding: intercept
       consequential decisions and return allow, steer, warn, ask, block,
       override, or degraded-allow verdicts.
 - [ ] Phase 6 - Reasoning controller and under-the-hood UX: allow reasoning with

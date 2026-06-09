@@ -13,6 +13,7 @@ from .models import (
     ActionBriefRecord,
     ActionInfluenceEvent,
     AgentTrace,
+    ActionDecisionReceipt,
     DecisionIntent,
     ExperienceAtom,
     ExperienceCard,
@@ -153,6 +154,11 @@ class CEM:
         for match in matches:
             self.store.save_situation_match(match)
         return matches
+
+    def decide_action(self, decision: DecisionIntent, *, boundaries: list) -> ActionDecisionReceipt:
+        from .policy import ActionDecisionPoint
+
+        return ActionDecisionPoint(self).decide(decision, boundaries=boundaries)
 
     def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
         """Bidirectionally link active cards whose claims conflict without a

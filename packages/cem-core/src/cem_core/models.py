@@ -190,6 +190,16 @@ SituationMatchType = Literal[
     "valid_neighbor",
     "no_match",
 ]
+PolicyVerdict = Literal[
+    "allow",
+    "steer",
+    "warn",
+    "ask",
+    "block",
+    "override_allowed",
+    "degraded_allow",
+]
+BoundaryStatus = Literal["interceptable", "non_interceptable", "unknown"]
 
 
 class BehaviorInvariant(StrictModel):
@@ -266,6 +276,47 @@ class SituationMatch(StrictModel):
             "fires": self.fires,
             "confidence": self.confidence,
             "reason": self.reason,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class RuntimeInterceptionBoundary(StrictModel):
+    boundary_id: str = Field(default_factory=lambda: new_id("boundary"))
+    action_kind: ActionKind
+    runtime_surface: str = Field(min_length=1)
+    interceptable: bool
+    supported_verdicts: list[PolicyVerdict] = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ActionDecisionReceipt(StrictModel):
+    receipt_id: str = Field(default_factory=lambda: new_id("receipt"))
+    decision_id: str
+    original_action: str = Field(min_length=1)
+    action_to_execute: str | None = None
+    verdict: PolicyVerdict
+    downstream_action_allowed: bool
+    user_visible: bool
+    boundary_status: BoundaryStatus
+    boundary_id: str | None = None
+    match_ids: list[str] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "receipt_id": self.receipt_id,
+            "decision_id": self.decision_id,
+            "verdict": self.verdict,
+            "downstream_action_allowed": self.downstream_action_allowed,
+            "user_visible": self.user_visible,
+            "boundary_status": self.boundary_status,
+            "boundary_id": self.boundary_id,
+            "match_ids": self.match_ids,
+            "source_ids": self.source_ids,
             "evidence_ids": self.evidence_ids,
         }
 

@@ -19,8 +19,9 @@ hidden "one more thing" to the v1 TODO.
 Current post-v1 phase: **AMS V2: Experience Enforcement Architecture**.
 Canonical plan: [docs/2026-06-10-ams-v2-experience-enforcement-plan.md](docs/2026-06-10-ams-v2-experience-enforcement-plan.md).
 Acceptance contract: [docs/2026-06-10-ams-v2-acceptance-contract.md](docs/2026-06-10-ams-v2-acceptance-contract.md).
-Current V2 build status: Phase 4 situation matching is complete; Phase 5
-action decision point and policy binding is the next active rail.
+Current V2 build status: Phase 5 action decision point and policy binding is
+complete; Phase 6 reasoning controller and under-the-hood UX is the next active
+rail.
 
 V2 includes the non-repeat enforcement kernel as a core subsystem, not a V1.5
 downgrade. The target is an under-the-hood experience layer that changes future

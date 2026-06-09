@@ -336,6 +336,52 @@ Entry format:
 - Follow-up: Start V2 Phase 5: implement the pre-action decision point, policy
   verdicts, enforcement receipts, and runtime interception boundary map.
 
+## LEDGER-20260610-007 - AMS V2 Phase 5 action decision point completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 5 and V2 plan acceptance for pre-action decision
+  points, policy verdicts, enforcement receipts, and runtime interception
+  boundary honesty.
+- Summary: Completed V2 Phase 5. Added `RuntimeInterceptionBoundary`,
+  `ActionDecisionReceipt`, `PolicyBindingLayer`, and `ActionDecisionPoint`.
+  Fired invariant matches now bind to `steer` or `block` before downstream
+  execution when the runtime boundary is interceptable. Fired skill matches bind
+  to silent `steer`. Non-interceptable boundaries produce honest
+  `degraded_allow` receipts instead of claiming full blocking. `CEM.decide_action`
+  is the kernel pre-action API and persists both boundary map records and action
+  decision receipts.
+- Files:
+  - `packages/cem-core/src/cem_core/policy.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_policy_binding.py`
+  - `tests/test_storage_evidence.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_policy_binding.py -q` failed because
+  `RuntimeInterceptionBoundary` did not exist. Green proof:
+  `python -m pytest tests/test_policy_binding.py -q` -> **passed**.
+  `python -m pytest tests/test_storage_evidence.py::test_action_decision_receipt_roundtrip_in_both_backends tests/test_storage_evidence.py::test_runtime_interception_boundary_roundtrip_in_both_backends -q`
+  -> **passed**. Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Live `python scripts/ams.py monitor --json` reports current
+  phase `AMS V2 Phase 6 - Reasoning controller and under-the-hood UX`; live
+  startup brief for Phase 5 completion returns `status=allow` and the Phase 6
+  next step. `git diff --check` -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 6: implement asymmetric reasoning rules, downgrade
+  receipts, silent steering behavior, and ask/block/override UX.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

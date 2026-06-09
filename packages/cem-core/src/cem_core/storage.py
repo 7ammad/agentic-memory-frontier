@@ -6,6 +6,7 @@ from typing import Protocol
 
 from .models import (
     ActionBriefRecord,
+    ActionDecisionReceipt,
     ActionInfluenceEvent,
     AgentTrace,
     BehaviorInvariant,
@@ -13,6 +14,7 @@ from .models import (
     ExperienceAtom,
     ExperienceCard,
     ExperienceGraphRecord,
+    RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
     ValidationDecision,
@@ -60,6 +62,12 @@ class CEMStore(Protocol):
     def save_situation_match(self, match: SituationMatch) -> None: ...
     def get_situation_match(self, match_id: str) -> SituationMatch: ...
     def list_situation_matches(self) -> list[SituationMatch]: ...
+    def save_action_decision_receipt(self, receipt: ActionDecisionReceipt) -> None: ...
+    def get_action_decision_receipt(self, receipt_id: str) -> ActionDecisionReceipt: ...
+    def list_action_decision_receipts(self) -> list[ActionDecisionReceipt]: ...
+    def save_runtime_interception_boundary(self, boundary: RuntimeInterceptionBoundary) -> None: ...
+    def get_runtime_interception_boundary(self, boundary_id: str) -> RuntimeInterceptionBoundary: ...
+    def list_runtime_interception_boundaries(self) -> list[RuntimeInterceptionBoundary]: ...
 
 
 class SQLiteStore:
@@ -154,6 +162,21 @@ class SQLiteStore:
                     source_type TEXT NOT NULL,
                     match_type TEXT NOT NULL,
                     fires INTEGER NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS action_decision_receipts (
+                    receipt_id TEXT PRIMARY KEY,
+                    decision_id TEXT NOT NULL,
+                    verdict TEXT NOT NULL,
+                    boundary_status TEXT NOT NULL,
+                    downstream_action_allowed INTEGER NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS runtime_interception_boundaries (
+                    boundary_id TEXT PRIMARY KEY,
+                    action_kind TEXT NOT NULL,
+                    runtime_surface TEXT NOT NULL,
+                    interceptable INTEGER NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -482,6 +505,71 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM situation_matches ORDER BY rowid").fetchall()
         return [SituationMatch.model_validate_json(row[0]) for row in rows]
 
+    def save_action_decision_receipt(self, receipt: ActionDecisionReceipt) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO action_decision_receipts(
+                    receipt_id, decision_id, verdict, boundary_status, downstream_action_allowed, payload
+                ) VALUES(?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    receipt.receipt_id,
+                    receipt.decision_id,
+                    receipt.verdict,
+                    receipt.boundary_status,
+                    1 if receipt.downstream_action_allowed else 0,
+                    receipt.model_dump_json(),
+                ),
+            )
+
+    def get_action_decision_receipt(self, receipt_id: str) -> ActionDecisionReceipt:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM action_decision_receipts WHERE receipt_id = ?",
+                (receipt_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Action decision receipt not found: {receipt_id}")
+        return ActionDecisionReceipt.model_validate_json(row[0])
+
+    def list_action_decision_receipts(self) -> list[ActionDecisionReceipt]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM action_decision_receipts ORDER BY rowid").fetchall()
+        return [ActionDecisionReceipt.model_validate_json(row[0]) for row in rows]
+
+    def save_runtime_interception_boundary(self, boundary: RuntimeInterceptionBoundary) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO runtime_interception_boundaries(
+                    boundary_id, action_kind, runtime_surface, interceptable, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    boundary.boundary_id,
+                    boundary.action_kind,
+                    boundary.runtime_surface,
+                    1 if boundary.interceptable else 0,
+                    boundary.model_dump_json(),
+                ),
+            )
+
+    def get_runtime_interception_boundary(self, boundary_id: str) -> RuntimeInterceptionBoundary:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM runtime_interception_boundaries WHERE boundary_id = ?",
+                (boundary_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Runtime interception boundary not found: {boundary_id}")
+        return RuntimeInterceptionBoundary.model_validate_json(row[0])
+
+    def list_runtime_interception_boundaries(self) -> list[RuntimeInterceptionBoundary]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM runtime_interception_boundaries ORDER BY rowid").fetchall()
+        return [RuntimeInterceptionBoundary.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -501,6 +589,8 @@ class InMemoryStore:
         self._behavior_invariants: dict[str, str] = {}
         self._skill_candidates: dict[str, str] = {}
         self._situation_matches: dict[str, str] = {}
+        self._action_decision_receipts: dict[str, str] = {}
+        self._runtime_interception_boundaries: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -675,4 +765,34 @@ class InMemoryStore:
         return [
             SituationMatch.model_validate_json(payload)
             for payload in self._situation_matches.values()
+        ]
+
+    def save_action_decision_receipt(self, receipt: ActionDecisionReceipt) -> None:
+        self._action_decision_receipts[receipt.receipt_id] = receipt.model_dump_json()
+
+    def get_action_decision_receipt(self, receipt_id: str) -> ActionDecisionReceipt:
+        payload = self._action_decision_receipts.get(receipt_id)
+        if payload is None:
+            raise KeyError(f"Action decision receipt not found: {receipt_id}")
+        return ActionDecisionReceipt.model_validate_json(payload)
+
+    def list_action_decision_receipts(self) -> list[ActionDecisionReceipt]:
+        return [
+            ActionDecisionReceipt.model_validate_json(payload)
+            for payload in self._action_decision_receipts.values()
+        ]
+
+    def save_runtime_interception_boundary(self, boundary: RuntimeInterceptionBoundary) -> None:
+        self._runtime_interception_boundaries[boundary.boundary_id] = boundary.model_dump_json()
+
+    def get_runtime_interception_boundary(self, boundary_id: str) -> RuntimeInterceptionBoundary:
+        payload = self._runtime_interception_boundaries.get(boundary_id)
+        if payload is None:
+            raise KeyError(f"Runtime interception boundary not found: {boundary_id}")
+        return RuntimeInterceptionBoundary.model_validate_json(payload)
+
+    def list_runtime_interception_boundaries(self) -> list[RuntimeInterceptionBoundary]:
+        return [
+            RuntimeInterceptionBoundary.model_validate_json(payload)
+            for payload in self._runtime_interception_boundaries.values()
         ]

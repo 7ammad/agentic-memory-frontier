@@ -18,9 +18,11 @@ from .compilers import (
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .kernel import CEM, card_is_inactive
 from .matching import SituationMatcher
+from .policy import ActionDecisionPoint, PolicyBindingLayer
 from .models import (
     ActionBrief,
     ActionBriefRecord,
+    ActionDecisionReceipt,
     ActionInfluenceEvent,
     AgentTrace,
     BehaviorInvariant,
@@ -31,6 +33,7 @@ from .models import (
     ExperienceCard,
     ExperienceGraphRecord,
     MemoryAudit,
+    RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
     SourceSpan,
@@ -55,6 +58,8 @@ from .storage import CEMStore, InMemoryStore, SQLiteStore
 __all__ = [
     "ActionBrief",
     "ActionBriefRecord",
+    "ActionDecisionPoint",
+    "ActionDecisionReceipt",
     "ActionInfluenceEvent",
     "AgentTrace",
     "AuthorityEvidence",
@@ -80,6 +85,8 @@ __all__ = [
     "MCPToolDefinition",
     "InMemoryStore",
     "MultiAgentTrustPolicy",
+    "PolicyBindingLayer",
+    "RuntimeInterceptionBoundary",
     "SharedTraceEnvelope",
     "SharedTraceImportReceipt",
     "SourceSpan",

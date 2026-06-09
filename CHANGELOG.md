@@ -32,6 +32,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `SituationMatcher`, exact repeat matching, paraphrase repeat matching,
   valid-neighbor suppression, owner-approved changed-context suppression, skill
   precondition matching, match persistence, and `CEM.match_situation()`.
+- Added AMS V2 Phase 5 policy binding: `RuntimeInterceptionBoundary`,
+  `ActionDecisionReceipt`, `PolicyBindingLayer`, `ActionDecisionPoint`,
+  persisted runtime boundary maps, persisted decision receipts, and
+  `CEM.decide_action()` for pre-action verdicts.
 
 ### Changed
 
@@ -42,13 +46,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   invariants, procedural skill memory, situation matching, policy binding,
   action decision points, reasoning control, under-the-hood inference receipts,
   supersession, multi-agent governance, and the V2 eval battery.
-- Updated monitor/dashboard phase status so AMS V2 Phase 5 is the active rail
-  after Phase 4 situation matching.
+- Updated monitor/dashboard phase status so AMS V2 Phase 6 is the active rail
+  after Phase 5 action decision point and policy binding.
 
 ### Next
 
-- Start AMS V2 Phase 5: pre-action decision point, policy verdicts,
-  enforcement receipts, and runtime interception boundary map.
+- Start AMS V2 Phase 6: asymmetric reasoning rules, downgrade receipts, silent
+  steering behavior, and ask/block/override UX.
 
 ### Verified
 
@@ -146,6 +150,25 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `AMS V2 Phase 5 - Action decision point and policy binding`.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 4 situation matching completion and Phase 5 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 5 next step.
+- Phase 5 red->green proof:
+  `python -m pytest tests/test_policy_binding.py -q` failed before
+  implementation because `RuntimeInterceptionBoundary` did not exist, then
+  passed after adding the policy binding layer.
+- Phase 5 focused checks:
+  `python -m pytest tests/test_policy_binding.py -q` -> passed.
+- Boundary and receipt storage checks:
+  `python -m pytest tests/test_storage_evidence.py::test_action_decision_receipt_roundtrip_in_both_backends tests/test_storage_evidence.py::test_runtime_interception_boundary_roundtrip_in_both_backends -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 6 - Reasoning controller and under-the-hood UX`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 5 action decision point completion and Phase 6 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 6 next step.
 
 ## 2026-06-09
 
