@@ -13,6 +13,7 @@ from .models import (
     ExperienceAtom,
     ExperienceCard,
     ExperienceGraphRecord,
+    SituationMatch,
     SkillCandidate,
     ValidationDecision,
     ValidationResult,
@@ -56,6 +57,9 @@ class CEMStore(Protocol):
     def save_skill_candidate(self, skill: SkillCandidate) -> None: ...
     def get_skill_candidate(self, skill_id: str) -> SkillCandidate: ...
     def list_skill_candidates(self) -> list[SkillCandidate]: ...
+    def save_situation_match(self, match: SituationMatch) -> None: ...
+    def get_situation_match(self, match_id: str) -> SituationMatch: ...
+    def list_situation_matches(self) -> list[SituationMatch]: ...
 
 
 class SQLiteStore:
@@ -141,6 +145,15 @@ class SQLiteStore:
                     source_attribution_id TEXT NOT NULL,
                     transfer_scope TEXT NOT NULL,
                     promotion_status TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS situation_matches (
+                    match_id TEXT PRIMARY KEY,
+                    decision_id TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    match_type TEXT NOT NULL,
+                    fires INTEGER NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -435,6 +448,40 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM skill_candidates ORDER BY rowid").fetchall()
         return [SkillCandidate.model_validate_json(row[0]) for row in rows]
 
+    def save_situation_match(self, match: SituationMatch) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO situation_matches(
+                    match_id, decision_id, source_id, source_type, match_type, fires, payload
+                ) VALUES(?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    match.match_id,
+                    match.decision_id,
+                    match.source_id,
+                    match.source_type,
+                    match.match_type,
+                    1 if match.fires else 0,
+                    match.model_dump_json(),
+                ),
+            )
+
+    def get_situation_match(self, match_id: str) -> SituationMatch:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM situation_matches WHERE match_id = ?",
+                (match_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Situation match not found: {match_id}")
+        return SituationMatch.model_validate_json(row[0])
+
+    def list_situation_matches(self) -> list[SituationMatch]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM situation_matches ORDER BY rowid").fetchall()
+        return [SituationMatch.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -453,6 +500,7 @@ class InMemoryStore:
         self._experience_attributions: dict[str, str] = {}
         self._behavior_invariants: dict[str, str] = {}
         self._skill_candidates: dict[str, str] = {}
+        self._situation_matches: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -612,4 +660,19 @@ class InMemoryStore:
         return [
             SkillCandidate.model_validate_json(payload)
             for payload in self._skill_candidates.values()
+        ]
+
+    def save_situation_match(self, match: SituationMatch) -> None:
+        self._situation_matches[match.match_id] = match.model_dump_json()
+
+    def get_situation_match(self, match_id: str) -> SituationMatch:
+        payload = self._situation_matches.get(match_id)
+        if payload is None:
+            raise KeyError(f"Situation match not found: {match_id}")
+        return SituationMatch.model_validate_json(payload)
+
+    def list_situation_matches(self) -> list[SituationMatch]:
+        return [
+            SituationMatch.model_validate_json(payload)
+            for payload in self._situation_matches.values()
         ]

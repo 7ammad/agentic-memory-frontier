@@ -101,7 +101,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
 - [x] Phase 3 - Invariants, skills, and authority scope: compile confirmed
       mistakes into behavior invariants, confirmed successes into skill
       candidates, and retrieve them through authority-ranked lanes.
-- [ ] Phase 4 - Situation matching: catch exact and paraphrased repeats while
+- [x] Phase 4 - Situation matching: catch exact and paraphrased repeats while
       suppressing valid neighbors according to the false-block budget.
 - [ ] Phase 5 - Action decision point and policy binding: intercept
       consequential decisions and return allow, steer, warn, ask, block,

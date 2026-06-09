@@ -28,6 +28,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `SkillCandidate`, `BehaviorInvariantCompiler`, `SkillCompiler`,
   `AuthorityScopeResolver`, invariant/skill storage, runtime compiler calls,
   and dashboard/operator files for latest invariant and skill candidates.
+- Added AMS V2 Phase 4 situation matching: `SituationMatch`,
+  `SituationMatcher`, exact repeat matching, paraphrase repeat matching,
+  valid-neighbor suppression, owner-approved changed-context suppression, skill
+  precondition matching, match persistence, and `CEM.match_situation()`.
 
 ### Changed
 
@@ -38,13 +42,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   invariants, procedural skill memory, situation matching, policy binding,
   action decision points, reasoning control, under-the-hood inference receipts,
   supersession, multi-agent governance, and the V2 eval battery.
-- Updated monitor/dashboard phase status so AMS V2 Phase 4 is the active rail
-  after Phase 3 invariant and skill compilation.
+- Updated monitor/dashboard phase status so AMS V2 Phase 5 is the active rail
+  after Phase 4 situation matching.
 
 ### Next
 
-- Start AMS V2 Phase 4: SituationMatcher for exact repeats, paraphrased
-  repeats, valid-neighbor suppression, confidence, and reason output.
+- Start AMS V2 Phase 5: pre-action decision point, policy verdicts,
+  enforcement receipts, and runtime interception boundary map.
 
 ### Verified
 
@@ -123,6 +127,25 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `AMS V2 Phase 4 - Situation matching`.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 3 compiler completion and Phase 4 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 4 next step.
+- Phase 4 red->green proof:
+  `python -m pytest tests/test_situation_matching.py -q` failed before
+  implementation because `cem_core.matching` did not exist, then passed after
+  adding match receipts and `SituationMatcher`.
+- Phase 4 focused checks:
+  `python -m pytest tests/test_situation_matching.py -q` -> passed.
+- Situation match storage:
+  `python -m pytest tests/test_storage_evidence.py::test_situation_match_roundtrip_in_both_backends -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 5 - Action decision point and policy binding`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 4 situation matching completion and Phase 5 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 5 next step.
 
 ## 2026-06-09
 

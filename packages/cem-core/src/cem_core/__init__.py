@@ -17,6 +17,7 @@ from .compilers import (
 )
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .kernel import CEM, card_is_inactive
+from .matching import SituationMatcher
 from .models import (
     ActionBrief,
     ActionBriefRecord,
@@ -30,6 +31,7 @@ from .models import (
     ExperienceCard,
     ExperienceGraphRecord,
     MemoryAudit,
+    SituationMatch,
     SkillCandidate,
     SourceSpan,
     TaskContext,
@@ -84,6 +86,8 @@ __all__ = [
     "SQLiteStore",
     "SkillCandidate",
     "SkillCompiler",
+    "SituationMatch",
+    "SituationMatcher",
     "SuccessAttributor",
     "TaskContext",
     "TraceReceipt",

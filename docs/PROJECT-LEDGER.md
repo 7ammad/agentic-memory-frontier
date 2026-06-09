@@ -292,6 +292,50 @@ Entry format:
 - Follow-up: Start V2 Phase 4: implement SituationMatcher for exact repeats,
   paraphrased repeats, valid-neighbor suppression, confidence, and reason output.
 
+## LEDGER-20260610-006 - AMS V2 Phase 4 situation matching completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 4 and V2 plan acceptance for exact repeats,
+  paraphrased repeats, valid-neighbor suppression, owner-approved changed
+  context, confidence, and receipt-grade reasons.
+- Summary: Completed V2 Phase 4 situation matching. Added `SituationMatch` and
+  `SituationMatcher`, exact invariant repeat matching, paraphrased general
+  behavior repeat matching, valid project-neighbor suppression, owner-approved
+  changed-context suppression, skill-transfer matching only when preconditions
+  hold, persistent match receipts, and `CEM.match_situation()` as the kernel
+  caller over persisted invariants and skills.
+- Files:
+  - `packages/cem-core/src/cem_core/matching.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_situation_matching.py`
+  - `tests/test_storage_evidence.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_situation_matching.py -q` failed because
+  `cem_core.matching` did not exist. Green proof:
+  `python -m pytest tests/test_situation_matching.py -q` -> **passed**.
+  `python -m pytest tests/test_storage_evidence.py::test_situation_match_roundtrip_in_both_backends -q`
+  -> **passed**. Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Live `python scripts/ams.py monitor --json` reports current
+  phase `AMS V2 Phase 5 - Action decision point and policy binding`; live
+  startup brief for Phase 4 completion returns `status=allow` and the Phase 5
+  next step. `git diff --check` -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 5: implement the pre-action decision point, policy
+  verdicts, enforcement receipts, and runtime interception boundary map.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

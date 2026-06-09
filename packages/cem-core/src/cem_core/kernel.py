@@ -7,14 +7,17 @@ from pathlib import Path
 
 from .contradiction import ContradictionDetector, contradiction_pair
 from .extractor import DeterministicExtractor, MemoryExtractor
+from .matching import SituationMatcher
 from .models import (
     ActionBrief,
     ActionBriefRecord,
     ActionInfluenceEvent,
     AgentTrace,
+    DecisionIntent,
     ExperienceAtom,
     ExperienceCard,
     MemoryAudit,
+    SituationMatch,
     TaskContext,
     TraceReceipt,
     ValidationDecision,
@@ -140,6 +143,16 @@ class CEM:
         self._supersede_stale_cards(atom, card)
         self._link_contradicting_cards(card)
         return card
+
+    def match_situation(self, decision: DecisionIntent) -> list[SituationMatch]:
+        matches = SituationMatcher().match_decision(
+            decision,
+            invariants=self.store.list_behavior_invariants(),
+            skills=self.store.list_skill_candidates(),
+        )
+        for match in matches:
+            self.store.save_situation_match(match)
+        return matches
 
     def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
         """Bidirectionally link active cards whose claims conflict without a

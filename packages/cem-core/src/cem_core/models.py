@@ -182,6 +182,14 @@ class ExperienceAttribution(StrictModel):
 InvariantEnforcement = Literal["steer", "block", "steer_or_block"]
 SupersessionStatus = Literal["active", "superseded", "retired"]
 SkillPromotionStatus = Literal["candidate", "verified", "rejected"]
+SituationSourceType = Literal["invariant", "skill"]
+SituationMatchType = Literal[
+    "exact_repeat",
+    "paraphrase_repeat",
+    "skill_transfer",
+    "valid_neighbor",
+    "no_match",
+]
 
 
 class BehaviorInvariant(StrictModel):
@@ -232,6 +240,32 @@ class SkillCandidate(StrictModel):
             "source_record_id": self.source_record_id,
             "transfer_scope": self.transfer_scope,
             "promotion_status": self.promotion_status,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class SituationMatch(StrictModel):
+    match_id: str = Field(default_factory=lambda: new_id("match"))
+    decision_id: str
+    source_id: str
+    source_type: SituationSourceType
+    match_type: SituationMatchType
+    fires: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "match_id": self.match_id,
+            "decision_id": self.decision_id,
+            "source_id": self.source_id,
+            "source_type": self.source_type,
+            "match_type": self.match_type,
+            "fires": self.fires,
+            "confidence": self.confidence,
+            "reason": self.reason,
             "evidence_ids": self.evidence_ids,
         }
 

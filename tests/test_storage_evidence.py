@@ -7,6 +7,7 @@ from cem_core.models import (
     DecisionIntent,
     ExperienceAttribution,
     ExperienceGraphRecord,
+    SituationMatch,
     SkillCandidate,
     VerificationProbe,
     VerificationResult,
@@ -132,6 +133,25 @@ def test_phase3_invariant_and_skill_roundtrip_in_both_backends(tmp_path):
         assert store.list_behavior_invariants() == [invariant]
         assert store.get_skill_candidate(skill.skill_id) == skill
         assert store.list_skill_candidates() == [skill]
+
+
+def test_situation_match_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        match = SituationMatch(
+            decision_id="decision_1",
+            source_id="invariant_1",
+            source_type="invariant",
+            match_type="paraphrase_repeat",
+            fires=True,
+            confidence=0.78,
+            reason="paraphrase repeat matched invariant markers",
+            evidence_ids=["decision_1", "invariant_1"],
+        )
+
+        store.save_situation_match(match)
+
+        assert store.get_situation_match(match.match_id) == match
+        assert store.list_situation_matches() == [match]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):
