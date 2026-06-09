@@ -13,8 +13,14 @@ $ErrorActionPreference = "Stop"
 
 $amsScript = Join-Path $Workspace "scripts\ams.py"
 if (-not (Test-Path $amsScript)) {
-    Write-Error "AMS_GUARD_FAIL: missing ams.py at $amsScript"
-    exit 12
+    Write-Output "AMS_RUNTIME_CONTROL_DEGRADED: missing ams.py at $amsScript; downstream command will run"
+    try {
+        & $Command @CommandArgs
+        exit $LASTEXITCODE
+    } catch {
+        [Console]::Error.WriteLine("AMS_GUARD_DOWNSTREAM_LAUNCH_FAIL: $($_.Exception.Message)")
+        exit 127
+    }
 }
 
 $startedAt = (Get-Date).ToUniversalTime().ToString("o")
@@ -23,11 +29,13 @@ $code = $LASTEXITCODE
 $controlObject = $null
 $controlId = $null
 $governedRunId = $null
+$controlStatus = $null
 if ($control) {
     try {
         $controlObject = $control | ConvertFrom-Json
         $controlId = $controlObject.control_id
         $governedRunId = $controlObject.governed_run_id
+        $controlStatus = $controlObject.status
     } catch {
         if (-not $Quiet) {
             Write-Output "AMS_TRACE_RECORD_FAIL: unable to parse runtime-control output: $_"
@@ -130,11 +138,18 @@ if ((-not $Quiet) -or $code -ne 0) {
     if ($control) { Write-Output $control }
 }
 
-if ($code -ne 0) {
+if (($code -ne 0) -and ($controlStatus -ne "block")) {
+    Write-Output "AMS_RUNTIME_CONTROL_DEGRADED: runtime-control infrastructure failed without an action-safety block; downstream command will run"
+}
+
+if ($controlStatus -eq "block") {
     Record-AmsRuntimeTrace -ObservedExitCode $code -EndedAt ((Get-Date).ToUniversalTime().ToString("o"))
     Close-AmsGovernedRun -ObservedExitCode $code -ActionTaken "AMS guard blocked downstream command: $Command $($CommandArgs -join ' ')"
     Write-Output "AMS_GUARD_BLOCKED: downstream command was not invoked"
-    exit $code
+    if ($code -ne 0) {
+        exit $code
+    }
+    exit 12
 }
 
 try {

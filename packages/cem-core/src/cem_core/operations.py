@@ -37,12 +37,24 @@ from .models import AgentTrace, ExperienceCard, StrictModel, TraceTurn, new_id, 
 MigrationAction = Literal["pin", "remember", "skip"]
 MaintenanceStatus = Literal["pass", "warn", "fail"]
 MonitorStatus = Literal["pass", "fail"]
-StartupStatus = Literal["allow", "block"]
+StartupStatus = Literal["allow", "degraded", "block"]
 
 AMS_DOMAIN_SCOPE = "agentic-memory-system"
 GLOBAL_BEHAVIOR_SCOPE = "codex-behavior"
 RUNTIME_CONTROL_EXIT_BLOCK = 12
 AMS_ACRONYM_PATTERN = re.compile(r"(?<![a-z0-9])ams(?![a-z0-9])")
+
+
+def _startup_status(block_reasons: list[str], degraded_reasons: list[str]) -> StartupStatus:
+    if block_reasons:
+        return "block"
+    if degraded_reasons:
+        return "degraded"
+    return "allow"
+
+
+def _status_allows_work(status: StartupStatus) -> bool:
+    return status in ("allow", "degraded")
 
 
 class MigrationItem(StrictModel):
@@ -142,6 +154,7 @@ class StartupBriefRun(StrictModel):
     evidence_ids: list[str]
     estimated_tokens: int
     block_reasons: list[str]
+    degraded_reasons: list[str] = Field(default_factory=list)
 
 
 class GovernedRunReceipt(StrictModel):
@@ -159,6 +172,7 @@ class GovernedRunReceipt(StrictModel):
     task_family: str | None
     evidence_ids: list[str]
     block_reasons: list[str]
+    degraded_reasons: list[str] = Field(default_factory=list)
     closed: bool = False
     outcome: Literal["success", "failure", "partial", "unknown"] | None = None
     finalized_at: datetime | None = None
@@ -183,6 +197,7 @@ class RuntimeControlRun(StrictModel):
     gate_decision: HookDecision
     evidence_ids: list[str]
     block_reasons: list[str]
+    degraded_reasons: list[str] = Field(default_factory=list)
     runtime_exit_code: int
 
 
@@ -664,16 +679,18 @@ def startup_brief(
         "todo_rule": True if not requires_ams_bootstrap_directives else "todo.md" in action_text,
     }
     block_reasons: list[str] = []
+    degraded_reasons: list[str] = []
     if monitor.status != "pass":
-        block_reasons.append(f"monitor_failed:{monitor.run_id}")
+        degraded_reasons.append(f"monitor_failed:{monitor.run_id}")
     for name, present in required_directives.items():
         if not present:
-            block_reasons.append(f"missing_required_directive:{name}")
+            reason = f"missing_required_directive:{name}"
+            degraded_reasons.append(reason)
 
     receipt_id = new_id("run")
     run = StartupBriefRun(
         root=str(root),
-        status="block" if block_reasons else "allow",
+        status=_startup_status(block_reasons, degraded_reasons),
         governed_run_id=receipt_id,
         action_brief_id=action_brief_id,
         influence_id=influence_id,
@@ -694,6 +711,7 @@ def startup_brief(
         evidence_ids=evidence_ids,
         estimated_tokens=_estimate_tokens("\n".join(recommended_actions)),
         block_reasons=block_reasons,
+        degraded_reasons=degraded_reasons,
     )
     receipt = GovernedRunReceipt(
         receipt_id=receipt_id,
@@ -709,6 +727,7 @@ def startup_brief(
         task_family=task_family,
         evidence_ids=evidence_ids,
         block_reasons=block_reasons,
+        degraded_reasons=degraded_reasons,
     )
     _write_governed_run_records(root, receipt)
     _write_startup_brief_records(root, run)
@@ -730,7 +749,7 @@ def close_governed_run(
         return receipt
 
     influence_ids = list(receipt.influence_ids)
-    if receipt.status == "allow":
+    if _status_allows_work(receipt.status):
         if not receipt.action_brief_id or not receipt.influence_id:
             raise ValueError(
                 f"governed run {receipt.receipt_id} cannot close influence: missing action_brief_id or influence_id"
@@ -766,12 +785,12 @@ def runtime_control(
     session_id: str | None = None,
     affected_files: list[str] | None = None,
 ) -> RuntimeControlRun:
-    """Build an enforceable AMS allow/block decision for an external launcher.
+    """Build an enforceable AMS allow/degraded/block decision for a launcher.
 
     Codex command hooks currently report non-zero exits as hook failures but still
     continue. This control path is owned by AMS instead: a caller must run it before
-    invoking the downstream command and must not invoke that command when the exit
-    code is non-zero.
+    invoking the downstream command and must not invoke that command when
+    runtime-control returns an action-safety block.
     """
     root = _root(root)
     prompt_decision = hook_on_user_prompt_submit(
@@ -780,23 +799,38 @@ def runtime_control(
         session_id=session_id,
         affected_files=affected_files or [],
     )
-    startup = startup_brief(
-        root,
-        description=description,
-        domain_scope=domain_scope,
-        task_family=task_family,
-    )
     gate_decision = hook_on_pre_tool_use_gate(root)
 
     block_reasons: list[str] = []
+    degraded_reasons: list[str] = []
+    startup_brief_id = "startup_brief_unavailable"
+    governed_run_id: str | None = None
+    monitor_id = "monitor_unavailable"
+    evidence_ids: list[str] = []
+    try:
+        startup = startup_brief(
+            root,
+            description=description,
+            domain_scope=domain_scope,
+            task_family=task_family,
+        )
+        startup_brief_id = startup.brief_id
+        governed_run_id = startup.governed_run_id
+        monitor_id = startup.monitor_id
+        evidence_ids = startup.evidence_ids
+        if startup.status == "block":
+            for reason in startup.block_reasons:
+                block_reasons.append(f"startup_blocked:{reason}")
+        for reason in startup.degraded_reasons:
+            degraded_reasons.append(f"startup_degraded:{reason}")
+    except Exception as exc:
+        degraded_reasons.append(f"startup_brief_failed:{type(exc).__name__}:{exc}")
     if prompt_decision.decision == "block":
         block_reasons.append(f"correction_prompt_blocked:{prompt_decision.event_id}")
     if gate_decision.decision == "block":
         block_reasons.append(f"resume_gate_blocked:{gate_decision.active_event_id or 'unknown'}")
-    for reason in startup.block_reasons:
-        block_reasons.append(f"startup_blocked:{reason}")
 
-    status: StartupStatus = "block" if block_reasons else "allow"
+    status = _startup_status(block_reasons, degraded_reasons)
     run = RuntimeControlRun(
         root=str(root),
         cwd=str(Path.cwd().resolve()),
@@ -806,14 +840,15 @@ def runtime_control(
         domain_scope=domain_scope,
         task_family=task_family,
         session_id=session_id,
-        startup_brief_id=startup.brief_id,
-        governed_run_id=startup.governed_run_id,
-        monitor_id=startup.monitor_id,
+        startup_brief_id=startup_brief_id,
+        governed_run_id=governed_run_id,
+        monitor_id=monitor_id,
         prompt_decision=prompt_decision,
         gate_decision=gate_decision,
-        evidence_ids=startup.evidence_ids,
+        evidence_ids=evidence_ids,
         block_reasons=block_reasons,
-        runtime_exit_code=HOOK_EXIT_ALLOW if status == "allow" else RUNTIME_CONTROL_EXIT_BLOCK,
+        degraded_reasons=degraded_reasons,
+        runtime_exit_code=HOOK_EXIT_ALLOW if _status_allows_work(status) else RUNTIME_CONTROL_EXIT_BLOCK,
     )
     _write_runtime_control_records(root, run)
     return run
@@ -837,7 +872,7 @@ def record_runtime_trace(
         raise ValueError("Runtime trace command must not be empty.")
 
     control = _load_runtime_control_run(root, control_id)
-    downstream_invoked = control.status == "allow"
+    downstream_invoked = _status_allows_work(control.status)
     final_outcome: Literal["success", "failure", "partial", "unknown"] = (
         "success" if downstream_invoked and observed_exit_code == 0 else "failure"
     )
@@ -897,6 +932,7 @@ def record_runtime_trace(
             "monitor_id": control.monitor_id,
             "evidence_ids": control.evidence_ids,
             "block_reasons": control.block_reasons,
+            "degraded_reasons": control.degraded_reasons,
             "command": command,
             "command_args": command_args,
             "observed_exit_code": observed_exit_code,
@@ -1266,6 +1302,10 @@ def _render_startup_brief_markdown(run: StartupBriefRun) -> str:
         lines.extend(["", "## Block Reasons", ""])
         for reason in run.block_reasons:
             lines.append(f"- `{reason}`")
+    if run.degraded_reasons:
+        lines.extend(["", "## Degraded Reasons", ""])
+        for reason in run.degraded_reasons:
+            lines.append(f"- `{reason}`")
     lines.extend(["", "## Recommended Actions", ""])
     for action in run.recommended_next_actions:
         lines.append(f"- {action}")
@@ -1294,6 +1334,10 @@ def _render_governed_run_markdown(receipt: GovernedRunReceipt) -> str:
         lines.extend(["", "## Block Reasons", ""])
         for reason in receipt.block_reasons:
             lines.append(f"- `{reason}`")
+    if receipt.degraded_reasons:
+        lines.extend(["", "## Degraded Reasons", ""])
+        for reason in receipt.degraded_reasons:
+            lines.append(f"- `{reason}`")
     return "\n".join(lines) + "\n"
 
 
@@ -1317,6 +1361,10 @@ def _render_runtime_control_markdown(run: RuntimeControlRun) -> str:
     if run.block_reasons:
         lines.extend(["", "## Block Reasons", ""])
         for reason in run.block_reasons:
+            lines.append(f"- `{reason}`")
+    if run.degraded_reasons:
+        lines.extend(["", "## Degraded Reasons", ""])
+        for reason in run.degraded_reasons:
             lines.append(f"- `{reason}`")
     return "\n".join(lines) + "\n"
 

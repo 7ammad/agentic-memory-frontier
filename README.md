@@ -127,9 +127,9 @@ The dashboard reports four layers:
 
 It also prints the current phase and next step so the overnight monitor runs show where the build stands, not only whether the store is alive.
 
-`startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, enforces required startup directives, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns `allow` or `block`.
+`startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, reports required startup directive presence, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns memory-readiness status. Missing, stale, contradicted, or failed memory returns `degraded` with warnings; it does not block fresh owner-directed work.
 
-`runtime-control` is the enforceable launcher-facing surface. It classifies the prompt, checks the correction resume gate, runs the startup brief, writes a runtime-control receipt, and exits non-zero on block. `scripts/ams-guarded-command.ps1` honors that exit code by refusing to invoke the downstream command when AMS blocks.
+`runtime-control` is the enforceable launcher-facing surface. It classifies the prompt, checks the correction resume gate, runs the startup brief, writes a runtime-control receipt, preserves startup degraded warnings, and exits non-zero only on a runtime-control/action-safety block. `scripts/ams-guarded-command.ps1` honors that exit code by refusing to invoke the downstream command when runtime-control blocks.
 
 `governed-run close` finalizes the latest or named governed-run receipt with an observed outcome. It links the startup brief, action brief, and influence id, writes an observational `ActionInfluenceEvent`, and keeps observed outcome separate from verified lift.
 

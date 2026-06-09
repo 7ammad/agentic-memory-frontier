@@ -83,8 +83,14 @@ Evidence required:
 - session startup runs the AMS gate;
 - startup returns a bounded action brief;
 - startup records `brief_id`, `monitor_id`, and evidence ids;
-- failure to retrieve required memory blocks work in an enforceable runtime path,
-  not only as advisory hook output;
+- missing, stale, contradicted, or failed memory retrieval degrades startup
+  status with auditable warnings and does not block fresh explicit owner work;
+- monitor, dashboard, MCP, and memory-surface failures degrade startup/runtime
+  memory-readiness status with auditable warnings and do not become command
+  authority;
+- enforcement lives in a separate runtime-control/action-safety lane for
+  destructive actions, secrets, legal/security risk, external sends, or an
+  explicit current owner pause/stop/correction gate;
 - legacy memory surfaces are secondary inputs, not the primary source.
 
 ### A2. Real Trace Intake

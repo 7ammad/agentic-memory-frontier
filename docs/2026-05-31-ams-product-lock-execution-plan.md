@@ -61,14 +61,14 @@ Work:
 
 - inspect Codex hook/config surfaces available on this machine;
 - decide where the AMS startup gate must run;
-- ensure startup emits `brief_id`, `monitor_id`, evidence ids, and block status;
+- ensure startup emits `brief_id`, `monitor_id`, evidence ids, and non-blocking memory-readiness status;
 - ensure legacy memory surfaces are treated as secondary inputs.
 
 Acceptance:
 
 - a fresh Codex session proves it started through AMS;
-- missing required AMS memory blocks serious work;
-- dashboard shows the latest allowed startup brief.
+- missing required AMS memory warns/degrades instead of blocking owner-directed work;
+- dashboard shows the latest allowed or degraded startup brief.
 
 ### Step 3. Governed-Run Receipts
 
@@ -101,7 +101,7 @@ Work:
 - DONE: implement `ams runtime-control` because Codex CLI 0.128.0 command-hook
   exits are advisory and do not stop the turn/tool;
 - DONE: add `scripts/ams-guarded-command.ps1`, which refuses to invoke the
-  downstream command when AMS blocks.
+  downstream command only when runtime-control/action-safety blocks.
 - DONE: add and run `scripts/install-ams-codex-entrypoint.ps1`, which backs up
   the npm Codex shims and routes default Codex launch through AMS.
 
@@ -111,8 +111,8 @@ Acceptance:
 - correction prompt records event and enforceably stops continuation;
 - pre-tool/tool execution is denied until explicit resume;
 - tests and smoke evidence cannot pass A6 on hook-failure output alone.
-- default-entrypoint smoke blocks missing-memory and correction cases before raw
-  Codex runs.
+- default-entrypoint smoke degrades missing-memory cases and blocks correction
+  cases before raw Codex runs.
 
 Remaining adoption work:
 

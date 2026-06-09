@@ -203,7 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     startup_parser = subparsers.add_parser(
         "startup-brief",
         parents=[json_parent],
-        help="Build a bounded startup brief and allow/block decision before agent work.",
+        help="Build a bounded startup brief and non-blocking memory-readiness status before agent work.",
     )
     startup_parser.add_argument("description", help="Task description.")
     startup_parser.add_argument("--domain", default="agentic-memory-system", help="Domain scope.")
@@ -217,7 +217,7 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_control_parser = subparsers.add_parser(
         "runtime-control",
         parents=[json_parent],
-        help="Build an enforceable AMS allow/block decision before a guarded runtime action.",
+        help="Build an enforceable AMS allow/degraded/block decision before a guarded runtime action.",
     )
     runtime_control_parser.add_argument("description", help="Prompt or task description to guard.")
     runtime_control_parser.add_argument("--domain", default="agentic-memory-system", help="Domain scope.")
@@ -763,6 +763,10 @@ def _emit_startup_brief(payload: dict[str, Any]) -> None:
         print("block_reasons:")
         for reason in payload["block_reasons"]:
             print(f"- {reason}")
+    if payload.get("degraded_reasons"):
+        print("degraded_reasons:")
+        for reason in payload["degraded_reasons"]:
+            print(f"- {reason}")
     print("required:")
     for name, present in payload["required_directives"].items():
         print(f"- {name}: {present}")
@@ -784,6 +788,10 @@ def _emit_runtime_control(payload: dict[str, Any]) -> None:
     if payload["block_reasons"]:
         print("block_reasons:")
         for reason in payload["block_reasons"]:
+            print(f"- {reason}")
+    if payload.get("degraded_reasons"):
+        print("degraded_reasons:")
+        for reason in payload["degraded_reasons"]:
             print(f"- {reason}")
 
 

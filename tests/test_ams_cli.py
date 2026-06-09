@@ -391,7 +391,7 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert dashboard["scope"]["global_behavior_directive_count"] == 0
 
 
-def test_ams_cli_monitor_blocks_unreconciled_memory_surfaces(tmp_path):
+def test_ams_cli_startup_brief_degrades_unreconciled_memory_surfaces(tmp_path):
     root = tmp_path / "ams"
     _seed_runtime_records(root)
 
@@ -408,8 +408,64 @@ def test_ams_cli_monitor_blocks_unreconciled_memory_surfaces(tmp_path):
     assert monitor["status"] == "fail"
     assert _check_status(monitor, "memory_surfaces_reconciled") == "fail"
     assert "not reconciled" in _check_detail(monitor, "memory_surfaces_reconciled")
-    assert result["status"] == "block"
-    assert any(reason.startswith("monitor_failed:") for reason in result["block_reasons"])
+    assert result["status"] == "degraded"
+    assert result["block_reasons"] == []
+    assert any(reason.startswith("monitor_failed:") for reason in result["degraded_reasons"])
+
+
+def test_ams_cli_runtime_control_does_not_block_unrelated_owner_task_on_monitor_failure(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_records(root)
+
+    result = _ams(
+        root,
+        "--json",
+        "runtime-control",
+        "Review third meeting transcript, Claude analysis, and low-quality voice-note transcription options",
+        "--domain",
+        "mtm-os",
+        "--session-id",
+        "incident-monitor-failure",
+    )
+
+    assert result["status"] == "degraded"
+    assert result["runtime_exit_code"] == 0
+    assert result["block_reasons"] == []
+    assert any(reason.startswith("startup_degraded:monitor_failed:") for reason in result["degraded_reasons"])
+
+    trace = _ams(
+        root,
+        "--json",
+        "runtime-trace",
+        "record",
+        "--control-id",
+        result["control_id"],
+        "--command",
+        "codex",
+        "--exit-code",
+        "0",
+    )
+    stored_trace = CEM(root).store.get_trace(trace["trace_id"])
+    closed = _ams(
+        root,
+        "--json",
+        "governed-run",
+        "close",
+        "--receipt-id",
+        result["governed_run_id"],
+        "--outcome",
+        "success",
+        "--action-taken",
+        "reviewed owner-directed transcript materials",
+    )
+
+    assert trace["runtime_control_status"] == "degraded"
+    assert trace["downstream_invoked"] is True
+    assert stored_trace.environment["degraded_reasons"] == result["degraded_reasons"]
+    assert closed["status"] == "degraded"
+    assert closed["closed"] is True
+    assert closed["outcome"] == "success"
+    assert closed["influence_ids"] == [closed["influence_id"]]
 
 
 def test_ams_cli_maintenance_review_detects_aging_risks_and_persists_report(tmp_path):
@@ -853,6 +909,34 @@ def test_ams_cli_runtime_control_blocks_correction_prompt(tmp_path):
     assert (root / "runtime-control-latest.json").exists()
 
 
+def test_runtime_control_degrades_when_startup_brief_infrastructure_fails(tmp_path, monkeypatch):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+
+    def fail_startup_brief(*args, **kwargs):
+        raise RuntimeError("startup database unavailable")
+
+    monkeypatch.setattr(operations, "startup_brief", fail_startup_brief)
+
+    result = operations.runtime_control(
+        root,
+        description="Review ordinary owner transcript task",
+        domain_scope="mtm-os",
+        session_id="startup-infra-failure",
+    )
+
+    assert result.status == "degraded"
+    assert result.runtime_exit_code == 0
+    assert result.block_reasons == []
+    assert result.startup_brief_id == "startup_brief_unavailable"
+    assert result.governed_run_id is None
+    assert result.monitor_id == "monitor_unavailable"
+    assert any(
+        reason.startswith("startup_brief_failed:RuntimeError")
+        for reason in result.degraded_reasons
+    )
+
+
 def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
     root = tmp_path / "ams"
     _seed_runtime_control_root(root)
@@ -1016,6 +1100,94 @@ def test_ams_guarded_command_runs_downstream_command_when_allowed(tmp_path):
     assert sentinel.exists()
 
 
+def test_ams_guarded_command_runs_downstream_when_runtime_control_infrastructure_fails(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "ams.py").write_text(
+        "import sys\n"
+        "if 'runtime-control' in sys.argv:\n"
+        "    print('runtime-control database unavailable')\n"
+        "    raise SystemExit(3)\n"
+        "raise SystemExit(2)\n",
+        encoding="utf-8",
+    )
+    sentinel = tmp_path / "infra-failure-command-ran.txt"
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(workspace),
+            "-Prompt",
+            "Review ordinary owner transcript task",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            f"echo ran>\"{sentinel}\"",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert process.returncode == 0
+    assert sentinel.exists()
+    assert "AMS_RUNTIME_CONTROL_EXIT: 3" in process.stdout
+    assert "AMS_RUNTIME_CONTROL_DEGRADED" in process.stdout
+    assert "AMS_GUARD_BLOCKED" not in process.stdout
+
+
+def test_ams_guarded_command_runs_downstream_when_ams_script_is_missing(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    (workspace / "scripts").mkdir(parents=True)
+    sentinel = tmp_path / "missing-ams-command-ran.txt"
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(workspace),
+            "-Prompt",
+            "Review ordinary owner transcript task",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            f"echo ran>\"{sentinel}\"",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert process.returncode == 0
+    assert "AMS_RUNTIME_CONTROL_DEGRADED: missing ams.py" in process.stdout
+    assert "AMS_GUARD_BLOCKED" not in process.stdout
+    assert sentinel.exists()
+
+
 def test_ams_guarded_command_records_runtime_trace_when_allowed_launch_fails(tmp_path):
     powershell = shutil.which("powershell")
     if os.name != "nt" or powershell is None:
@@ -1059,6 +1231,83 @@ def test_ams_guarded_command_records_runtime_trace_when_allowed_launch_fails(tmp
     latest_run = _ams(root, "--json", "dashboard")["latest_governed_run"]
     assert latest_run["closed"] is True
     assert latest_run["outcome"] == "failure"
+
+
+def test_session_start_gate_warns_and_allows_unknown_startup_status(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "ams.py").write_text(
+        "print('{\"status\":\"weird\",\"block_reasons\":[],\"degraded_reasons\":[]}')\n",
+        encoding="utf-8",
+    )
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "session-start-gate.ps1"),
+            "-Workspace",
+            str(workspace),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    combined_output = process.stdout + process.stderr
+
+    assert process.returncode == 0
+    assert "unknown AMS startup brief status weird" in combined_output
+    assert "SESSION_GATE_DEGRADED" in combined_output
+    assert "SESSION_GATE_PASS" not in combined_output
+
+
+def test_session_start_gate_warns_and_allows_startup_brief_command_failure(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "ams.py").write_text(
+        "print('startup brief database unavailable')\n"
+        "raise SystemExit(3)\n",
+        encoding="utf-8",
+    )
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "session-start-gate.ps1"),
+            "-Workspace",
+            str(workspace),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    combined_output = process.stdout + process.stderr
+
+    assert process.returncode == 0
+    assert "startup brief database unavailable" in combined_output
+    assert "unable to build AMS startup brief" in combined_output
+    assert "SESSION_GATE_DEGRADED" in combined_output
 
 
 def test_ams_guarded_command_quietly_records_runtime_trace(tmp_path):
@@ -1151,7 +1400,7 @@ def test_ams_guarded_command_quiet_mode_surfaces_trace_recording_failure(tmp_pat
     assert latest_run["outcome"] == "success"
 
 
-def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
+def test_ams_cli_startup_brief_degrades_when_required_memory_is_missing(tmp_path):
     root = tmp_path / "ams"
 
     result = _ams(
@@ -1163,14 +1412,16 @@ def test_ams_cli_startup_brief_blocks_when_required_memory_is_missing(tmp_path):
         "agentic-memory-system",
     )
 
-    assert result["status"] == "block"
+    assert result["status"] == "degraded"
     assert result["governed_run_id"].startswith("run_")
-    assert any(reason.startswith("monitor_failed:") for reason in result["block_reasons"])
-    assert "missing_required_directive:waki_boundary" in result["block_reasons"]
+    assert result["block_reasons"] == []
+    assert "missing_required_directive:waki_boundary" in result["degraded_reasons"]
+    assert any(reason.startswith("monitor_failed:") for reason in result["degraded_reasons"])
     latest = _ams(root, "--json", "dashboard")["latest_governed_run"]
     assert latest["receipt_id"] == result["governed_run_id"]
-    assert latest["status"] == "block"
-    assert latest["block_reasons"] == result["block_reasons"]
+    assert latest["status"] == "degraded"
+    assert latest["block_reasons"] == []
+    assert latest["degraded_reasons"] == result["degraded_reasons"]
     assert latest["closed"] is False
     assert latest["outcome"] is None
 
@@ -1285,6 +1536,14 @@ def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resu
         "mistake-capture",
     )
     monitor = _ams(root, "--json", "monitor")
+    startup = _ams(
+        root,
+        "--json",
+        "startup-brief",
+        "Review third meeting transcript after an unresolved owner correction",
+        "--domain",
+        "mtm-os",
+    )
 
     assert event["resume_status"] == "blocked"
     assert event["resume_required"] is True
@@ -1304,6 +1563,29 @@ def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resu
     assert any("avoid continuing after live correction" in action for action in brief["recommended_next_actions"])
     assert monitor["status"] == "fail"
     assert _check_status(monitor, "correction_resume_gate_clear") == "fail"
+    assert startup["status"] == "degraded"
+    assert startup["block_reasons"] == []
+    assert any(
+        reason.startswith("monitor_failed:")
+        for reason in startup["degraded_reasons"]
+    )
+
+    control_process = _ams_process(
+        root,
+        "--json",
+        "runtime-control",
+        "Review third meeting transcript after an unresolved owner correction",
+        "--domain",
+        "mtm-os",
+        "--session-id",
+        "unresolved-correction-gate",
+    )
+    assert control_process.returncode == 12
+    control = json.loads(control_process.stdout)
+    assert control["status"] == "block"
+    assert control["prompt_decision"]["decision"] == "allow"
+    assert control["gate_decision"]["decision"] == "block"
+    assert any(reason.startswith("resume_gate_blocked:") for reason in control["block_reasons"])
 
     resumed = _ams(
         root,
