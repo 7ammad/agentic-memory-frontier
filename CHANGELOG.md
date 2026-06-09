@@ -16,6 +16,8 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Converted `scripts/session-start-gate.ps1` from a hard startup gate into a warning surface: missing `ams.py`, startup-brief command failure, malformed output, unknown status, or startup `block` now report `SESSION_GATE_DEGRADED` and exit 0.
 - Converted `scripts/ams-guarded-command.ps1` missing-`ams.py` handling from fail-closed to degraded/non-blocking so an absent AMS script cannot stop an unrelated owner command.
 - Superseded stale live AMS card `card_3b90d70eb3ac475286cc96cb59646011`, which still claimed safety-critical missing directives could block, and recorded replacement card `card_db1b028bfc664fa097f2dd7f01598d92`.
+- Corrected memory-surface reconciliation for the AMS-only Codex default: `ams-memory` as primary plus native Codex Memories disabled now reconciles even when the unfinished `codex-memory` bridge is not configured. The bridge is reported as an optional warning, not a readiness dependency.
+- Corrected the live Codex memory wiring: native Codex Memories are explicitly disabled in `C:\Users\7amma\.codex\config.toml`, `ams-memory` is registered as the primary MCP, and existing Codex automations now start from AMS startup/action briefs instead of old Markdown/native memory defaults.
 
 ### Verified
 
@@ -33,6 +35,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Live MTM incident replay from `C:\Dev\MTM Final AI approach\MTM OS\mtm-os`: `startup-brief "Review third meeting transcript, Claude analysis, and low-quality voice-note transcription options" --domain mtm-os --json` -> `status=degraded`, `block_reasons=[]`, `degraded_reasons=["monitor_failed:*"]`.
 - Live AMS retrieval check no longer surfaces the stale missing-directives blocking card; audit shows `card_3b90d70eb3ac475286cc96cb59646011` as `promotion_status=superseded`.
 - Independent Codex review found two issues: active correction gates were degraded and degraded trace/close surfaces lacked tests. Both were fixed. Re-review then found session-start could still fail-closed on unknown startup status; that was fixed with a degrade/allow PowerShell regression. Later review found a missing-`ams.py` fail-closed launcher path plus stale docs; both were fixed. Final independent re-review reported no actionable findings, with the caveat that its read-only sandbox could not run tests. Local final affected suite passed (`24 passed`) and full suite passed (`211 passed`).
+- AMS-only default red proof: `python -m pytest tests/test_ams_cli.py::test_ams_cli_memory_surfaces_reconcile_ams_only_when_native_memory_disabled -q` failed before the reconciliation fix because `report["reconciled"]` was `False`.
+- AMS-only default green proof: the same focused regression passed, and the affected memory/startup/runtime cluster passed (`6 passed`).
+- Live global memory proof: `python scripts/ams.py memory-surfaces --json` -> `reconciled=true`, `ams-memory=primary/pass`, `codex-memory=unconfigured/warn`, `native-codex-memory=secondary_import_source/pass` with native Codex Memories disabled/import-only.
+- Live Codex config proof: TOML parse showed `features.memories=False`, `memories.generate_memories=False`, `memories.use_memories=False`, and `ams-memory.command=python`; `codex mcp list` showed `ams-memory` enabled; `codex features list` showed `memories experimental false`; direct MCP stdio initialize/tools-list returned the CEM tool list.
+- Refreshed live Monitor-0 after the config repair -> `status=pass`, `memory_surfaces_reconciled=pass`, detail `ams-memory primary; codex-memory optional bridge unconfigured; native Codex memory disabled/import-only`.
+- Independent local `codex review --base staging` found one P2: AMS-only reconciliation would pass if native Codex Memories were not disabled but no `MEMORY.md` existed yet. Added a regression for that exact case and tightened reconciliation to require native-memory disablement for AMS-only mode, or the old secondary bridge plus imported native registry for bridge mode.
+- Final AMS-only verification: `python -m pytest -q` passed; `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-ams-only-memory-p2` -> `AMS_OPERATOR_PROOF_PASS`.
 - `git diff --check` -> clean aside from expected Windows CRLF warnings.
 
 ## 2026-06-01

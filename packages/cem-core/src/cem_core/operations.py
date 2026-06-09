@@ -985,6 +985,7 @@ def memory_surface_report(
         or (Path.home() / ".codex" / "memories")
     ).expanduser().resolve()
     config = _load_toml(config_path)
+    native_codex_memories_disabled = _native_codex_memories_disabled(config)
     servers = config.get("mcp_servers", {}) if isinstance(config.get("mcp_servers", {}), dict) else {}
     ams_server = servers.get("ams-memory") if isinstance(servers.get("ams-memory"), dict) else None
     codex_server = servers.get("codex-memory") if isinstance(servers.get("codex-memory"), dict) else None
@@ -1011,26 +1012,42 @@ def memory_surface_report(
         ),
     )
 
+    codex_configured_as_secondary = codex_server is not None and ams_matches_root
+    if codex_configured_as_secondary:
+        codex_detail = "configured only as secondary legacy/bridge input; AMS guarded startup is primary"
+    elif ams_matches_root:
+        codex_detail = "optional secondary legacy/bridge input is not configured; AMS guarded startup is primary"
+    else:
+        codex_detail = "not configured or AMS primary root is not established"
     codex_surface = MemorySurface(
         name="codex-memory",
-        role="secondary" if codex_server is not None and ams_matches_root else "unconfigured",
-        status="pass" if codex_server is not None and ams_matches_root else "warn",
+        role="secondary" if codex_configured_as_secondary else "unconfigured",
+        status="pass" if codex_configured_as_secondary else "warn",
         configured=codex_server is not None,
         source_path=_server_env_string(codex_server, "CODEX_MEMORY_DB_PATH"),
-        detail=(
-            "configured only as secondary legacy/bridge input; AMS guarded startup is primary"
-            if codex_server is not None and ams_matches_root
-            else "not configured or AMS primary root is not established"
-        ),
+        detail=codex_detail,
     )
 
-    native_surface = MemorySurface(
-        name="native-codex-memory",
-        role="secondary_import_source" if legacy_registry.exists() else "unconfigured",
-        status="pass" if migration_matches_legacy else ("warn" if legacy_registry.exists() else "pass"),
-        configured=legacy_registry.exists(),
-        source_path=str(legacy_registry) if legacy_registry.exists() else None,
-        detail=(
+    native_role: Literal["secondary_import_source", "unconfigured"] = (
+        "secondary_import_source" if legacy_registry.exists() else "unconfigured"
+    )
+    if native_codex_memories_disabled:
+        native_status: Literal["pass", "warn", "fail"] = "pass"
+        if migration_matches_legacy and latest_migration:
+            native_detail = (
+                "native Codex Memories disabled by Codex config; "
+                f"latest applied migration imports this registry via {latest_migration['run_id']}"
+            )
+        elif legacy_registry.exists():
+            native_detail = (
+                "native Codex Memories disabled by Codex config; registry is inactive default memory "
+                "and may only be used as AMS-pointed evidence/migration input"
+            )
+        else:
+            native_detail = "native Codex Memories disabled by Codex config; legacy registry not present"
+    else:
+        native_status = "pass" if migration_matches_legacy else ("warn" if legacy_registry.exists() else "pass")
+        native_detail = (
             f"latest applied migration imports this registry via {latest_migration['run_id']}"
             if migration_matches_legacy and latest_migration
             else (
@@ -1038,11 +1055,21 @@ def memory_surface_report(
                 if legacy_registry.exists()
                 else "legacy registry not present"
             )
-        ),
+        )
+    native_surface = MemorySurface(
+        name="native-codex-memory",
+        role=native_role,
+        status=native_status,
+        configured=legacy_registry.exists(),
+        source_path=str(legacy_registry) if legacy_registry.exists() else None,
+        detail=native_detail,
     )
 
     surfaces = [ams_surface, codex_surface, native_surface]
-    reconciled = ams_surface.status == "pass" and codex_surface.role == "secondary" and native_surface.status == "pass"
+    reconciled = ams_surface.status == "pass" and (
+        native_codex_memories_disabled
+        or (codex_surface.role == "secondary" and native_surface.status == "pass")
+    )
     return MemorySurfaceReport(
         root=str(root),
         config_path=str(config_path),
@@ -1464,7 +1491,21 @@ def _maintenance_check_detail(run: MaintenanceRun) -> str:
 
 def _memory_surface_check_detail(report: MemorySurfaceReport) -> str:
     if report.reconciled:
-        return "reconciled: ams-memory primary, codex-memory secondary, native import current"
+        details: list[str] = []
+        for surface in report.surfaces:
+            if surface.name == "ams-memory":
+                details.append(f"ams-memory {surface.role}")
+            elif surface.name == "codex-memory":
+                if surface.role == "secondary":
+                    details.append("codex-memory optional secondary configured")
+                else:
+                    details.append("codex-memory optional bridge unconfigured")
+            elif surface.name == "native-codex-memory":
+                if "disabled by Codex config" in surface.detail:
+                    details.append("native Codex memory disabled/import-only")
+                elif surface.status == "pass":
+                    details.append("native import current")
+        return "reconciled: " + "; ".join(details)
     details = [
         f"{surface.name}={surface.status}/{surface.role}: {surface.detail}"
         for surface in report.surfaces
@@ -1626,6 +1667,18 @@ def _server_configured_root(server: dict[str, Any] | None) -> Path | None:
         _server_env_path(server, "AMS_ROOT")
         or _server_env_path(server, "CEM_ROOT")
         or _server_arg_path(server, "--root")
+    )
+
+
+def _native_codex_memories_disabled(config: dict[str, Any]) -> bool:
+    features = config.get("features")
+    memories = config.get("memories")
+    features = features if isinstance(features, dict) else {}
+    memories = memories if isinstance(memories, dict) else {}
+    return (
+        features.get("memories") is False
+        and memories.get("generate_memories") is False
+        and memories.get("use_memories") is False
     )
 
 

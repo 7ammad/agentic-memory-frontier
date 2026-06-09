@@ -329,6 +329,63 @@ def test_ams_cli_memory_surfaces_accept_ams_mcp_root_arg_without_env(tmp_path):
     assert surfaces["ams-memory"]["source_path"] == str(root.resolve())
 
 
+def test_ams_cli_memory_surfaces_reconcile_ams_only_when_native_memory_disabled(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = _legacy_memory_base(tmp_path)
+    config_path = _codex_config_with_ams_only_and_native_disabled(tmp_path, root)
+
+    report = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
+    surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+
+    assert report["reconciled"] is True
+    assert surfaces["ams-memory"]["role"] == "primary"
+    assert surfaces["ams-memory"]["status"] == "pass"
+    assert surfaces["codex-memory"]["role"] == "unconfigured"
+    assert surfaces["codex-memory"]["status"] == "warn"
+    assert surfaces["native-codex-memory"]["role"] == "secondary_import_source"
+    assert surfaces["native-codex-memory"]["status"] == "pass"
+    assert "disabled by Codex config" in surfaces["native-codex-memory"]["detail"]
+
+    _seed_runtime_records(root)
+    monitor = _ams(root, "--json", "monitor")
+    assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
+    assert "codex-memory optional bridge unconfigured" in _check_detail(monitor, "memory_surfaces_reconciled")
+    assert "native Codex memory disabled/import-only" in _check_detail(monitor, "memory_surfaces_reconciled")
+
+
+def test_ams_cli_memory_surfaces_reject_ams_only_when_native_memory_not_disabled(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = tmp_path / "empty-memory-base"
+    memory_base.mkdir()
+    config_path = _codex_config_with_ams_only(tmp_path, root)
+
+    report = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
+    surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+
+    assert report["reconciled"] is False
+    assert surfaces["ams-memory"]["role"] == "primary"
+    assert surfaces["ams-memory"]["status"] == "pass"
+    assert surfaces["codex-memory"]["role"] == "unconfigured"
+    assert surfaces["native-codex-memory"]["role"] == "unconfigured"
+    assert "disabled by Codex config" not in surfaces["native-codex-memory"]["detail"]
+
+
 def test_ams_cli_memory_surfaces_warn_until_legacy_migration_applied(tmp_path):
     root = tmp_path / "ams"
     memory_base = _legacy_memory_base(tmp_path)
@@ -1769,6 +1826,47 @@ def _codex_config_with_ams_root_arg(tmp_path: Path, root: Path) -> Path:
                 "",
                 "[mcp_servers.codex-memory.env]",
                 f"CODEX_MEMORY_DB_PATH = {json.dumps(str(codex_db))}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _codex_config_with_ams_only_and_native_disabled(tmp_path: Path, root: Path) -> Path:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[features]",
+                "memories = false",
+                "",
+                "[memories]",
+                "generate_memories = false",
+                "use_memories = false",
+                "disable_on_external_context = true",
+                "no_memories_if_mcp_or_web_search = true",
+                "",
+                "[mcp_servers.ams-memory]",
+                'command = "python"',
+                f"args = [{json.dumps(str(ROOT / 'scripts' / 'run_cem_mcp_stdio.py'))}, \"--root\", {json.dumps(str(root))}]",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _codex_config_with_ams_only(tmp_path: Path, root: Path) -> Path:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[mcp_servers.ams-memory]",
+                'command = "python"',
+                f"args = [{json.dumps(str(ROOT / 'scripts' / 'run_cem_mcp_stdio.py'))}, \"--root\", {json.dumps(str(root))}]",
                 "",
             ]
         ),
