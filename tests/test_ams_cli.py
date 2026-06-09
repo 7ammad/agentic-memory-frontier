@@ -419,11 +419,11 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 11
     assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 1 - Experience graph and decision intent"
+    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 2 - Error and success attribution"
     assert monitor["phase"]["status"] == "active"
     assert (
         monitor["phase"]["next_step"]
-        == "implement V2 decision-intent and experience-graph schema for expected outcome, authority, approval/experiment state, runtime surface, and evidence ids"
+        == "implement V2 ErrorAttributor and SuccessAttributor for mistake, approved-experiment failure, acceptable tradeoff, success, and unresolved outcomes"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
@@ -431,7 +431,7 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert "aging and maintenance" not in monitor["phase"]["next_step"]
     assert monitor["phase"]["ready_for_next_phase"] is False
     assert monitor["phase"]["open_followups"] == [
-        "V2 Phase 1 implementation and red-test canaries are pending",
+        "V2 Phase 2 attribution implementation and red-test canaries are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
     assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
@@ -728,10 +728,10 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
     assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 1 - Experience graph and decision intent"
+    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 2 - Error and success attribution"
     assert dashboard["phase"]["ready_for_next_phase"] is False
     assert dashboard["phase"]["open_followups"] == [
-        "V2 Phase 1 implementation and red-test canaries are pending",
+        "V2 Phase 2 attribution implementation and red-test canaries are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
 
@@ -1034,15 +1034,32 @@ def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
     assert result["observed_exit_code"] == 0
     assert result["downstream_invoked"] is True
     assert result["proposed_atom_count"] == 1
+    assert result["decision_id"].startswith("decision_")
+    assert result["experience_record_id"].startswith("experience_")
     assert (root / "runtime-trace-runs.jsonl").exists()
     assert (root / "runtime-trace-latest.json").exists()
     assert (root / "runtime-trace-latest.md").exists()
+    assert (root / "experience-graph-runs.jsonl").exists()
+    assert (root / "experience-graph-latest.json").exists()
+    assert (root / "experience-graph-latest.md").exists()
 
     dashboard = _ams(root, "--json", "dashboard")
     assert dashboard["latest_runtime_trace"]["trace_id"] == result["trace_id"]
+    assert dashboard["latest_experience_graph_record"]["record_id"] == result["experience_record_id"]
     trace = CEM(root).store.get_trace(result["trace_id"])
     assert trace.final_outcome == "success"
     assert trace.environment["runtime_control_id"] == control["control_id"]
+    experience = CEM(root).store.get_experience_graph_record(result["experience_record_id"])
+    assert experience.decision.decision_id == result["decision_id"]
+    assert experience.decision.expected_outcome == "downstream command should complete successfully"
+    assert experience.decision.runtime_surface == "ams-guarded-command"
+    assert experience.decision.evidence_ids[:3] == [
+        control["control_id"],
+        control["startup_brief_id"],
+        control["monitor_id"],
+    ]
+    assert experience.outcome_evidence_ids == [result["trace_id"]]
+    assert experience.audit_summary()["evidence_ids"][0] == control["control_id"]
     atom = CEM(root).store.get_atom(result["proposed_atom_ids"][0])
     assert atom.source_trace_ids == [result["trace_id"]]
     assert atom.source_spans[0].text == "check startup brief before edits"

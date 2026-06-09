@@ -112,6 +112,8 @@ Entry format:
   --domain codex-harness --json` returns `status=allow` and the V2 Phase 1 next
   step. Governed runs `run_ceaef4a810034fe79e17c4b20a028df8` and
   `run_c4352731e6964af6bded48049303f6f1` closed with outcome success.
+  Superseded by LEDGER-20260610-003 for current live phase status: AMS now
+  reports Phase 2 active after Phase 1 runtime capture completion.
 - Follow-up: Start V2 Phase 1: implement decision-intent and experience-graph
   schema with red-test canaries for missing expected outcome, authority,
   approval/experiment state, runtime surface, and evidence ids.
@@ -147,6 +149,45 @@ Entry format:
   Full suite `python -m pytest -q` -> **passed**.
 - Follow-up: Wire runtime capture so consequential actions persist V2 decision
   intent records, then add persistence/audit paths for experience graph records.
+
+## LEDGER-20260610-003 - AMS V2 Phase 1 runtime capture completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 1 and red tests added for missing runtime
+  decision-intent persistence.
+- Summary: Completed V2 Phase 1 for the guarded runtime path. `record_runtime_trace`
+  now converts each AMS-guarded command outcome into a `DecisionIntent` and
+  `ExperienceGraphRecord`, persists the record through SQLite and in-memory
+  storage backends, writes `experience-graph-runs.jsonl`,
+  `experience-graph-latest.json`, and `experience-graph-latest.md`, links the
+  record back from `RuntimeTraceRun`, and exposes the latest V2 experience graph
+  record on the dashboard. Phase status now advances to AMS V2 Phase 2: Error
+  and success attribution.
+- Files:
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `tests/test_ams_cli.py`
+  - `tests/test_storage_evidence.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_storage_evidence.py::test_experience_graph_record_roundtrip_in_both_backends -q`
+  failed because `SQLiteStore` lacked `save_experience_graph_record`; red proof
+  `python -m pytest tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates -q`
+  failed because runtime-trace output lacked `decision_id`. Green proof: both
+  focused tests passed after implementation. Affected file suite
+  `python -m pytest tests/test_storage_evidence.py tests/test_ams_cli.py tests/test_evidence_models.py -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite `python -m pytest -q` -> **passed**. Live
+  `python scripts/ams.py monitor --json` reports current phase `AMS V2 Phase 2
+  - Error and success attribution`; live startup brief for Phase 1 completion
+  returns `status=allow` and the Phase 2 next step. `git diff --check` -> clean
+  with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 2: implement ErrorAttributor and SuccessAttributor
+  over experience graph records.
 
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 

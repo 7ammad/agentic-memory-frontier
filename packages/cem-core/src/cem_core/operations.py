@@ -32,7 +32,7 @@ from .local_memory import (
     retrieve_brief,
     run_eval,
 )
-from .models import AgentTrace, ExperienceCard, StrictModel, TraceTurn, new_id, utc_now
+from .models import AgentTrace, DecisionIntent, ExperienceCard, ExperienceGraphRecord, StrictModel, TraceTurn, new_id, utc_now
 
 MigrationAction = Literal["pin", "remember", "skip"]
 MaintenanceStatus = Literal["pass", "warn", "fail"]
@@ -219,6 +219,8 @@ class RuntimeTraceRun(StrictModel):
     downstream_invoked: bool
     observed_exit_code: int
     final_outcome: Literal["success", "failure", "partial", "unknown"]
+    decision_id: str
+    experience_record_id: str
     proposed_atom_count: int
     proposed_atom_ids: list[str]
     source_turn_ids: list[str]
@@ -637,6 +639,7 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_governed_run": _load_json(root / "governed-run-latest.json"),
         "latest_runtime_control": _load_json(root / "runtime-control-latest.json"),
         "latest_runtime_trace": _load_json(root / "runtime-trace-latest.json"),
+        "latest_experience_graph_record": _load_json(root / "experience-graph-latest.json"),
         "latest_maintenance": _load_json(root / "maintenance-latest.json"),
     }
 
@@ -941,6 +944,37 @@ def record_runtime_trace(
     )
     cem = CEM(root)
     cem.ingest_trace(trace)
+    command_text = command + (f" {' '.join(command_args)}" if command_args else "")
+    decision = DecisionIntent(
+        trace_id=trace.trace_id,
+        turn_id=trace.turns[2].turn_id,
+        agent_id="codex",
+        session_id=session_id,
+        task_id=task_id,
+        proposed_action=command_text,
+        action_kind="command",
+        expected_outcome=(
+            "downstream command should complete successfully"
+            if downstream_invoked
+            else "blocked command should not execute downstream"
+        ),
+        applicable_authority="current_evidence",
+        authority_refs=[control.control_id, control.startup_brief_id, control.monitor_id],
+        approval_state="not_required",
+        experiment_state="not_experiment",
+        runtime_surface="ams-guarded-command",
+        evidence_ids=[control.control_id, control.startup_brief_id, control.monitor_id, *control.evidence_ids],
+    )
+    experience_record = ExperienceGraphRecord(
+        decision=decision,
+        actual_outcome=(
+            f"downstream_invoked={downstream_invoked}; observed_exit_code={observed_exit_code}; final_outcome={final_outcome}"
+        ),
+        outcome_status=final_outcome,
+        scope_candidate="task",
+        outcome_evidence_ids=[trace.trace_id],
+    )
+    cem.store.save_experience_graph_record(experience_record)
     atoms = cem.propose_memories(trace.trace_id)
     run = RuntimeTraceRun(
         trace_id=trace.trace_id,
@@ -959,11 +993,14 @@ def record_runtime_trace(
         downstream_invoked=downstream_invoked,
         observed_exit_code=observed_exit_code,
         final_outcome=final_outcome,
+        decision_id=decision.decision_id,
+        experience_record_id=experience_record.record_id,
         proposed_atom_count=len(atoms),
         proposed_atom_ids=[atom.atom_id for atom in atoms],
         source_turn_ids=[turn.turn_id for turn in trace.turns],
     )
     _write_runtime_trace_records(root, run)
+    _write_experience_graph_records(root, experience_record)
     return run
 
 
@@ -1103,16 +1140,16 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS v1 product lock is accepted; AMS V2 Phase 0 contract lock is complete with full-scope experience enforcement plan, acceptance contract, seed corpus, and no-trimming rule"
+            "AMS v1 product lock is accepted; AMS V2 Phase 1 experience graph and decision intent are complete for guarded runtime traces"
         ),
-        current_phase="AMS V2 Phase 1 - Experience graph and decision intent",
+        current_phase="AMS V2 Phase 2 - Error and success attribution",
         status="active",
         next_step=(
-            "implement V2 decision-intent and experience-graph schema for expected outcome, authority, approval/experiment state, runtime surface, and evidence ids"
+            "implement V2 ErrorAttributor and SuccessAttributor for mistake, approved-experiment failure, acceptable tradeoff, success, and unresolved outcomes"
         ),
         ready_for_next_phase=False,
         open_followups=[
-            "V2 Phase 1 implementation and red-test canaries are pending",
+            "V2 Phase 2 attribution implementation and red-test canaries are pending",
             "V2 dashboard/operator proof remains pending until Phase 10",
         ],
     )
@@ -1243,6 +1280,13 @@ def _write_runtime_trace_records(root: Path, run: RuntimeTraceRun) -> None:
     _append_jsonl(root / "runtime-trace-runs.jsonl", run.model_dump(mode="json"))
     _write_json(root / "runtime-trace-latest.json", run.model_dump(mode="json"))
     (root / "runtime-trace-latest.md").write_text(_render_runtime_trace_markdown(run), encoding="utf-8")
+
+
+def _write_experience_graph_records(root: Path, record: ExperienceGraphRecord) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "experience-graph-runs.jsonl", record.model_dump(mode="json"))
+    _write_json(root / "experience-graph-latest.json", record.model_dump(mode="json"))
+    (root / "experience-graph-latest.md").write_text(_render_experience_graph_markdown(record), encoding="utf-8")
 
 
 def _write_maintenance_records(root: Path, run: MaintenanceRun) -> None:
@@ -1417,12 +1461,31 @@ def _render_runtime_trace_markdown(run: RuntimeTraceRun) -> str:
         f"- session_id: `{run.session_id}`",
         f"- command: `{run.command}`",
         f"- command_args: `{len(run.command_args)}`",
+        f"- decision_id: `{run.decision_id}`",
+        f"- experience_record_id: `{run.experience_record_id}`",
         f"- proposed_atoms: `{run.proposed_atom_count}`",
     ]
     if run.proposed_atom_ids:
         lines.extend(["", "## Proposed Atoms", ""])
         for atom_id in run.proposed_atom_ids:
             lines.append(f"- `{atom_id}`")
+    return "\n".join(lines) + "\n"
+
+
+def _render_experience_graph_markdown(record: ExperienceGraphRecord) -> str:
+    audit = record.audit_summary()
+    lines = [
+        "# AMS V2 Experience Graph Latest",
+        "",
+        f"- record_id: `{record.record_id}`",
+        f"- decision_id: `{record.decision.decision_id}`",
+        f"- action_kind: `{record.decision.action_kind}`",
+        f"- authority: `{record.decision.applicable_authority}`",
+        f"- scope_candidate: `{record.scope_candidate}`",
+        f"- outcome_status: `{record.outcome_status}`",
+        f"- runtime_surface: `{record.decision.runtime_surface}`",
+        f"- evidence_ids: `{len(audit['evidence_ids'])}`",
+    ]
     return "\n".join(lines) + "\n"
 
 

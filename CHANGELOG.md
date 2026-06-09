@@ -18,6 +18,8 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added the first AMS V2 Phase 1 schema models: `DecisionIntent` and
   `ExperienceGraphRecord`, including required attribution fields and a compact
   audit summary.
+- Wired guarded runtime traces to persist V2 experience graph records and expose
+  the latest record through dashboard/operator files.
 
 ### Changed
 
@@ -28,14 +30,14 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   invariants, procedural skill memory, situation matching, policy binding,
   action decision points, reasoning control, under-the-hood inference receipts,
   supersession, multi-agent governance, and the V2 eval battery.
-- Updated monitor/dashboard phase status so AMS V2 Phase 1 is the active rail
-  after Phase 0 contract lock.
+- Updated monitor/dashboard phase status so AMS V2 Phase 2 is the active rail
+  after Phase 1 runtime decision-intent capture.
 
 ### Next
 
-- Start AMS V2 Phase 1: decision-intent and experience-graph schema, with red
-  tests for missing expected outcome, authority, approval/experiment state,
-  runtime surface, and evidence ids.
+- Start AMS V2 Phase 2: ErrorAttributor and SuccessAttributor with red tests
+  for mistake, approved-experiment failure, acceptable tradeoff, success, and
+  unresolved outcomes.
 
 ### Verified
 
@@ -51,11 +53,23 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `$env:PYTHONPATH='packages/cem-core/src'; python -c "from cem_core import DecisionIntent, ExperienceGraphRecord; print(DecisionIntent.__name__, ExperienceGraphRecord.__name__)"`
   -> `DecisionIntent ExperienceGraphRecord`.
 - Full suite: `python -m pytest -q` -> passed.
+- Runtime capture red->green proof:
+  `python -m pytest tests/test_storage_evidence.py::test_experience_graph_record_roundtrip_in_both_backends -q`
+  failed before persistence existed, then passed.
+- Runtime trace red->green proof:
+  `python -m pytest tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates -q`
+  failed before `decision_id` existed, then passed.
+- Affected files:
+  `python -m pytest tests/test_storage_evidence.py tests/test_ams_cli.py tests/test_evidence_models.py -q`
+  -> passed.
+- Full suite after Phase 1 runtime capture: `python -m pytest -q` -> passed.
 - `git diff --check` passed with only expected Windows CRLF warnings.
 - Live `python scripts/ams.py monitor --json` reports current phase
-  `AMS V2 Phase 1 - Experience graph and decision intent`.
+  `AMS V2 Phase 2 - Error and success attribution`.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 0 status wiring after contract lock" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 1 next step.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 1 runtime capture completion and Phase 2 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 2 next step.
 
 ## 2026-06-09
 

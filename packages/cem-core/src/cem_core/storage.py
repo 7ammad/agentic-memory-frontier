@@ -10,6 +10,7 @@ from .models import (
     AgentTrace,
     ExperienceAtom,
     ExperienceCard,
+    ExperienceGraphRecord,
     ValidationDecision,
     ValidationResult,
     VerificationProbe,
@@ -40,6 +41,9 @@ class CEMStore(Protocol):
     def get_action_brief_record(self, brief_id: str) -> ActionBriefRecord: ...
     def save_action_influence_event(self, event: ActionInfluenceEvent) -> None: ...
     def list_action_influence_events(self, influence_id: str) -> list[ActionInfluenceEvent]: ...
+    def save_experience_graph_record(self, record: ExperienceGraphRecord) -> None: ...
+    def get_experience_graph_record(self, record_id: str) -> ExperienceGraphRecord: ...
+    def list_experience_graph_records(self) -> list[ExperienceGraphRecord]: ...
 
 
 class SQLiteStore:
@@ -99,6 +103,11 @@ class SQLiteStore:
                 CREATE TABLE IF NOT EXISTS action_influence_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     influence_id TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS experience_graph_records (
+                    record_id TEXT PRIMARY KEY,
+                    decision_id TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -275,6 +284,28 @@ class SQLiteStore:
             ).fetchall()
         return [ActionInfluenceEvent.model_validate_json(row[0]) for row in rows]
 
+    def save_experience_graph_record(self, record: ExperienceGraphRecord) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO experience_graph_records(record_id, decision_id, payload) VALUES(?, ?, ?)",
+                (record.record_id, record.decision.decision_id, record.model_dump_json()),
+            )
+
+    def get_experience_graph_record(self, record_id: str) -> ExperienceGraphRecord:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM experience_graph_records WHERE record_id = ?",
+                (record_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Experience graph record not found: {record_id}")
+        return ExperienceGraphRecord.model_validate_json(row[0])
+
+    def list_experience_graph_records(self) -> list[ExperienceGraphRecord]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM experience_graph_records ORDER BY rowid").fetchall()
+        return [ExperienceGraphRecord.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -289,6 +320,7 @@ class InMemoryStore:
         self._verification_results: list[tuple[str, str]] = []
         self._action_brief_records: dict[str, str] = {}
         self._action_influence_events: list[tuple[str, str]] = []
+        self._experience_graph_records: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -388,4 +420,19 @@ class InMemoryStore:
             ActionInfluenceEvent.model_validate_json(payload)
             for stored_influence_id, payload in self._action_influence_events
             if stored_influence_id == influence_id
+        ]
+
+    def save_experience_graph_record(self, record: ExperienceGraphRecord) -> None:
+        self._experience_graph_records[record.record_id] = record.model_dump_json()
+
+    def get_experience_graph_record(self, record_id: str) -> ExperienceGraphRecord:
+        payload = self._experience_graph_records.get(record_id)
+        if payload is None:
+            raise KeyError(f"Experience graph record not found: {record_id}")
+        return ExperienceGraphRecord.model_validate_json(payload)
+
+    def list_experience_graph_records(self) -> list[ExperienceGraphRecord]:
+        return [
+            ExperienceGraphRecord.model_validate_json(payload)
+            for payload in self._experience_graph_records.values()
         ]

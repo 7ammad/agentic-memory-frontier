@@ -87,14 +87,14 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
 
 - [x] Phase 0 - V2 contract lock: accept the full V2 plan, add V2 acceptance
       criteria, define the seed corpus, and lock the no-trimming rule.
-- [ ] Phase 1 - Experience graph and decision intent: capture expected outcome,
+- [x] Phase 1 - Experience graph and decision intent: capture expected outcome,
       authority, approval/experiment state, runtime surface, and evidence ids
       for consequential actions.
   - [x] Add V2 `DecisionIntent` and `ExperienceGraphRecord` schema models with
         audit summary and required attribution fields.
-  - [ ] Wire runtime capture so consequential actions persist V2 decision
+  - [x] Wire runtime capture so consequential actions persist V2 decision
         intent records.
-  - [ ] Add persistence/audit path for experience graph records.
+  - [x] Add persistence/audit path for experience graph records.
 - [ ] Phase 2 - Error and success attribution: classify mistake,
       approved-experiment failure, acceptable tradeoff, success, and unresolved
       outcomes, including owner-labeled seed cases.
