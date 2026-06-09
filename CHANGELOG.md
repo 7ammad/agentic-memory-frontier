@@ -24,6 +24,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `ErrorAttributor`, `SuccessAttributor`, the owner-labeled attribution seed
   corpus, attribution storage, runtime attribution receipts, and dashboard
   exposure for the latest attribution.
+- Added AMS V2 Phase 3 compilation: `BehaviorInvariant`,
+  `SkillCandidate`, `BehaviorInvariantCompiler`, `SkillCompiler`,
+  `AuthorityScopeResolver`, invariant/skill storage, runtime compiler calls,
+  and dashboard/operator files for latest invariant and skill candidates.
 
 ### Changed
 
@@ -34,13 +38,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   invariants, procedural skill memory, situation matching, policy binding,
   action decision points, reasoning control, under-the-hood inference receipts,
   supersession, multi-agent governance, and the V2 eval battery.
-- Updated monitor/dashboard phase status so AMS V2 Phase 3 is the active rail
-  after Phase 2 error/success attribution.
+- Updated monitor/dashboard phase status so AMS V2 Phase 4 is the active rail
+  after Phase 3 invariant and skill compilation.
 
 ### Next
 
-- Start AMS V2 Phase 3: BehaviorInvariantCompiler, SkillCompiler,
-  authority-ranked retrieval lanes, and scope promotion rules.
+- Start AMS V2 Phase 4: SituationMatcher for exact repeats, paraphrased
+  repeats, valid-neighbor suppression, confidence, and reason output.
 
 ### Verified
 
@@ -99,6 +103,26 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `AMS V2 Phase 3 - Invariants, skills, and authority scope`.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 2 attribution completion and Phase 3 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 3 next step.
+- Phase 3 red->green proof:
+  `python -m pytest tests/test_phase3_compilers.py -q` failed before
+  implementation because `cem_core.compilers` did not exist, then passed after
+  adding invariant, skill, and authority compilers.
+- Phase 3 focused checks:
+  `python -m pytest tests/test_phase3_compilers.py tests/test_storage_evidence.py -q`
+  -> passed.
+- Runtime compiler checks:
+  `python -m pytest tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates tests/test_ams_cli.py::test_ams_cli_runtime_trace_compiles_failure_into_behavior_invariant -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 4 - Situation matching`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 3 compiler completion and Phase 4 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 4 next step.
 
 ## 2026-06-09
 

@@ -98,7 +98,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
 - [x] Phase 2 - Error and success attribution: classify mistake,
       approved-experiment failure, acceptable tradeoff, success, and unresolved
       outcomes, including owner-labeled seed cases.
-- [ ] Phase 3 - Invariants, skills, and authority scope: compile confirmed
+- [x] Phase 3 - Invariants, skills, and authority scope: compile confirmed
       mistakes into behavior invariants, confirmed successes into skill
       candidates, and retrieve them through authority-ranked lanes.
 - [ ] Phase 4 - Situation matching: catch exact and paraphrased repeats while

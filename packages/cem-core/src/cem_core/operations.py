@@ -23,6 +23,7 @@ from .correction_hooks import (
     hook_on_user_prompt_submit,
 )
 from .attribution import attribute_experience_record
+from .compilers import BehaviorInvariantCompiler, SkillCompiler
 from .kernel import CEM, card_is_inactive
 from .local_memory import (
     default_root,
@@ -35,10 +36,12 @@ from .local_memory import (
 )
 from .models import (
     AgentTrace,
+    BehaviorInvariant,
     DecisionIntent,
     ExperienceAttribution,
     ExperienceCard,
     ExperienceGraphRecord,
+    SkillCandidate,
     StrictModel,
     TraceTurn,
     new_id,
@@ -240,6 +243,8 @@ class RuntimeTraceRun(StrictModel):
         "success",
         "unresolved",
     ]
+    invariant_id: str | None = None
+    skill_id: str | None = None
     proposed_atom_count: int
     proposed_atom_ids: list[str]
     source_turn_ids: list[str]
@@ -660,6 +665,8 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_runtime_trace": _load_json(root / "runtime-trace-latest.json"),
         "latest_experience_graph_record": _load_json(root / "experience-graph-latest.json"),
         "latest_experience_attribution": _load_json(root / "experience-attribution-latest.json"),
+        "latest_behavior_invariant": _load_json(root / "behavior-invariant-latest.json"),
+        "latest_skill_candidate": _load_json(root / "skill-candidate-latest.json"),
         "latest_maintenance": _load_json(root / "maintenance-latest.json"),
     }
 
@@ -999,6 +1006,12 @@ def record_runtime_trace(
     experience_record.inference_receipt_id = attribution.attribution_id
     cem.store.save_experience_graph_record(experience_record)
     cem.store.save_experience_attribution(attribution)
+    invariant = BehaviorInvariantCompiler().compile(experience_record, attribution)
+    if invariant is not None:
+        cem.store.save_behavior_invariant(invariant)
+    skill = SkillCompiler().compile(experience_record, attribution)
+    if skill is not None:
+        cem.store.save_skill_candidate(skill)
     atoms = cem.propose_memories(trace.trace_id)
     run = RuntimeTraceRun(
         trace_id=trace.trace_id,
@@ -1021,6 +1034,8 @@ def record_runtime_trace(
         experience_record_id=experience_record.record_id,
         attribution_id=attribution.attribution_id,
         attribution_class=attribution.attribution_class,
+        invariant_id=invariant.invariant_id if invariant is not None else None,
+        skill_id=skill.skill_id if skill is not None else None,
         proposed_atom_count=len(atoms),
         proposed_atom_ids=[atom.atom_id for atom in atoms],
         source_turn_ids=[turn.turn_id for turn in trace.turns],
@@ -1028,6 +1043,10 @@ def record_runtime_trace(
     _write_runtime_trace_records(root, run)
     _write_experience_graph_records(root, experience_record)
     _write_experience_attribution_records(root, attribution)
+    if invariant is not None:
+        _write_behavior_invariant_records(root, invariant)
+    if skill is not None:
+        _write_skill_candidate_records(root, skill)
     return run
 
 
@@ -1167,16 +1186,16 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS v1 product lock is accepted; AMS V2 Phase 2 error/success attribution is complete for seeded outcomes and guarded runtime traces"
+            "AMS v1 product lock is accepted; AMS V2 Phase 3 invariant and skill compilation is complete for attributed guarded runtime traces"
         ),
-        current_phase="AMS V2 Phase 3 - Invariants, skills, and authority scope",
+        current_phase="AMS V2 Phase 4 - Situation matching",
         status="active",
         next_step=(
-            "implement V2 BehaviorInvariantCompiler, SkillCompiler, authority-ranked retrieval lanes, and scope promotion rules"
+            "implement V2 SituationMatcher for exact repeats, paraphrased repeats, valid-neighbor suppression, confidence, and reason output"
         ),
         ready_for_next_phase=False,
         open_followups=[
-            "V2 Phase 3 invariant/skill compiler implementation and red-test canaries are pending",
+            "V2 Phase 4 situation-matching implementation and red-test canaries are pending",
             "V2 dashboard/operator proof remains pending until Phase 10",
         ],
     )
@@ -1322,6 +1341,26 @@ def _write_experience_attribution_records(root: Path, attribution: ExperienceAtt
     _write_json(root / "experience-attribution-latest.json", attribution.model_dump(mode="json"))
     (root / "experience-attribution-latest.md").write_text(
         _render_experience_attribution_markdown(attribution),
+        encoding="utf-8",
+    )
+
+
+def _write_behavior_invariant_records(root: Path, invariant: BehaviorInvariant) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "behavior-invariant-runs.jsonl", invariant.model_dump(mode="json"))
+    _write_json(root / "behavior-invariant-latest.json", invariant.model_dump(mode="json"))
+    (root / "behavior-invariant-latest.md").write_text(
+        _render_behavior_invariant_markdown(invariant),
+        encoding="utf-8",
+    )
+
+
+def _write_skill_candidate_records(root: Path, skill: SkillCandidate) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "skill-candidate-runs.jsonl", skill.model_dump(mode="json"))
+    _write_json(root / "skill-candidate-latest.json", skill.model_dump(mode="json"))
+    (root / "skill-candidate-latest.md").write_text(
+        _render_skill_candidate_markdown(skill),
         encoding="utf-8",
     )
 
@@ -1502,6 +1541,8 @@ def _render_runtime_trace_markdown(run: RuntimeTraceRun) -> str:
         f"- experience_record_id: `{run.experience_record_id}`",
         f"- attribution_id: `{run.attribution_id}`",
         f"- attribution_class: `{run.attribution_class}`",
+        f"- invariant_id: `{run.invariant_id}`",
+        f"- skill_id: `{run.skill_id}`",
         f"- proposed_atoms: `{run.proposed_atom_count}`",
     ]
     if run.proposed_atom_ids:
@@ -1546,6 +1587,37 @@ def _render_experience_attribution_markdown(attribution: ExperienceAttribution) 
         f"- approved_experiment_exclusion: `{attribution.approved_experiment_exclusion}`",
         f"- needs_owner_review: `{attribution.needs_owner_review}`",
         f"- evidence_ids: `{len(attribution.evidence_ids)}`",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _render_behavior_invariant_markdown(invariant: BehaviorInvariant) -> str:
+    lines = [
+        "# AMS V2 Behavior Invariant Latest",
+        "",
+        f"- invariant_id: `{invariant.invariant_id}`",
+        f"- source_attribution_id: `{invariant.source_attribution_id}`",
+        f"- authority: `{invariant.authority}`",
+        f"- scope: `{invariant.scope}`",
+        f"- enforcement: `{invariant.enforcement}`",
+        f"- supersession_status: `{invariant.supersession_status}`",
+        f"- evidence_ids: `{len(invariant.evidence_ids)}`",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _render_skill_candidate_markdown(skill: SkillCandidate) -> str:
+    lines = [
+        "# AMS V2 Skill Candidate Latest",
+        "",
+        f"- skill_id: `{skill.skill_id}`",
+        f"- source_attribution_id: `{skill.source_attribution_id}`",
+        f"- transfer_scope: `{skill.transfer_scope}`",
+        f"- promotion_status: `{skill.promotion_status}`",
+        f"- preconditions: `{len(skill.preconditions)}`",
+        f"- procedure_steps: `{len(skill.procedure)}`",
+        f"- when_not_to_apply: `{len(skill.when_not_to_apply)}`",
+        f"- evidence_ids: `{len(skill.evidence_ids)}`",
     ]
     return "\n".join(lines) + "\n"
 

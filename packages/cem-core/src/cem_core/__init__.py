@@ -9,6 +9,12 @@ from .attribution import (
     V2_ATTRIBUTION_SEED_CORPUS,
     attribute_experience_record,
 )
+from .compilers import (
+    AuthorityEvidence,
+    AuthorityScopeResolver,
+    BehaviorInvariantCompiler,
+    SkillCompiler,
+)
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .kernel import CEM, card_is_inactive
 from .models import (
@@ -16,6 +22,7 @@ from .models import (
     ActionBriefRecord,
     ActionInfluenceEvent,
     AgentTrace,
+    BehaviorInvariant,
     ConfidenceInterval,
     DecisionIntent,
     ExperienceAttribution,
@@ -23,6 +30,7 @@ from .models import (
     ExperienceCard,
     ExperienceGraphRecord,
     MemoryAudit,
+    SkillCandidate,
     SourceSpan,
     TaskContext,
     TraceReceipt,
@@ -47,6 +55,10 @@ __all__ = [
     "ActionBriefRecord",
     "ActionInfluenceEvent",
     "AgentTrace",
+    "AuthorityEvidence",
+    "AuthorityScopeResolver",
+    "BehaviorInvariant",
+    "BehaviorInvariantCompiler",
     "CEM",
     "ConfidenceInterval",
     "CEMMCPToolServer",
@@ -70,6 +82,8 @@ __all__ = [
     "SharedTraceImportReceipt",
     "SourceSpan",
     "SQLiteStore",
+    "SkillCandidate",
+    "SkillCompiler",
     "SuccessAttributor",
     "TaskContext",
     "TraceReceipt",

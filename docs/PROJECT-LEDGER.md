@@ -241,6 +241,57 @@ Entry format:
 - Follow-up: Start V2 Phase 3: implement BehaviorInvariantCompiler,
   SkillCompiler, authority-ranked retrieval lanes, and scope promotion rules.
 
+## LEDGER-20260610-005 - AMS V2 Phase 3 invariant and skill compilation completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 3 and V2 plan acceptance for confirmed mistakes,
+  confirmed successes, authority-ranked lanes, and scope promotion.
+- Summary: Completed V2 Phase 3 for attributed guarded runtime traces. Added
+  `BehaviorInvariant` and `SkillCandidate` models, `BehaviorInvariantCompiler`,
+  `SkillCompiler`, and `AuthorityScopeResolver`. Confirmed mistake
+  attributions now compile into active `steer_or_block` behavior invariants
+  with authority, scope, trigger, forbidden repeat, corrected action, evidence,
+  and supersession status. Confirmed success attributions now compile into skill
+  candidates with preconditions, procedure, expected result, failure boundaries,
+  transfer scope, and `when_not_to_apply` constraints. Runtime traces persist
+  compiled invariant/skill artifacts, expose them on the dashboard, and write
+  `behavior-invariant-*` / `skill-candidate-*` operator files. Current owner
+  instruction outranks stale learned cards and can promote project scope to
+  `global_agent_behavior`.
+- Files:
+  - `packages/cem-core/src/cem_core/compilers.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_phase3_compilers.py`
+  - `tests/test_storage_evidence.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_phase3_compilers.py -q` failed because
+  `cem_core.compilers` did not exist. Green proof:
+  `python -m pytest tests/test_phase3_compilers.py -q` -> **passed**.
+  `python -m pytest tests/test_phase3_compilers.py tests/test_storage_evidence.py -q`
+  -> **passed**.
+  `python -m pytest tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates tests/test_ams_cli.py::test_ams_cli_runtime_trace_compiles_failure_into_behavior_invariant -q`
+  -> **passed**. Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Live `python scripts/ams.py monitor --json` reports current
+  phase `AMS V2 Phase 4 - Situation matching`; live startup brief for Phase 3
+  completion returns `status=allow` and the Phase 4 next step. `git diff --check`
+  -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 4: implement SituationMatcher for exact repeats,
+  paraphrased repeats, valid-neighbor suppression, confidence, and reason output.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

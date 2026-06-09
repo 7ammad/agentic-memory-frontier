@@ -3,9 +3,11 @@ import pytest
 from cem_core.models import (
     ActionBriefRecord,
     ActionInfluenceEvent,
+    BehaviorInvariant,
     DecisionIntent,
     ExperienceAttribution,
     ExperienceGraphRecord,
+    SkillCandidate,
     VerificationProbe,
     VerificationResult,
 )
@@ -96,6 +98,40 @@ def test_experience_attribution_roundtrip_in_both_backends(tmp_path):
 
         assert store.get_experience_attribution(attribution.attribution_id) == attribution
         assert store.list_experience_attributions() == [attribution]
+
+
+def test_phase3_invariant_and_skill_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        invariant = BehaviorInvariant(
+            source_attribution_id="attribution_1",
+            source_record_id="experience_1",
+            authority="owner_instruction",
+            scope="global_agent_behavior",
+            trigger="equivalent situation match",
+            forbidden_repeat="scope general correction to project noun",
+            corrected_action="route correction to codex-harness",
+            enforcement="steer_or_block",
+            evidence_ids=["attribution_1", "directive_1"],
+        )
+        skill = SkillCandidate(
+            source_attribution_id="attribution_2",
+            source_record_id="experience_2",
+            transfer_scope="agent",
+            preconditions=["authority_basis=system_instruction"],
+            procedure=["run startup brief before edits"],
+            expected_result="memory evidence loaded",
+            failure_boundaries=["do not apply when owner supersedes"],
+            evidence_ids=["attribution_2", "trace_2"],
+            when_not_to_apply=["missing authority evidence"],
+        )
+
+        store.save_behavior_invariant(invariant)
+        store.save_skill_candidate(skill)
+
+        assert store.get_behavior_invariant(invariant.invariant_id) == invariant
+        assert store.list_behavior_invariants() == [invariant]
+        assert store.get_skill_candidate(skill.skill_id) == skill
+        assert store.list_skill_candidates() == [skill]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):

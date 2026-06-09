@@ -179,6 +179,63 @@ class ExperienceAttribution(StrictModel):
         }
 
 
+InvariantEnforcement = Literal["steer", "block", "steer_or_block"]
+SupersessionStatus = Literal["active", "superseded", "retired"]
+SkillPromotionStatus = Literal["candidate", "verified", "rejected"]
+
+
+class BehaviorInvariant(StrictModel):
+    invariant_id: str = Field(default_factory=lambda: new_id("invariant"))
+    source_attribution_id: str
+    source_record_id: str
+    authority: ApplicableAuthority
+    scope: ExperienceScopeCandidate
+    trigger: str = Field(min_length=1)
+    forbidden_repeat: str = Field(min_length=1)
+    corrected_action: str = Field(min_length=1)
+    enforcement: InvariantEnforcement
+    evidence_ids: list[str] = Field(min_length=1)
+    supersession_status: SupersessionStatus = "active"
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "invariant_id": self.invariant_id,
+            "source_attribution_id": self.source_attribution_id,
+            "source_record_id": self.source_record_id,
+            "authority": self.authority,
+            "scope": self.scope,
+            "enforcement": self.enforcement,
+            "evidence_ids": self.evidence_ids,
+            "supersession_status": self.supersession_status,
+        }
+
+
+class SkillCandidate(StrictModel):
+    skill_id: str = Field(default_factory=lambda: new_id("skill"))
+    source_attribution_id: str
+    source_record_id: str
+    transfer_scope: ExperienceScopeCandidate
+    preconditions: list[str] = Field(default_factory=list)
+    procedure: list[str] = Field(min_length=1)
+    expected_result: str = Field(min_length=1)
+    failure_boundaries: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(min_length=1)
+    when_not_to_apply: list[str] = Field(default_factory=list)
+    promotion_status: SkillPromotionStatus = "candidate"
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "skill_id": self.skill_id,
+            "source_attribution_id": self.source_attribution_id,
+            "source_record_id": self.source_record_id,
+            "transfer_scope": self.transfer_scope,
+            "promotion_status": self.promotion_status,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
 class ExperienceAtom(StrictModel):
     atom_id: str = Field(default_factory=lambda: new_id("atom"))
     source_trace_ids: list[str]

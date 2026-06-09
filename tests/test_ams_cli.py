@@ -419,11 +419,11 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 11
     assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 3 - Invariants, skills, and authority scope"
+    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 4 - Situation matching"
     assert monitor["phase"]["status"] == "active"
     assert (
         monitor["phase"]["next_step"]
-        == "implement V2 BehaviorInvariantCompiler, SkillCompiler, authority-ranked retrieval lanes, and scope promotion rules"
+        == "implement V2 SituationMatcher for exact repeats, paraphrased repeats, valid-neighbor suppression, confidence, and reason output"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
@@ -431,7 +431,7 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert "aging and maintenance" not in monitor["phase"]["next_step"]
     assert monitor["phase"]["ready_for_next_phase"] is False
     assert monitor["phase"]["open_followups"] == [
-        "V2 Phase 3 invariant/skill compiler implementation and red-test canaries are pending",
+        "V2 Phase 4 situation-matching implementation and red-test canaries are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
     assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
@@ -728,10 +728,10 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
     assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 3 - Invariants, skills, and authority scope"
+    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 4 - Situation matching"
     assert dashboard["phase"]["ready_for_next_phase"] is False
     assert dashboard["phase"]["open_followups"] == [
-        "V2 Phase 3 invariant/skill compiler implementation and red-test canaries are pending",
+        "V2 Phase 4 situation-matching implementation and red-test canaries are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
 
@@ -1038,6 +1038,8 @@ def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
     assert result["experience_record_id"].startswith("experience_")
     assert result["attribution_id"].startswith("attribution_")
     assert result["attribution_class"] == "success"
+    assert result["invariant_id"] is None
+    assert result["skill_id"].startswith("skill_")
     assert (root / "runtime-trace-runs.jsonl").exists()
     assert (root / "runtime-trace-latest.json").exists()
     assert (root / "runtime-trace-latest.md").exists()
@@ -1047,11 +1049,15 @@ def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
     assert (root / "experience-attribution-runs.jsonl").exists()
     assert (root / "experience-attribution-latest.json").exists()
     assert (root / "experience-attribution-latest.md").exists()
+    assert (root / "skill-candidate-runs.jsonl").exists()
+    assert (root / "skill-candidate-latest.json").exists()
+    assert (root / "skill-candidate-latest.md").exists()
 
     dashboard = _ams(root, "--json", "dashboard")
     assert dashboard["latest_runtime_trace"]["trace_id"] == result["trace_id"]
     assert dashboard["latest_experience_graph_record"]["record_id"] == result["experience_record_id"]
     assert dashboard["latest_experience_attribution"]["attribution_id"] == result["attribution_id"]
+    assert dashboard["latest_skill_candidate"]["skill_id"] == result["skill_id"]
     trace = CEM(root).store.get_trace(result["trace_id"])
     assert trace.final_outcome == "success"
     assert trace.environment["runtime_control_id"] == control["control_id"]
@@ -1072,9 +1078,54 @@ def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
     assert attribution.record_id == result["experience_record_id"]
     assert attribution.attribution_class == "success"
     assert attribution.skill_candidate is True
+    skill = CEM(root).store.get_skill_candidate(result["skill_id"])
+    assert skill.source_attribution_id == result["attribution_id"]
+    assert skill.transfer_scope == "task"
     atom = CEM(root).store.get_atom(result["proposed_atom_ids"][0])
     assert atom.source_trace_ids == [result["trace_id"]]
     assert atom.source_spans[0].text == "check startup brief before edits"
+
+
+def test_ams_cli_runtime_trace_compiles_failure_into_behavior_invariant(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    control = _ams(
+        root,
+        "--json",
+        "runtime-control",
+        "SKILL: do not repeat failed guarded command",
+        "--session-id",
+        "invariant_session",
+    )
+
+    result = _ams(
+        root,
+        "--json",
+        "runtime-trace",
+        "record",
+        "--control-id",
+        control["control_id"],
+        "--command",
+        "codex",
+        "--command-arg=--bad-flag",
+        "--exit-code",
+        "2",
+    )
+
+    assert result["final_outcome"] == "failure"
+    assert result["attribution_class"] == "mistake"
+    assert result["invariant_id"].startswith("invariant_")
+    assert result["skill_id"] is None
+    assert (root / "behavior-invariant-runs.jsonl").exists()
+    assert (root / "behavior-invariant-latest.json").exists()
+    assert (root / "behavior-invariant-latest.md").exists()
+
+    dashboard = _ams(root, "--json", "dashboard")
+    assert dashboard["latest_behavior_invariant"]["invariant_id"] == result["invariant_id"]
+    invariant = CEM(root).store.get_behavior_invariant(result["invariant_id"])
+    assert invariant.source_attribution_id == result["attribution_id"]
+    assert invariant.enforcement == "steer_or_block"
+    assert invariant.supersession_status == "active"
 
 
 def test_ams_cli_runtime_trace_rejects_missing_control_receipt(tmp_path):

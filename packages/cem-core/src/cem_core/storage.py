@@ -8,10 +8,12 @@ from .models import (
     ActionBriefRecord,
     ActionInfluenceEvent,
     AgentTrace,
+    BehaviorInvariant,
     ExperienceAttribution,
     ExperienceAtom,
     ExperienceCard,
     ExperienceGraphRecord,
+    SkillCandidate,
     ValidationDecision,
     ValidationResult,
     VerificationProbe,
@@ -48,6 +50,12 @@ class CEMStore(Protocol):
     def save_experience_attribution(self, attribution: ExperienceAttribution) -> None: ...
     def get_experience_attribution(self, attribution_id: str) -> ExperienceAttribution: ...
     def list_experience_attributions(self) -> list[ExperienceAttribution]: ...
+    def save_behavior_invariant(self, invariant: BehaviorInvariant) -> None: ...
+    def get_behavior_invariant(self, invariant_id: str) -> BehaviorInvariant: ...
+    def list_behavior_invariants(self) -> list[BehaviorInvariant]: ...
+    def save_skill_candidate(self, skill: SkillCandidate) -> None: ...
+    def get_skill_candidate(self, skill_id: str) -> SkillCandidate: ...
+    def list_skill_candidates(self) -> list[SkillCandidate]: ...
 
 
 class SQLiteStore:
@@ -119,6 +127,20 @@ class SQLiteStore:
                     record_id TEXT NOT NULL,
                     decision_id TEXT NOT NULL,
                     attribution_class TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS behavior_invariants (
+                    invariant_id TEXT PRIMARY KEY,
+                    source_attribution_id TEXT NOT NULL,
+                    authority TEXT NOT NULL,
+                    scope TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS skill_candidates (
+                    skill_id TEXT PRIMARY KEY,
+                    source_attribution_id TEXT NOT NULL,
+                    transfer_scope TEXT NOT NULL,
+                    promotion_status TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -349,6 +371,70 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM experience_attributions ORDER BY rowid").fetchall()
         return [ExperienceAttribution.model_validate_json(row[0]) for row in rows]
 
+    def save_behavior_invariant(self, invariant: BehaviorInvariant) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO behavior_invariants(
+                    invariant_id, source_attribution_id, authority, scope, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    invariant.invariant_id,
+                    invariant.source_attribution_id,
+                    invariant.authority,
+                    invariant.scope,
+                    invariant.model_dump_json(),
+                ),
+            )
+
+    def get_behavior_invariant(self, invariant_id: str) -> BehaviorInvariant:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM behavior_invariants WHERE invariant_id = ?",
+                (invariant_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Behavior invariant not found: {invariant_id}")
+        return BehaviorInvariant.model_validate_json(row[0])
+
+    def list_behavior_invariants(self) -> list[BehaviorInvariant]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM behavior_invariants ORDER BY rowid").fetchall()
+        return [BehaviorInvariant.model_validate_json(row[0]) for row in rows]
+
+    def save_skill_candidate(self, skill: SkillCandidate) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO skill_candidates(
+                    skill_id, source_attribution_id, transfer_scope, promotion_status, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    skill.skill_id,
+                    skill.source_attribution_id,
+                    skill.transfer_scope,
+                    skill.promotion_status,
+                    skill.model_dump_json(),
+                ),
+            )
+
+    def get_skill_candidate(self, skill_id: str) -> SkillCandidate:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM skill_candidates WHERE skill_id = ?",
+                (skill_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Skill candidate not found: {skill_id}")
+        return SkillCandidate.model_validate_json(row[0])
+
+    def list_skill_candidates(self) -> list[SkillCandidate]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM skill_candidates ORDER BY rowid").fetchall()
+        return [SkillCandidate.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -365,6 +451,8 @@ class InMemoryStore:
         self._action_influence_events: list[tuple[str, str]] = []
         self._experience_graph_records: dict[str, str] = {}
         self._experience_attributions: dict[str, str] = {}
+        self._behavior_invariants: dict[str, str] = {}
+        self._skill_candidates: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -494,4 +582,34 @@ class InMemoryStore:
         return [
             ExperienceAttribution.model_validate_json(payload)
             for payload in self._experience_attributions.values()
+        ]
+
+    def save_behavior_invariant(self, invariant: BehaviorInvariant) -> None:
+        self._behavior_invariants[invariant.invariant_id] = invariant.model_dump_json()
+
+    def get_behavior_invariant(self, invariant_id: str) -> BehaviorInvariant:
+        payload = self._behavior_invariants.get(invariant_id)
+        if payload is None:
+            raise KeyError(f"Behavior invariant not found: {invariant_id}")
+        return BehaviorInvariant.model_validate_json(payload)
+
+    def list_behavior_invariants(self) -> list[BehaviorInvariant]:
+        return [
+            BehaviorInvariant.model_validate_json(payload)
+            for payload in self._behavior_invariants.values()
+        ]
+
+    def save_skill_candidate(self, skill: SkillCandidate) -> None:
+        self._skill_candidates[skill.skill_id] = skill.model_dump_json()
+
+    def get_skill_candidate(self, skill_id: str) -> SkillCandidate:
+        payload = self._skill_candidates.get(skill_id)
+        if payload is None:
+            raise KeyError(f"Skill candidate not found: {skill_id}")
+        return SkillCandidate.model_validate_json(payload)
+
+    def list_skill_candidates(self) -> list[SkillCandidate]:
+        return [
+            SkillCandidate.model_validate_json(payload)
+            for payload in self._skill_candidates.values()
         ]
