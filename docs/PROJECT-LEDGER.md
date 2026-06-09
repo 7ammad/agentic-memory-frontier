@@ -430,6 +430,49 @@ Entry format:
 - Follow-up: Start V2 Phase 7: implement SupersessionLedger, active forgetting,
   stale invariant demotion, and owner override handling.
 
+## LEDGER-20260610-009 - AMS V2 Phase 7 supersession completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 7 and V2 plan acceptance for supersession ledger,
+  active forgetting, stale invariant demotion, and owner override handling.
+- Summary: Completed V2 Phase 7. Added `SupersessionEvent`,
+  `SupersessionLedger`, supersession/reversal/owner-override events, persistent
+  supersession storage, and active filtering in `CEM.match_situation` so
+  superseded invariants stop firing on the next equivalent decision. Reversal
+  reactivates the invariant and owner override creates an auditable,
+  reversible event without deleting evidence.
+- Files:
+  - `packages/cem-core/src/cem_core/supersession.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_supersession.py`
+  - `tests/test_storage_evidence.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_supersession.py -q` failed because
+  `cem_core.supersession` did not exist. Green proof:
+  `python -m pytest tests/test_supersession.py -q` -> **passed**.
+  `python -m pytest tests/test_storage_evidence.py::test_supersession_event_roundtrip_in_both_backends -q`
+  -> **passed**. Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Live `python scripts/ams.py monitor --json` reports current
+  phase `AMS V2 Phase 8 - Multi-agent experience governance`; live startup
+  brief for Phase 7 completion returns `status=allow` and the Phase 8 next step.
+  `git diff --check` -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 8: implement writer identity, cross-agent authority
+  model, visibility and ownership constraints, and conflict receipts.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

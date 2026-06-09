@@ -182,6 +182,13 @@ class ExperienceAttribution(StrictModel):
 InvariantEnforcement = Literal["steer", "block", "steer_or_block"]
 SupersessionStatus = Literal["active", "superseded", "retired"]
 SkillPromotionStatus = Literal["candidate", "verified", "rejected"]
+SupersessionSource = Literal[
+    "current_owner_instruction",
+    "updated_authoritative_docs",
+    "higher_priority_verified_evidence",
+    "failed_replay_evidence",
+    "owner_approved_override",
+]
 SituationSourceType = Literal["invariant", "skill"]
 SituationMatchType = Literal[
     "exact_repeat",
@@ -251,6 +258,29 @@ class SkillCandidate(StrictModel):
             "source_record_id": self.source_record_id,
             "transfer_scope": self.transfer_scope,
             "promotion_status": self.promotion_status,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class SupersessionEvent(StrictModel):
+    supersession_id: str = Field(default_factory=lambda: new_id("supersession"))
+    target_id: str
+    target_type: Literal["invariant", "skill"]
+    source: SupersessionSource
+    reason: str = Field(min_length=1)
+    reversible: bool = True
+    reverses_supersession_id: str | None = None
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "supersession_id": self.supersession_id,
+            "target_id": self.target_id,
+            "target_type": self.target_type,
+            "source": self.source,
+            "reversible": self.reversible,
+            "reverses_supersession_id": self.reverses_supersession_id,
             "evidence_ids": self.evidence_ids,
         }
 

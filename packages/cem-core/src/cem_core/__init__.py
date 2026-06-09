@@ -20,6 +20,7 @@ from .kernel import CEM, card_is_inactive
 from .matching import SituationMatcher
 from .policy import ActionDecisionPoint, PolicyBindingLayer
 from .reasoning import ReasoningController
+from .supersession import SupersessionLedger
 from .models import (
     ActionBrief,
     ActionBriefRecord,
@@ -39,6 +40,7 @@ from .models import (
     SituationMatch,
     SkillCandidate,
     SourceSpan,
+    SupersessionEvent,
     TaskContext,
     TraceReceipt,
     TraceTurn,
@@ -100,6 +102,8 @@ __all__ = [
     "SituationMatch",
     "SituationMatcher",
     "SuccessAttributor",
+    "SupersessionEvent",
+    "SupersessionLedger",
     "TaskContext",
     "TraceReceipt",
     "TraceTurn",

@@ -40,6 +40,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `ReasoningController`, `CEM.control_reasoning()`, constrained downgrade rules,
   visible override/block receipts, silent-steer UX, and persisted reasoning
   control receipts.
+- Added AMS V2 Phase 7 supersession: `SupersessionEvent`,
+  `SupersessionLedger`, supersession/reversal/owner-override events,
+  supersession storage, and active filtering so superseded invariants stop
+  firing on equivalent future decisions.
 
 ### Changed
 
@@ -50,13 +54,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   invariants, procedural skill memory, situation matching, policy binding,
   action decision points, reasoning control, under-the-hood inference receipts,
   supersession, multi-agent governance, and the V2 eval battery.
-- Updated monitor/dashboard phase status so AMS V2 Phase 7 is the active rail
-  after Phase 6 reasoning controller and under-the-hood UX.
+- Updated monitor/dashboard phase status so AMS V2 Phase 8 is the active rail
+  after Phase 7 supersession and active forgetting.
 
 ### Next
 
-- Start AMS V2 Phase 7: SupersessionLedger, active forgetting path, stale
-  invariant demotion, and owner override handling.
+- Start AMS V2 Phase 8: writer identity, cross-agent authority model,
+  visibility and ownership constraints, and conflict receipts.
 
 ### Verified
 
@@ -195,6 +199,25 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `AMS V2 Phase 7 - Supersession and active forgetting`.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 6 reasoning controller completion and Phase 7 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 7 next step.
+- Phase 7 red->green proof:
+  `python -m pytest tests/test_supersession.py -q` failed before
+  implementation because `cem_core.supersession` did not exist, then passed
+  after adding supersession events and active filtering.
+- Phase 7 focused checks:
+  `python -m pytest tests/test_supersession.py -q` -> passed.
+- Supersession storage:
+  `python -m pytest tests/test_storage_evidence.py::test_supersession_event_roundtrip_in_both_backends -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 8 - Multi-agent experience governance`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 7 supersession completion and Phase 8 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 8 next step.
 
 ## 2026-06-09
 

@@ -12,6 +12,7 @@ from cem_core.models import (
     RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
+    SupersessionEvent,
     VerificationProbe,
     VerificationResult,
 )
@@ -217,6 +218,22 @@ def test_reasoning_control_receipt_roundtrip_in_both_backends(tmp_path):
 
         assert store.get_reasoning_control_receipt(receipt.reasoning_receipt_id) == receipt
         assert store.list_reasoning_control_receipts() == [receipt]
+
+
+def test_supersession_event_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        event = SupersessionEvent(
+            target_id="invariant_1",
+            target_type="invariant",
+            source="current_owner_instruction",
+            reason="owner superseded this invariant",
+            evidence_ids=["invariant_1", "directive_1"],
+        )
+
+        store.save_supersession_event(event)
+
+        assert store.get_supersession_event(event.supersession_id) == event
+        assert store.list_supersession_events() == [event]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):

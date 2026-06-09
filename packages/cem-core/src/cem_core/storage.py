@@ -18,6 +18,7 @@ from .models import (
     RuntimeInterceptionBoundary,
     SituationMatch,
     SkillCandidate,
+    SupersessionEvent,
     ValidationDecision,
     ValidationResult,
     VerificationProbe,
@@ -72,6 +73,9 @@ class CEMStore(Protocol):
     def save_reasoning_control_receipt(self, receipt: ReasoningControlReceipt) -> None: ...
     def get_reasoning_control_receipt(self, receipt_id: str) -> ReasoningControlReceipt: ...
     def list_reasoning_control_receipts(self) -> list[ReasoningControlReceipt]: ...
+    def save_supersession_event(self, event: SupersessionEvent) -> None: ...
+    def get_supersession_event(self, supersession_id: str) -> SupersessionEvent: ...
+    def list_supersession_events(self) -> list[SupersessionEvent]: ...
 
 
 class SQLiteStore:
@@ -189,6 +193,13 @@ class SQLiteStore:
                     original_verdict TEXT NOT NULL,
                     final_verdict TEXT NOT NULL,
                     user_visible INTEGER NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS supersession_events (
+                    supersession_id TEXT PRIMARY KEY,
+                    target_id TEXT NOT NULL,
+                    target_type TEXT NOT NULL,
+                    source TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -615,6 +626,38 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM reasoning_control_receipts ORDER BY rowid").fetchall()
         return [ReasoningControlReceipt.model_validate_json(row[0]) for row in rows]
 
+    def save_supersession_event(self, event: SupersessionEvent) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO supersession_events(
+                    supersession_id, target_id, target_type, source, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    event.supersession_id,
+                    event.target_id,
+                    event.target_type,
+                    event.source,
+                    event.model_dump_json(),
+                ),
+            )
+
+    def get_supersession_event(self, supersession_id: str) -> SupersessionEvent:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM supersession_events WHERE supersession_id = ?",
+                (supersession_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Supersession event not found: {supersession_id}")
+        return SupersessionEvent.model_validate_json(row[0])
+
+    def list_supersession_events(self) -> list[SupersessionEvent]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM supersession_events ORDER BY rowid").fetchall()
+        return [SupersessionEvent.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -637,6 +680,7 @@ class InMemoryStore:
         self._action_decision_receipts: dict[str, str] = {}
         self._runtime_interception_boundaries: dict[str, str] = {}
         self._reasoning_control_receipts: dict[str, str] = {}
+        self._supersession_events: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -856,4 +900,19 @@ class InMemoryStore:
         return [
             ReasoningControlReceipt.model_validate_json(payload)
             for payload in self._reasoning_control_receipts.values()
+        ]
+
+    def save_supersession_event(self, event: SupersessionEvent) -> None:
+        self._supersession_events[event.supersession_id] = event.model_dump_json()
+
+    def get_supersession_event(self, supersession_id: str) -> SupersessionEvent:
+        payload = self._supersession_events.get(supersession_id)
+        if payload is None:
+            raise KeyError(f"Supersession event not found: {supersession_id}")
+        return SupersessionEvent.model_validate_json(payload)
+
+    def list_supersession_events(self) -> list[SupersessionEvent]:
+        return [
+            SupersessionEvent.model_validate_json(payload)
+            for payload in self._supersession_events.values()
         ]

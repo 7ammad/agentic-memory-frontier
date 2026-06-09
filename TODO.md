@@ -110,7 +110,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
       experience while preventing silent rationalization past confirmed
       mistakes; surface concise inference receipts instead of raw hidden
       reasoning.
-- [ ] Phase 7 - Supersession and active forgetting: retire stale or wrong
+- [x] Phase 7 - Supersession and active forgetting: retire stale or wrong
       invariants and skills through authority-ranked supersession.
 - [ ] Phase 8 - Multi-agent experience governance: share governed experience
       across agents without scope pollution.

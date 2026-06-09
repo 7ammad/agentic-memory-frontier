@@ -147,10 +147,20 @@ class CEM:
         return card
 
     def match_situation(self, decision: DecisionIntent) -> list[SituationMatch]:
+        invariants = [
+            invariant
+            for invariant in self.store.list_behavior_invariants()
+            if invariant.supersession_status == "active"
+        ]
+        skills = [
+            skill
+            for skill in self.store.list_skill_candidates()
+            if skill.promotion_status != "rejected"
+        ]
         matches = SituationMatcher().match_decision(
             decision,
-            invariants=self.store.list_behavior_invariants(),
-            skills=self.store.list_skill_candidates(),
+            invariants=invariants,
+            skills=skills,
         )
         for match in matches:
             self.store.save_situation_match(match)
