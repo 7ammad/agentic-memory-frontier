@@ -8,6 +8,7 @@ from .models import (
     ActionBriefRecord,
     ActionInfluenceEvent,
     AgentTrace,
+    ExperienceAttribution,
     ExperienceAtom,
     ExperienceCard,
     ExperienceGraphRecord,
@@ -44,6 +45,9 @@ class CEMStore(Protocol):
     def save_experience_graph_record(self, record: ExperienceGraphRecord) -> None: ...
     def get_experience_graph_record(self, record_id: str) -> ExperienceGraphRecord: ...
     def list_experience_graph_records(self) -> list[ExperienceGraphRecord]: ...
+    def save_experience_attribution(self, attribution: ExperienceAttribution) -> None: ...
+    def get_experience_attribution(self, attribution_id: str) -> ExperienceAttribution: ...
+    def list_experience_attributions(self) -> list[ExperienceAttribution]: ...
 
 
 class SQLiteStore:
@@ -108,6 +112,13 @@ class SQLiteStore:
                 CREATE TABLE IF NOT EXISTS experience_graph_records (
                     record_id TEXT PRIMARY KEY,
                     decision_id TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS experience_attributions (
+                    attribution_id TEXT PRIMARY KEY,
+                    record_id TEXT NOT NULL,
+                    decision_id TEXT NOT NULL,
+                    attribution_class TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -306,6 +317,38 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM experience_graph_records ORDER BY rowid").fetchall()
         return [ExperienceGraphRecord.model_validate_json(row[0]) for row in rows]
 
+    def save_experience_attribution(self, attribution: ExperienceAttribution) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO experience_attributions(
+                    attribution_id, record_id, decision_id, attribution_class, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    attribution.attribution_id,
+                    attribution.record_id,
+                    attribution.decision_id,
+                    attribution.attribution_class,
+                    attribution.model_dump_json(),
+                ),
+            )
+
+    def get_experience_attribution(self, attribution_id: str) -> ExperienceAttribution:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM experience_attributions WHERE attribution_id = ?",
+                (attribution_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Experience attribution not found: {attribution_id}")
+        return ExperienceAttribution.model_validate_json(row[0])
+
+    def list_experience_attributions(self) -> list[ExperienceAttribution]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM experience_attributions ORDER BY rowid").fetchall()
+        return [ExperienceAttribution.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -321,6 +364,7 @@ class InMemoryStore:
         self._action_brief_records: dict[str, str] = {}
         self._action_influence_events: list[tuple[str, str]] = []
         self._experience_graph_records: dict[str, str] = {}
+        self._experience_attributions: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -435,4 +479,19 @@ class InMemoryStore:
         return [
             ExperienceGraphRecord.model_validate_json(payload)
             for payload in self._experience_graph_records.values()
+        ]
+
+    def save_experience_attribution(self, attribution: ExperienceAttribution) -> None:
+        self._experience_attributions[attribution.attribution_id] = attribution.model_dump_json()
+
+    def get_experience_attribution(self, attribution_id: str) -> ExperienceAttribution:
+        payload = self._experience_attributions.get(attribution_id)
+        if payload is None:
+            raise KeyError(f"Experience attribution not found: {attribution_id}")
+        return ExperienceAttribution.model_validate_json(payload)
+
+    def list_experience_attributions(self) -> list[ExperienceAttribution]:
+        return [
+            ExperienceAttribution.model_validate_json(payload)
+            for payload in self._experience_attributions.values()
         ]

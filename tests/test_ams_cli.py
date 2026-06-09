@@ -419,11 +419,11 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 11
     assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 2 - Error and success attribution"
+    assert monitor["phase"]["current_phase"] == "AMS V2 Phase 3 - Invariants, skills, and authority scope"
     assert monitor["phase"]["status"] == "active"
     assert (
         monitor["phase"]["next_step"]
-        == "implement V2 ErrorAttributor and SuccessAttributor for mistake, approved-experiment failure, acceptable tradeoff, success, and unresolved outcomes"
+        == "implement V2 BehaviorInvariantCompiler, SkillCompiler, authority-ranked retrieval lanes, and scope promotion rules"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
@@ -431,7 +431,7 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
     assert "aging and maintenance" not in monitor["phase"]["next_step"]
     assert monitor["phase"]["ready_for_next_phase"] is False
     assert monitor["phase"]["open_followups"] == [
-        "V2 Phase 2 attribution implementation and red-test canaries are pending",
+        "V2 Phase 3 invariant/skill compiler implementation and red-test canaries are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
     assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
@@ -728,10 +728,10 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
     assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
-    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 2 - Error and success attribution"
+    assert dashboard["phase"]["current_phase"] == "AMS V2 Phase 3 - Invariants, skills, and authority scope"
     assert dashboard["phase"]["ready_for_next_phase"] is False
     assert dashboard["phase"]["open_followups"] == [
-        "V2 Phase 2 attribution implementation and red-test canaries are pending",
+        "V2 Phase 3 invariant/skill compiler implementation and red-test canaries are pending",
         "V2 dashboard/operator proof remains pending until Phase 10",
     ]
 
@@ -1036,16 +1036,22 @@ def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
     assert result["proposed_atom_count"] == 1
     assert result["decision_id"].startswith("decision_")
     assert result["experience_record_id"].startswith("experience_")
+    assert result["attribution_id"].startswith("attribution_")
+    assert result["attribution_class"] == "success"
     assert (root / "runtime-trace-runs.jsonl").exists()
     assert (root / "runtime-trace-latest.json").exists()
     assert (root / "runtime-trace-latest.md").exists()
     assert (root / "experience-graph-runs.jsonl").exists()
     assert (root / "experience-graph-latest.json").exists()
     assert (root / "experience-graph-latest.md").exists()
+    assert (root / "experience-attribution-runs.jsonl").exists()
+    assert (root / "experience-attribution-latest.json").exists()
+    assert (root / "experience-attribution-latest.md").exists()
 
     dashboard = _ams(root, "--json", "dashboard")
     assert dashboard["latest_runtime_trace"]["trace_id"] == result["trace_id"]
     assert dashboard["latest_experience_graph_record"]["record_id"] == result["experience_record_id"]
+    assert dashboard["latest_experience_attribution"]["attribution_id"] == result["attribution_id"]
     trace = CEM(root).store.get_trace(result["trace_id"])
     assert trace.final_outcome == "success"
     assert trace.environment["runtime_control_id"] == control["control_id"]
@@ -1058,8 +1064,14 @@ def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
         control["startup_brief_id"],
         control["monitor_id"],
     ]
+    assert experience.attribution_status == "attributed"
+    assert experience.inference_receipt_id == result["attribution_id"]
     assert experience.outcome_evidence_ids == [result["trace_id"]]
     assert experience.audit_summary()["evidence_ids"][0] == control["control_id"]
+    attribution = CEM(root).store.get_experience_attribution(result["attribution_id"])
+    assert attribution.record_id == result["experience_record_id"]
+    assert attribution.attribution_class == "success"
+    assert attribution.skill_candidate is True
     atom = CEM(root).store.get_atom(result["proposed_atom_ids"][0])
     assert atom.source_trace_ids == [result["trace_id"]]
     assert atom.source_spans[0].text == "check startup brief before edits"

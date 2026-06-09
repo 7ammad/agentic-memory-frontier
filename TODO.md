@@ -95,7 +95,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
   - [x] Wire runtime capture so consequential actions persist V2 decision
         intent records.
   - [x] Add persistence/audit path for experience graph records.
-- [ ] Phase 2 - Error and success attribution: classify mistake,
+- [x] Phase 2 - Error and success attribution: classify mistake,
       approved-experiment failure, acceptable tradeoff, success, and unresolved
       outcomes, including owner-labeled seed cases.
 - [ ] Phase 3 - Invariants, skills, and authority scope: compile confirmed

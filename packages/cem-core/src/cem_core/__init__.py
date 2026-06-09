@@ -3,6 +3,12 @@ from .contradiction import (
     ContradictionMatch,
     KeyValueContradictionDetector,
 )
+from .attribution import (
+    ErrorAttributor,
+    SuccessAttributor,
+    V2_ATTRIBUTION_SEED_CORPUS,
+    attribute_experience_record,
+)
 from .extractor import DeterministicExtractor, MemoryExtractor
 from .kernel import CEM, card_is_inactive
 from .models import (
@@ -12,6 +18,7 @@ from .models import (
     AgentTrace,
     ConfidenceInterval,
     DecisionIntent,
+    ExperienceAttribution,
     ExperienceAtom,
     ExperienceCard,
     ExperienceGraphRecord,
@@ -48,6 +55,8 @@ __all__ = [
     "CEMStore",
     "DecisionIntent",
     "DeterministicExtractor",
+    "ErrorAttributor",
+    "ExperienceAttribution",
     "ExperienceAtom",
     "ExperienceCard",
     "ExperienceGraphRecord",
@@ -61,13 +70,16 @@ __all__ = [
     "SharedTraceImportReceipt",
     "SourceSpan",
     "SQLiteStore",
+    "SuccessAttributor",
     "TaskContext",
     "TraceReceipt",
     "TraceTurn",
+    "V2_ATTRIBUTION_SEED_CORPUS",
     "ValidationDecision",
     "ValidationResult",
     "VerificationProbe",
     "VerificationResult",
+    "attribute_experience_record",
     "build_shared_trace_envelope",
     "card_is_inactive",
     "import_shared_trace",

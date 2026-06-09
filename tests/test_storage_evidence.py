@@ -4,6 +4,7 @@ from cem_core.models import (
     ActionBriefRecord,
     ActionInfluenceEvent,
     DecisionIntent,
+    ExperienceAttribution,
     ExperienceGraphRecord,
     VerificationProbe,
     VerificationResult,
@@ -73,6 +74,28 @@ def test_experience_graph_record_roundtrip_in_both_backends(tmp_path):
 
         assert store.get_experience_graph_record(record.record_id) == record
         assert store.list_experience_graph_records() == [record]
+
+
+def test_experience_attribution_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        attribution = ExperienceAttribution(
+            record_id="experience_1",
+            decision_id="decision_1",
+            attribution_class="mistake",
+            scope_candidate="global_agent_behavior",
+            authority_basis="owner_instruction",
+            authority_refs=["directive_1"],
+            non_repeat_candidate=True,
+            invariant_candidate=True,
+            confidence=0.9,
+            receipt_summary="Owner correction proves this is a non-repeat candidate.",
+            evidence_ids=["directive_1", "trace_1"],
+        )
+
+        store.save_experience_attribution(attribution)
+
+        assert store.get_experience_attribution(attribution.attribution_id) == attribution
+        assert store.list_experience_attributions() == [attribution]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):

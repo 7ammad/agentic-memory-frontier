@@ -22,6 +22,7 @@ from .correction_hooks import (
     hook_on_pre_tool_use_gate,
     hook_on_user_prompt_submit,
 )
+from .attribution import attribute_experience_record
 from .kernel import CEM, card_is_inactive
 from .local_memory import (
     default_root,
@@ -32,7 +33,17 @@ from .local_memory import (
     retrieve_brief,
     run_eval,
 )
-from .models import AgentTrace, DecisionIntent, ExperienceCard, ExperienceGraphRecord, StrictModel, TraceTurn, new_id, utc_now
+from .models import (
+    AgentTrace,
+    DecisionIntent,
+    ExperienceAttribution,
+    ExperienceCard,
+    ExperienceGraphRecord,
+    StrictModel,
+    TraceTurn,
+    new_id,
+    utc_now,
+)
 
 MigrationAction = Literal["pin", "remember", "skip"]
 MaintenanceStatus = Literal["pass", "warn", "fail"]
@@ -221,6 +232,14 @@ class RuntimeTraceRun(StrictModel):
     final_outcome: Literal["success", "failure", "partial", "unknown"]
     decision_id: str
     experience_record_id: str
+    attribution_id: str
+    attribution_class: Literal[
+        "mistake",
+        "approved_experiment_failure",
+        "acceptable_tradeoff",
+        "success",
+        "unresolved",
+    ]
     proposed_atom_count: int
     proposed_atom_ids: list[str]
     source_turn_ids: list[str]
@@ -640,6 +659,7 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_runtime_control": _load_json(root / "runtime-control-latest.json"),
         "latest_runtime_trace": _load_json(root / "runtime-trace-latest.json"),
         "latest_experience_graph_record": _load_json(root / "experience-graph-latest.json"),
+        "latest_experience_attribution": _load_json(root / "experience-attribution-latest.json"),
         "latest_maintenance": _load_json(root / "maintenance-latest.json"),
     }
 
@@ -974,7 +994,11 @@ def record_runtime_trace(
         scope_candidate="task",
         outcome_evidence_ids=[trace.trace_id],
     )
+    attribution = attribute_experience_record(experience_record)
+    experience_record.attribution_status = "attributed"
+    experience_record.inference_receipt_id = attribution.attribution_id
     cem.store.save_experience_graph_record(experience_record)
+    cem.store.save_experience_attribution(attribution)
     atoms = cem.propose_memories(trace.trace_id)
     run = RuntimeTraceRun(
         trace_id=trace.trace_id,
@@ -995,12 +1019,15 @@ def record_runtime_trace(
         final_outcome=final_outcome,
         decision_id=decision.decision_id,
         experience_record_id=experience_record.record_id,
+        attribution_id=attribution.attribution_id,
+        attribution_class=attribution.attribution_class,
         proposed_atom_count=len(atoms),
         proposed_atom_ids=[atom.atom_id for atom in atoms],
         source_turn_ids=[turn.turn_id for turn in trace.turns],
     )
     _write_runtime_trace_records(root, run)
     _write_experience_graph_records(root, experience_record)
+    _write_experience_attribution_records(root, attribution)
     return run
 
 
@@ -1140,16 +1167,16 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS v1 product lock is accepted; AMS V2 Phase 1 experience graph and decision intent are complete for guarded runtime traces"
+            "AMS v1 product lock is accepted; AMS V2 Phase 2 error/success attribution is complete for seeded outcomes and guarded runtime traces"
         ),
-        current_phase="AMS V2 Phase 2 - Error and success attribution",
+        current_phase="AMS V2 Phase 3 - Invariants, skills, and authority scope",
         status="active",
         next_step=(
-            "implement V2 ErrorAttributor and SuccessAttributor for mistake, approved-experiment failure, acceptable tradeoff, success, and unresolved outcomes"
+            "implement V2 BehaviorInvariantCompiler, SkillCompiler, authority-ranked retrieval lanes, and scope promotion rules"
         ),
         ready_for_next_phase=False,
         open_followups=[
-            "V2 Phase 2 attribution implementation and red-test canaries are pending",
+            "V2 Phase 3 invariant/skill compiler implementation and red-test canaries are pending",
             "V2 dashboard/operator proof remains pending until Phase 10",
         ],
     )
@@ -1287,6 +1314,16 @@ def _write_experience_graph_records(root: Path, record: ExperienceGraphRecord) -
     _append_jsonl(root / "experience-graph-runs.jsonl", record.model_dump(mode="json"))
     _write_json(root / "experience-graph-latest.json", record.model_dump(mode="json"))
     (root / "experience-graph-latest.md").write_text(_render_experience_graph_markdown(record), encoding="utf-8")
+
+
+def _write_experience_attribution_records(root: Path, attribution: ExperienceAttribution) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "experience-attribution-runs.jsonl", attribution.model_dump(mode="json"))
+    _write_json(root / "experience-attribution-latest.json", attribution.model_dump(mode="json"))
+    (root / "experience-attribution-latest.md").write_text(
+        _render_experience_attribution_markdown(attribution),
+        encoding="utf-8",
+    )
 
 
 def _write_maintenance_records(root: Path, run: MaintenanceRun) -> None:
@@ -1463,6 +1500,8 @@ def _render_runtime_trace_markdown(run: RuntimeTraceRun) -> str:
         f"- command_args: `{len(run.command_args)}`",
         f"- decision_id: `{run.decision_id}`",
         f"- experience_record_id: `{run.experience_record_id}`",
+        f"- attribution_id: `{run.attribution_id}`",
+        f"- attribution_class: `{run.attribution_class}`",
         f"- proposed_atoms: `{run.proposed_atom_count}`",
     ]
     if run.proposed_atom_ids:
@@ -1483,8 +1522,30 @@ def _render_experience_graph_markdown(record: ExperienceGraphRecord) -> str:
         f"- authority: `{record.decision.applicable_authority}`",
         f"- scope_candidate: `{record.scope_candidate}`",
         f"- outcome_status: `{record.outcome_status}`",
+        f"- attribution_status: `{record.attribution_status}`",
+        f"- inference_receipt_id: `{record.inference_receipt_id}`",
         f"- runtime_surface: `{record.decision.runtime_surface}`",
         f"- evidence_ids: `{len(audit['evidence_ids'])}`",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _render_experience_attribution_markdown(attribution: ExperienceAttribution) -> str:
+    lines = [
+        "# AMS V2 Experience Attribution Latest",
+        "",
+        f"- attribution_id: `{attribution.attribution_id}`",
+        f"- record_id: `{attribution.record_id}`",
+        f"- decision_id: `{attribution.decision_id}`",
+        f"- attribution_class: `{attribution.attribution_class}`",
+        f"- scope_candidate: `{attribution.scope_candidate}`",
+        f"- authority_basis: `{attribution.authority_basis}`",
+        f"- non_repeat_candidate: `{attribution.non_repeat_candidate}`",
+        f"- invariant_candidate: `{attribution.invariant_candidate}`",
+        f"- skill_candidate: `{attribution.skill_candidate}`",
+        f"- approved_experiment_exclusion: `{attribution.approved_experiment_exclusion}`",
+        f"- needs_owner_review: `{attribution.needs_owner_review}`",
+        f"- evidence_ids: `{len(attribution.evidence_ids)}`",
     ]
     return "\n".join(lines) + "\n"
 

@@ -189,6 +189,58 @@ Entry format:
 - Follow-up: Start V2 Phase 2: implement ErrorAttributor and SuccessAttributor
   over experience graph records.
 
+## LEDGER-20260610-004 - AMS V2 Phase 2 attribution completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 2 and the V2 acceptance seed cases for mistake,
+  approved-experiment exclusion, success transfer, and unresolved outcomes.
+- Summary: Completed V2 Phase 2 for deterministic attribution. Added
+  `ExperienceAttribution`, `ErrorAttributor`, `SuccessAttributor`, and an
+  owner-labeled attribution seed corpus. Runtime trace capture now attributes
+  every guarded `ExperienceGraphRecord`, persists the attribution receipt,
+  marks the experience record `attributed`, writes
+  `experience-attribution-runs.jsonl`, `experience-attribution-latest.json`,
+  and `experience-attribution-latest.md`, and exposes the latest attribution on
+  the dashboard. The attributor classifies `mistake`,
+  `approved_experiment_failure`, `acceptable_tradeoff`, `success`, and
+  `unresolved`, and promotes the original June 9-style scope-trap evidence from
+  `project` to `global_agent_behavior` instead of preserving the bad scope.
+- Files:
+  - `packages/cem-core/src/cem_core/attribution.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_attribution.py`
+  - `tests/test_storage_evidence.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_attribution.py -q` failed because
+  `cem_core.attribution` did not exist. Scope-trap canary:
+  `python -m pytest tests/test_attribution.py::test_error_attributor_marks_general_owner_correction_as_non_repeat_mistake -q`
+  failed while the attributor preserved `project` scope. Green proof:
+  `python -m pytest tests/test_attribution.py -q` -> **passed**.
+  `python -m pytest tests/test_storage_evidence.py tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates -q`
+  -> **passed**. Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed** after an earlier default-timeout run was interrupted by the
+  command timeout and pytest's Windows stdout flush error during shutdown. Live
+  `python scripts/ams.py monitor --json` reports current phase `AMS V2 Phase 3
+  - Invariants, skills, and authority scope`; live startup brief for Phase 2
+  completion returns `status=allow` and the Phase 3 next step. `git diff --check`
+  -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 3: implement BehaviorInvariantCompiler,
+  SkillCompiler, authority-ranked retrieval lanes, and scope promotion rules.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

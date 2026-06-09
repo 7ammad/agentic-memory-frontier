@@ -20,6 +20,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   audit summary.
 - Wired guarded runtime traces to persist V2 experience graph records and expose
   the latest record through dashboard/operator files.
+- Added AMS V2 Phase 2 attribution: `ExperienceAttribution`,
+  `ErrorAttributor`, `SuccessAttributor`, the owner-labeled attribution seed
+  corpus, attribution storage, runtime attribution receipts, and dashboard
+  exposure for the latest attribution.
 
 ### Changed
 
@@ -30,14 +34,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   invariants, procedural skill memory, situation matching, policy binding,
   action decision points, reasoning control, under-the-hood inference receipts,
   supersession, multi-agent governance, and the V2 eval battery.
-- Updated monitor/dashboard phase status so AMS V2 Phase 2 is the active rail
-  after Phase 1 runtime decision-intent capture.
+- Updated monitor/dashboard phase status so AMS V2 Phase 3 is the active rail
+  after Phase 2 error/success attribution.
 
 ### Next
 
-- Start AMS V2 Phase 2: ErrorAttributor and SuccessAttributor with red tests
-  for mistake, approved-experiment failure, acceptable tradeoff, success, and
-  unresolved outcomes.
+- Start AMS V2 Phase 3: BehaviorInvariantCompiler, SkillCompiler,
+  authority-ranked retrieval lanes, and scope promotion rules.
 
 ### Verified
 
@@ -70,6 +73,32 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   returns `status=allow` and the V2 Phase 1 next step.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 1 runtime capture completion and Phase 2 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 2 next step.
+- Phase 2 red->green proof:
+  `python -m pytest tests/test_attribution.py -q` failed before implementation
+  because `cem_core.attribution` did not exist, then passed after adding
+  deterministic attribution.
+- Scope-trap canary:
+  `python -m pytest tests/test_attribution.py::test_error_attributor_marks_general_owner_correction_as_non_repeat_mistake -q`
+  failed while the attributor preserved `project` scope, then passed after
+  general Codex/AMS correction evidence promoted the scope candidate to
+  `global_agent_behavior`.
+- Phase 2 focused checks:
+  `python -m pytest tests/test_attribution.py -q` -> passed.
+- Runtime attribution checks:
+  `python -m pytest tests/test_storage_evidence.py tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed. An earlier default-timeout full-suite attempt was interrupted by
+  the command timeout and pytest's Windows stdout flush error during shutdown,
+  then the longer quiet rerun passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 3 - Invariants, skills, and authority scope`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 2 attribution completion and Phase 3 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 3 next step.
 
 ## 2026-06-09
 

@@ -90,6 +90,13 @@ ExperienceScopeCandidate = Literal[
     "multi_agent",
     "unknown",
 ]
+AttributionClass = Literal[
+    "mistake",
+    "approved_experiment_failure",
+    "acceptable_tradeoff",
+    "success",
+    "unresolved",
+]
 
 
 class DecisionIntent(StrictModel):
@@ -133,6 +140,42 @@ class ExperienceGraphRecord(StrictModel):
             "scope_candidate": self.scope_candidate,
             "outcome_status": self.outcome_status,
             "evidence_ids": evidence_ids,
+        }
+
+
+class ExperienceAttribution(StrictModel):
+    attribution_id: str = Field(default_factory=lambda: new_id("attribution"))
+    record_id: str
+    decision_id: str
+    attribution_class: AttributionClass
+    scope_candidate: ExperienceScopeCandidate
+    authority_basis: ApplicableAuthority
+    authority_refs: list[str] = Field(default_factory=list)
+    non_repeat_candidate: bool = False
+    invariant_candidate: bool = False
+    skill_candidate: bool = False
+    approved_experiment_exclusion: bool = False
+    needs_owner_review: bool = False
+    confidence: float = Field(ge=0.0, le=1.0)
+    receipt_summary: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "attribution_id": self.attribution_id,
+            "record_id": self.record_id,
+            "decision_id": self.decision_id,
+            "attribution_class": self.attribution_class,
+            "scope_candidate": self.scope_candidate,
+            "authority_basis": self.authority_basis,
+            "non_repeat_candidate": self.non_repeat_candidate,
+            "invariant_candidate": self.invariant_candidate,
+            "skill_candidate": self.skill_candidate,
+            "approved_experiment_exclusion": self.approved_experiment_exclusion,
+            "needs_owner_review": self.needs_owner_review,
+            "confidence": self.confidence,
+            "evidence_ids": self.evidence_ids,
         }
 
 
