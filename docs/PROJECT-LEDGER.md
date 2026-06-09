@@ -116,6 +116,38 @@ Entry format:
   schema with red-test canaries for missing expected outcome, authority,
   approval/experiment state, runtime surface, and evidence ids.
 
+## LEDGER-20260610-002 - AMS V2 Phase 1 schema surface started
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: active
+- Source: TODO AMS V2 Phase 1 and `docs/2026-06-10-ams-v2-acceptance-contract.md`.
+- Summary: Started V2 Phase 1 by adding `DecisionIntent` and
+  `ExperienceGraphRecord` schema models. The new decision intent record requires
+  the attribution fields V2 needs before outcome classification can be honest:
+  proposed action, expected outcome, applicable authority, approval state,
+  experiment state, runtime surface, and evidence ids. The experience graph
+  record binds that decision intent to actual outcome, scope candidate,
+  attribution status, outcome evidence, and a compact audit summary that excludes
+  raw hidden reasoning.
+- Files:
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_evidence_models.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: Red proof before implementation:
+  `python -m pytest tests/test_evidence_models.py -q` failed during collection
+  because `DecisionIntent` did not exist. Green proof after implementation:
+  `python -m pytest tests/test_evidence_models.py -q` -> **9 passed**.
+  `python -m compileall -q packages/cem-core/src/cem_core` -> **passed**.
+  Export smoke with `PYTHONPATH=packages/cem-core/src` imports
+  `DecisionIntent` and `ExperienceGraphRecord` from `cem_core` successfully.
+  Full suite `python -m pytest -q` -> **passed**.
+- Follow-up: Wire runtime capture so consequential actions persist V2 decision
+  intent records, then add persistence/audit paths for experience graph records.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

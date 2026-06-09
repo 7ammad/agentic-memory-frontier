@@ -15,6 +15,9 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Added `docs/2026-06-10-ams-v2-acceptance-contract.md` with the Phase 0
   acceptance axes, seed corpus, false-block budget shape, red-test rule, and
   receipt rule.
+- Added the first AMS V2 Phase 1 schema models: `DecisionIntent` and
+  `ExperienceGraphRecord`, including required attribution fields and a compact
+  audit summary.
 
 ### Changed
 
@@ -40,6 +43,14 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
   -> `2 passed`.
 - Full AMS CLI test file: `python -m pytest tests/test_ams_cli.py -q` -> passed.
+- Phase 1 red->green proof: `python -m pytest tests/test_evidence_models.py -q`
+  failed before implementation because `DecisionIntent` was missing, then
+  passed after adding the schema models.
+- `python -m compileall -q packages/cem-core/src/cem_core` passed.
+- Export smoke:
+  `$env:PYTHONPATH='packages/cem-core/src'; python -c "from cem_core import DecisionIntent, ExperienceGraphRecord; print(DecisionIntent.__name__, ExperienceGraphRecord.__name__)"`
+  -> `DecisionIntent ExperienceGraphRecord`.
+- Full suite: `python -m pytest -q` -> passed.
 - `git diff --check` passed with only expected Windows CRLF warnings.
 - Live `python scripts/ams.py monitor --json` reports current phase
   `AMS V2 Phase 1 - Experience graph and decision intent`.

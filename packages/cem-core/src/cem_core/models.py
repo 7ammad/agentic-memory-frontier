@@ -68,6 +68,74 @@ class AgentTrace(StrictModel):
     environment: dict[str, JsonValue] = Field(default_factory=dict)
 
 
+ActionKind = Literal["message", "tool_use", "file_edit", "command", "external_send", "decision", "other"]
+ApplicableAuthority = Literal[
+    "owner_instruction",
+    "system_instruction",
+    "developer_instruction",
+    "project_docs",
+    "verified_experience",
+    "best_practice",
+    "current_evidence",
+    "logic",
+    "unknown",
+]
+ApprovalState = Literal["not_required", "owner_approved", "owner_rejected", "pending", "implicit", "unknown"]
+ExperimentState = Literal["not_experiment", "approved_experiment", "unapproved_experiment", "unknown"]
+ExperienceScopeCandidate = Literal[
+    "global_agent_behavior",
+    "agent",
+    "project",
+    "task",
+    "multi_agent",
+    "unknown",
+]
+
+
+class DecisionIntent(StrictModel):
+    decision_id: str = Field(default_factory=lambda: new_id("decision"))
+    trace_id: str | None = None
+    turn_id: str | None = None
+    agent_id: str
+    session_id: str
+    task_id: str | None = None
+    proposed_action: str = Field(min_length=1)
+    action_kind: ActionKind
+    expected_outcome: str = Field(min_length=1)
+    applicable_authority: ApplicableAuthority
+    authority_refs: list[str] = Field(default_factory=list)
+    approval_state: ApprovalState
+    experiment_state: ExperimentState
+    runtime_surface: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    captured_at: datetime = Field(default_factory=utc_now)
+
+
+class ExperienceGraphRecord(StrictModel):
+    record_id: str = Field(default_factory=lambda: new_id("experience"))
+    decision: DecisionIntent
+    actual_outcome: str | None = None
+    outcome_status: Literal["success", "failure", "partial", "unknown"] = "unknown"
+    scope_candidate: ExperienceScopeCandidate = "unknown"
+    outcome_evidence_ids: list[str] = Field(default_factory=list)
+    attribution_status: Literal["unattributed", "pending", "attributed"] = "pending"
+    inference_receipt_id: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        evidence_ids = [*self.decision.evidence_ids, *self.outcome_evidence_ids]
+        return {
+            "record_id": self.record_id,
+            "decision_id": self.decision.decision_id,
+            "agent_id": self.decision.agent_id,
+            "task_id": self.decision.task_id,
+            "applicable_authority": self.decision.applicable_authority,
+            "scope_candidate": self.scope_candidate,
+            "outcome_status": self.outcome_status,
+            "evidence_ids": evidence_ids,
+        }
+
+
 class ExperienceAtom(StrictModel):
     atom_id: str = Field(default_factory=lambda: new_id("atom"))
     source_trace_ids: list[str]
