@@ -576,6 +576,71 @@ Entry format:
   dashboard/monitor V2 release status, audit docs, review prompts, and
   product-lock update.
 
+## LEDGER-20260610-012 - AMS V2 operator proof and release lock completed
+
+- Date: 2026-06-10
+- Type: implementation / verification / release-lock
+- Status: resolved
+- Source: TODO AMS V2 Phase 10 and V2 plan acceptance for fresh-root operator
+  proof, dashboard/monitor V2 status, audit docs, review prompts, and final
+  product-lock update.
+- Summary: Completed V2 Phase 10. Added
+  `scripts/run_ams_v2_operator_proof.py`, which composes the accepted v1
+  fresh-root operator proof with the V2 eval harness and asserts terminal V2
+  release status. The proof validates the v1 operator path, memory-surface
+  reconciliation, monitor, maintenance, governed-run closure, optional frontier
+  eval, V2 eval verdict, all 13 V2 seed ids, zero false blocks, final
+  `AMS V2 Accepted` phase status, `ready_for_next_phase=true`, and no open
+  follow-ups. Updated `PRODUCT-LOCK.md`, TODO, README, AGENTS, V2 plan/contract
+  status, V2 product-lock audit, and V2 review prompts so the release claim
+  cites terminal proof receipts.
+- Files:
+  - `scripts/run_ams_v2_operator_proof.py`
+  - `tests/test_ams_v2_operator_proof.py`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `tests/test_ams_cli.py`
+  - `PRODUCT-LOCK.md`
+  - `TODO.md`
+  - `README.md`
+  - `AGENTS.md`
+  - `CHANGELOG.md`
+  - `docs/PROJECT-LEDGER.md`
+  - `docs/2026-06-10-ams-v2-product-lock-audit.md`
+  - `docs/2026-06-10-ams-v2-review-prompts.md`
+  - `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`
+  - `docs/2026-06-10-ams-v2-acceptance-contract.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_ams_v2_operator_proof.py -q` failed because
+  `scripts/run_ams_v2_operator_proof.py` did not exist. Green focused proof:
+  `python -m pytest tests/test_ams_v2_operator_proof.py -q` -> **passed**.
+  Focused final phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. Compile
+  `python -m compileall -q scripts/run_ams_v2_operator_proof.py packages/cem-core/src/cem_core/operations.py`
+  -> **passed**. Full terminal V2 operator proof
+  `python scripts/run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final`
+  -> **AMS_V2_OPERATOR_PROOF_PASS**, v1 operator pass, V2 eval PASS 13/13,
+  false_blocks=0/0, phase `AMS V2 Accepted ready=True`. Focused release checks
+  `python -m pytest tests/test_ams_v2_operator_proof.py tests/test_v2_eval_harness.py tests/test_ams_cli.py -k "v2_operator_proof or v2_eval_harness or monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Compileall
+  `python -m compileall -q packages scripts tests` -> **passed**. Live
+  `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Accepted`, ready_for_next_phase `true`, and no open follow-ups. Live
+  startup brief for terminal V2 acceptance returns `status=allow`.
+  `git diff --check` -> clean with expected Windows CRLF warnings. Independent
+  review found P1/P2 issues in the first staged release proof; follow-up fixes
+  made the proof use a unique child proof root, pass Phase 4 storage under the
+  supplied root, derive seed coverage from executed cases, and persist a
+  `v2-operator-proof-latest.json` receipt that enumerates the V1 operator root,
+  V2 eval receipt, Phase 4 frontier root, and monitor artifact. Final
+  staged-diff independent review returned **no blocking findings**; residual
+  risks were limited to the review lane not itself running tests/proof and to
+  future post-V2 improvements beyond the deterministic local acceptance proof.
+- Follow-up: None for AMS V2. Future work must be opened as a named post-V2
+  phase or as a regression fix from a failing acceptance check.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

@@ -117,7 +117,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
 - [x] Phase 9 - V2 eval harness: run non-repeat, false-block,
       approved-experiment, skill-transfer, supersession, multi-agent conflict,
       and context-pollution evals.
-- [ ] Phase 10 - Operator proof and release lock: fresh-root V2 operator proof,
+- [x] Phase 10 - Operator proof and release lock: fresh-root V2 operator proof,
       dashboard/monitor V2 status, review receipts, and product-lock update.
 
 ### 0. Foundation Lock

@@ -13,8 +13,8 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 - Product line: **AMS**.
 - Canonical acceptance lock: `PRODUCT-LOCK.md`.
 - Current phase: **AMS V2 - Experience Enforcement Architecture**.
-- Current status: AMS v1 accepted; AMS V2 Phase 9 eval harness complete for non-repeat, false-block, approved-experiment, skill-transfer, supersession, multi-agent conflict, and context-pollution evals; Phase 10 is next.
-- Current next gap: implement V2 Phase 10 - operator proof and release lock.
+- Current status: AMS v1 accepted; AMS V2 accepted after fresh-root V2 operator proof, V2 eval harness, audit docs, review prompts, and product-lock update.
+- Current next gap: none for AMS V2. Future work must be opened as a named post-V2 phase or a regression fix.
 - Current live rails: `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`.
 - V2 plan: `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`.
 - V2 acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.

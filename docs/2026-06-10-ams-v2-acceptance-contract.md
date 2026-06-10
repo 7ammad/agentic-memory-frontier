@@ -1,7 +1,7 @@
 # AMS V2 Acceptance Contract
 
 Date: 2026-06-10
-Status: Phase 0 contract lock
+Status: accepted after terminal V2 operator proof
 Parent plan: `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`
 
 ## Contract
@@ -89,4 +89,3 @@ Phase 0 is complete when:
 4. Dashboard/monitor phase status reports AMS V2 as active.
 5. Ledger and changelog record the V2 opening and no-trimming correction.
 6. `git diff --check` and focused phase-status tests pass.
-

@@ -1,7 +1,7 @@
 # AMS V2 Experience Enforcement Plan
 
 Date: 2026-06-10
-Status: active execution plan
+Status: accepted after terminal V2 operator proof
 Scope: full AMS V2, not V1.5, not a smaller proof kernel
 Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`
 

@@ -53,6 +53,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `V2EvalHarnessReport`, `V2EvalSuiteRow`, `V2EvalCaseResult`,
   `run_v2_eval_harness()`, exported V2 eval constants, and
   `scripts/run_ams_v2_eval.py` for the one-command Phase 9 acceptance battery.
+- Added AMS V2 Phase 10 release lock:
+  `scripts/run_ams_v2_operator_proof.py`, V2 product-lock audit,
+  V2 review prompts, final product-lock update, and terminal
+  monitor/dashboard phase status.
 
 ### Changed
 
@@ -70,11 +74,15 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   control.
 - Updated monitor/dashboard phase status so AMS V2 Phase 10 is the active rail
   after the Phase 9 eval harness.
+- Updated monitor/dashboard phase status to `AMS V2 Accepted` after the
+  Phase 10 operator proof and release lock.
+- Updated `PRODUCT-LOCK.md` to record AMS V2 as accepted with the terminal proof
+  command and expected receipt.
 
 ### Next
 
-- Start AMS V2 Phase 10: one-command V2 operator proof, dashboard/monitor
-  release status, audit docs, review prompts, and product-lock update.
+- None for AMS V2. Future work must be opened as a named post-V2 phase or as a
+  regression fix from a failing acceptance check.
 
 ### Verified
 
@@ -278,6 +286,31 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 9 eval harness completion and Phase 10 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 10 next step.
 - `git diff --check` passed with only expected Windows CRLF warnings.
+- Phase 10 red proof:
+  `python -m pytest tests/test_ams_v2_operator_proof.py -q` failed before
+  implementation because `scripts/run_ams_v2_operator_proof.py` did not exist.
+- Phase 10 focused checks:
+  `python -m pytest tests/test_ams_v2_operator_proof.py -q` -> passed.
+- Focused final phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q scripts/run_ams_v2_operator_proof.py packages/cem-core/src/cem_core/operations.py`
+  -> passed.
+- Full terminal V2 operator proof:
+  `python scripts/run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final`
+  -> `AMS_V2_OPERATOR_PROOF_PASS`; v1 operator pass; V2 eval PASS 13/13;
+  false_blocks=0/0; phase `AMS V2 Accepted ready=True`.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports `AMS V2 Accepted`,
+  `ready_for_next_phase=true`, and no open follow-ups.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 terminal acceptance after operator proof" --domain codex-harness --json`
+  returns `status=allow` and terminal accepted phase state.
+- Independent release reviews found and then cleared blocking release-proof
+  issues: unique proof root isolation, Phase 4 storage under the supplied proof
+  root, executed-case seed coverage, persisted V2 proof receipt, artifact
+  manifest completeness, and stale ledger follow-up wording. Final staged-diff
+  review returned no P0/P1/P2 findings.
 
 ## 2026-06-09
 

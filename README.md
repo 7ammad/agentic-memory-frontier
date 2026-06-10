@@ -19,8 +19,9 @@ hidden "one more thing" to the v1 TODO.
 Current post-v1 phase: **AMS V2: Experience Enforcement Architecture**.
 Canonical plan: [docs/2026-06-10-ams-v2-experience-enforcement-plan.md](docs/2026-06-10-ams-v2-experience-enforcement-plan.md).
 Acceptance contract: [docs/2026-06-10-ams-v2-acceptance-contract.md](docs/2026-06-10-ams-v2-acceptance-contract.md).
-Current V2 build status: Phase 9 V2 eval harness is complete; Phase 10 operator
-proof and release lock is the next active rail.
+Current V2 build status: **AMS V2 Accepted** after the terminal V2 operator
+proof. Future work should open a named post-V2 phase or fix a failing
+acceptance check.
 
 V2 includes the non-repeat enforcement kernel as a core subsystem, not a V1.5
 downgrade. The target is an under-the-hood experience layer that changes future
@@ -400,6 +401,21 @@ Expected terminal signal:
 ```text
 AMS_OPERATOR_PROOF_PASS
 frontier_eval=PASS margin=75.0pp
+```
+
+Run the complete AMS V2 operator proof from a fresh root:
+
+```powershell
+python scripts/run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final
+```
+
+This composes the accepted v1 operator path with the V2 eval harness. Expected
+terminal signal:
+
+```text
+AMS_V2_OPERATOR_PROOF_PASS
+v2_eval=PASS 13/13 false_blocks=0/0
+phase=AMS V2 Accepted ready=True
 ```
 
 ## HaluMem Adapter Smoke
