@@ -18,7 +18,9 @@ from .models import (
     ExperienceAtom,
     ExperienceCard,
     MemoryAudit,
+    MultiAgentGovernanceReceipt,
     ReasoningControlReceipt,
+    SharedExperienceEnvelope,
     SituationMatch,
     TaskContext,
     TraceReceipt,
@@ -189,6 +191,18 @@ class CEM:
         )
         self.store.save_reasoning_control_receipt(control)
         return control
+
+    def govern_shared_experience(
+        self,
+        envelope: SharedExperienceEnvelope,
+    ) -> MultiAgentGovernanceReceipt:
+        from .multi_agent_governance import MultiAgentGovernanceLayer
+
+        existing = self.store.list_shared_experience_envelopes()
+        receipt = MultiAgentGovernanceLayer().evaluate(envelope, existing=existing)
+        self.store.save_shared_experience_envelope(envelope)
+        self.store.save_multi_agent_governance_receipt(receipt)
+        return receipt
 
     def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
         """Bidirectionally link active cards whose claims conflict without a

@@ -473,6 +473,56 @@ Entry format:
 - Follow-up: Start V2 Phase 8: implement writer identity, cross-agent authority
   model, visibility and ownership constraints, and conflict receipts.
 
+## LEDGER-20260610-010 - AMS V2 Phase 8 multi-agent governance completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 8 and V2 plan acceptance for writer identity,
+  cross-agent authority, visibility/ownership constraints, conflict receipts,
+  and scope-pollution canaries.
+- Summary: Completed V2 Phase 8. Added `SharedExperienceEnvelope`,
+  `MultiAgentGovernanceReceipt`, `MultiAgentGovernanceLayer`, and
+  `CEM.govern_shared_experience()`. Cross-agent shared experience now carries
+  writer identity, recipient identity, writer authority, visibility, ownership,
+  requested scope, and provenance. Project/agent-specific lessons cannot
+  silently promote into recipient global behavior rules unless backed by owner
+  authority. Private/source-owned experience is rejected across agents. Global
+  owner directives can apply across agents. Conflicting cross-agent claims
+  produce authority-ranked receipts.
+- Files:
+  - `packages/cem-core/src/cem_core/multi_agent_governance.py`
+  - `packages/cem-core/src/cem_core/models.py`
+  - `packages/cem-core/src/cem_core/storage.py`
+  - `packages/cem-core/src/cem_core/kernel.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `tests/test_multi_agent_governance_v2.py`
+  - `tests/test_storage_evidence.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_multi_agent_governance_v2.py -q` failed because
+  `cem_core.multi_agent_governance` did not exist. Green proof:
+  `python -m pytest tests/test_multi_agent_governance_v2.py -q` -> **passed**.
+  `python -m pytest tests/test_storage_evidence.py::test_shared_experience_governance_roundtrip_in_both_backends -q`
+  -> **passed**. Combined focused checks
+  `python -m pytest tests/test_multi_agent_governance_v2.py tests/test_storage_evidence.py::test_shared_experience_governance_roundtrip_in_both_backends -q`
+  -> **passed**. Focused phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. `python -m compileall -q packages/cem-core/src/cem_core` ->
+  **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Live `python scripts/ams.py monitor --json` reports current
+  phase `AMS V2 Phase 9 - V2 eval harness`; live startup brief for Phase 8
+  completion returns `status=allow` and the Phase 9 next step.
+  `git diff --check` -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 9: implement NonRepeatEval, FalseBlockEval,
+  ApprovedExperimentEval, SkillTransferEval, SupersessionEval,
+  MultiAgentConflictEval, and ContextPollutionEval.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

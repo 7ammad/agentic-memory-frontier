@@ -35,8 +35,10 @@ from .models import (
     ExperienceCard,
     ExperienceGraphRecord,
     MemoryAudit,
+    MultiAgentGovernanceReceipt,
     ReasoningControlReceipt,
     RuntimeInterceptionBoundary,
+    SharedExperienceEnvelope,
     SituationMatch,
     SkillCandidate,
     SourceSpan,
@@ -57,6 +59,7 @@ from .multi_agent import (
     build_shared_trace_envelope,
     import_shared_trace,
 )
+from .multi_agent_governance import MultiAgentGovernanceLayer
 from .storage import CEMStore, InMemoryStore, SQLiteStore
 
 __all__ = [
@@ -88,11 +91,14 @@ __all__ = [
     "MemoryExtractor",
     "MCPToolDefinition",
     "InMemoryStore",
+    "MultiAgentGovernanceLayer",
+    "MultiAgentGovernanceReceipt",
     "MultiAgentTrustPolicy",
     "PolicyBindingLayer",
     "ReasoningController",
     "ReasoningControlReceipt",
     "RuntimeInterceptionBoundary",
+    "SharedExperienceEnvelope",
     "SharedTraceEnvelope",
     "SharedTraceImportReceipt",
     "SourceSpan",

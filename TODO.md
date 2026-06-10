@@ -112,7 +112,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
       reasoning.
 - [x] Phase 7 - Supersession and active forgetting: retire stale or wrong
       invariants and skills through authority-ranked supersession.
-- [ ] Phase 8 - Multi-agent experience governance: share governed experience
+- [x] Phase 8 - Multi-agent experience governance: share governed experience
       across agents without scope pollution.
 - [ ] Phase 9 - V2 eval harness: run non-repeat, false-block,
       approved-experiment, skill-transfer, supersession, multi-agent conflict,

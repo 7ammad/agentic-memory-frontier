@@ -189,6 +189,10 @@ SupersessionSource = Literal[
     "failed_replay_evidence",
     "owner_approved_override",
 ]
+SharedExperienceVisibility = Literal["private", "team", "all_agents"]
+SharedExperienceOwnership = Literal["source_agent", "owner", "shared"]
+GovernanceVerdict = Literal["accept", "reject", "conflict"]
+RecipientApplicability = Literal["applicable", "not_applicable", "needs_review"]
 SituationSourceType = Literal["invariant", "skill"]
 SituationMatchType = Literal[
     "exact_repeat",
@@ -281,6 +285,54 @@ class SupersessionEvent(StrictModel):
             "source": self.source,
             "reversible": self.reversible,
             "reverses_supersession_id": self.reverses_supersession_id,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class SharedExperienceEnvelope(StrictModel):
+    envelope_id: str = Field(default_factory=lambda: new_id("sharedexp"))
+    writer_agent_id: str = Field(min_length=1)
+    recipient_agent_id: str = Field(min_length=1)
+    experience: BehaviorInvariant
+    writer_authority: ApplicableAuthority
+    visibility: SharedExperienceVisibility
+    ownership: SharedExperienceOwnership
+    requested_scope: ExperienceScopeCandidate
+    provenance_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class MultiAgentGovernanceReceipt(StrictModel):
+    governance_receipt_id: str = Field(default_factory=lambda: new_id("governance"))
+    envelope_id: str
+    writer_agent_id: str
+    recipient_agent_id: str
+    verdict: GovernanceVerdict
+    recipient_applicability: RecipientApplicability
+    promoted_scope: ExperienceScopeCandidate | None = None
+    scope_pollution_detected: bool = False
+    conflict_receipt_required: bool = False
+    winning_authority: ApplicableAuthority | None = None
+    losing_authority: ApplicableAuthority | None = None
+    conflict_agent_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "governance_receipt_id": self.governance_receipt_id,
+            "envelope_id": self.envelope_id,
+            "writer_agent_id": self.writer_agent_id,
+            "recipient_agent_id": self.recipient_agent_id,
+            "verdict": self.verdict,
+            "recipient_applicability": self.recipient_applicability,
+            "promoted_scope": self.promoted_scope,
+            "scope_pollution_detected": self.scope_pollution_detected,
+            "conflict_receipt_required": self.conflict_receipt_required,
+            "winning_authority": self.winning_authority,
+            "losing_authority": self.losing_authority,
+            "conflict_agent_ids": self.conflict_agent_ids,
             "evidence_ids": self.evidence_ids,
         }
 

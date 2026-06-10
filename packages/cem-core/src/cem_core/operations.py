@@ -1186,16 +1186,16 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS v1 product lock is accepted; AMS V2 Phase 7 supersession and active forgetting are complete for invariants, reversals, and owner override events"
+            "AMS v1 product lock is accepted; AMS V2 Phase 8 multi-agent experience governance is complete for writer identity, authority, visibility, ownership, scope-pollution prevention, and conflict receipts"
         ),
-        current_phase="AMS V2 Phase 8 - Multi-agent experience governance",
+        current_phase="AMS V2 Phase 9 - V2 eval harness",
         status="active",
         next_step=(
-            "implement V2 writer identity, cross-agent authority model, visibility and ownership constraints, and conflict receipts"
+            "implement V2 NonRepeatEval, FalseBlockEval, ApprovedExperimentEval, SkillTransferEval, SupersessionEval, MultiAgentConflictEval, and ContextPollutionEval"
         ),
         ready_for_next_phase=False,
         open_followups=[
-            "V2 Phase 8 multi-agent governance implementation is pending",
+            "V2 Phase 9 eval harness implementation is pending",
             "V2 dashboard/operator proof remains pending until Phase 10",
         ],
     )

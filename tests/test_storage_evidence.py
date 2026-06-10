@@ -10,9 +10,11 @@ from cem_core.models import (
     ExperienceGraphRecord,
     ReasoningControlReceipt,
     RuntimeInterceptionBoundary,
+    SharedExperienceEnvelope,
     SituationMatch,
     SkillCandidate,
     SupersessionEvent,
+    MultiAgentGovernanceReceipt,
     VerificationProbe,
     VerificationResult,
 )
@@ -234,6 +236,49 @@ def test_supersession_event_roundtrip_in_both_backends(tmp_path):
 
         assert store.get_supersession_event(event.supersession_id) == event
         assert store.list_supersession_events() == [event]
+
+
+def test_shared_experience_governance_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        invariant = BehaviorInvariant(
+            source_attribution_id="attribution_1",
+            source_record_id="experience_1",
+            authority="owner_instruction",
+            scope="global_agent_behavior",
+            trigger="equivalent situation match",
+            forbidden_repeat="scope general behavior failure as project-specific",
+            corrected_action="route to codex-harness",
+            enforcement="steer_or_block",
+            evidence_ids=["attribution_1"],
+        )
+        envelope = SharedExperienceEnvelope(
+            writer_agent_id="codex",
+            recipient_agent_id="cursor-agent",
+            experience=invariant,
+            writer_authority="owner_instruction",
+            visibility="all_agents",
+            ownership="owner",
+            requested_scope="global_agent_behavior",
+            provenance_ids=["directive_owner"],
+        )
+        receipt = MultiAgentGovernanceReceipt(
+            envelope_id=envelope.envelope_id,
+            writer_agent_id="codex",
+            recipient_agent_id="cursor-agent",
+            verdict="accept",
+            recipient_applicability="applicable",
+            promoted_scope="global_agent_behavior",
+            reason="accepted",
+            evidence_ids=[envelope.envelope_id],
+        )
+
+        store.save_shared_experience_envelope(envelope)
+        store.save_multi_agent_governance_receipt(receipt)
+
+        assert store.get_shared_experience_envelope(envelope.envelope_id) == envelope
+        assert store.list_shared_experience_envelopes() == [envelope]
+        assert store.get_multi_agent_governance_receipt(receipt.governance_receipt_id) == receipt
+        assert store.list_multi_agent_governance_receipts() == [receipt]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):

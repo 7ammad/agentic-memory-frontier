@@ -16,9 +16,11 @@ from .models import (
     ExperienceGraphRecord,
     ReasoningControlReceipt,
     RuntimeInterceptionBoundary,
+    SharedExperienceEnvelope,
     SituationMatch,
     SkillCandidate,
     SupersessionEvent,
+    MultiAgentGovernanceReceipt,
     ValidationDecision,
     ValidationResult,
     VerificationProbe,
@@ -76,6 +78,12 @@ class CEMStore(Protocol):
     def save_supersession_event(self, event: SupersessionEvent) -> None: ...
     def get_supersession_event(self, supersession_id: str) -> SupersessionEvent: ...
     def list_supersession_events(self) -> list[SupersessionEvent]: ...
+    def save_shared_experience_envelope(self, envelope: SharedExperienceEnvelope) -> None: ...
+    def get_shared_experience_envelope(self, envelope_id: str) -> SharedExperienceEnvelope: ...
+    def list_shared_experience_envelopes(self) -> list[SharedExperienceEnvelope]: ...
+    def save_multi_agent_governance_receipt(self, receipt: MultiAgentGovernanceReceipt) -> None: ...
+    def get_multi_agent_governance_receipt(self, receipt_id: str) -> MultiAgentGovernanceReceipt: ...
+    def list_multi_agent_governance_receipts(self) -> list[MultiAgentGovernanceReceipt]: ...
 
 
 class SQLiteStore:
@@ -200,6 +208,21 @@ class SQLiteStore:
                     target_id TEXT NOT NULL,
                     target_type TEXT NOT NULL,
                     source TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS shared_experience_envelopes (
+                    envelope_id TEXT PRIMARY KEY,
+                    writer_agent_id TEXT NOT NULL,
+                    recipient_agent_id TEXT NOT NULL,
+                    writer_authority TEXT NOT NULL,
+                    requested_scope TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS multi_agent_governance_receipts (
+                    governance_receipt_id TEXT PRIMARY KEY,
+                    envelope_id TEXT NOT NULL,
+                    verdict TEXT NOT NULL,
+                    recipient_applicability TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -658,6 +681,71 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM supersession_events ORDER BY rowid").fetchall()
         return [SupersessionEvent.model_validate_json(row[0]) for row in rows]
 
+    def save_shared_experience_envelope(self, envelope: SharedExperienceEnvelope) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO shared_experience_envelopes(
+                    envelope_id, writer_agent_id, recipient_agent_id, writer_authority, requested_scope, payload
+                ) VALUES(?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    envelope.envelope_id,
+                    envelope.writer_agent_id,
+                    envelope.recipient_agent_id,
+                    envelope.writer_authority,
+                    envelope.requested_scope,
+                    envelope.model_dump_json(),
+                ),
+            )
+
+    def get_shared_experience_envelope(self, envelope_id: str) -> SharedExperienceEnvelope:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM shared_experience_envelopes WHERE envelope_id = ?",
+                (envelope_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Shared experience envelope not found: {envelope_id}")
+        return SharedExperienceEnvelope.model_validate_json(row[0])
+
+    def list_shared_experience_envelopes(self) -> list[SharedExperienceEnvelope]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM shared_experience_envelopes ORDER BY rowid").fetchall()
+        return [SharedExperienceEnvelope.model_validate_json(row[0]) for row in rows]
+
+    def save_multi_agent_governance_receipt(self, receipt: MultiAgentGovernanceReceipt) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO multi_agent_governance_receipts(
+                    governance_receipt_id, envelope_id, verdict, recipient_applicability, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    receipt.governance_receipt_id,
+                    receipt.envelope_id,
+                    receipt.verdict,
+                    receipt.recipient_applicability,
+                    receipt.model_dump_json(),
+                ),
+            )
+
+    def get_multi_agent_governance_receipt(self, receipt_id: str) -> MultiAgentGovernanceReceipt:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM multi_agent_governance_receipts WHERE governance_receipt_id = ?",
+                (receipt_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Multi-agent governance receipt not found: {receipt_id}")
+        return MultiAgentGovernanceReceipt.model_validate_json(row[0])
+
+    def list_multi_agent_governance_receipts(self) -> list[MultiAgentGovernanceReceipt]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM multi_agent_governance_receipts ORDER BY rowid").fetchall()
+        return [MultiAgentGovernanceReceipt.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -681,6 +769,8 @@ class InMemoryStore:
         self._runtime_interception_boundaries: dict[str, str] = {}
         self._reasoning_control_receipts: dict[str, str] = {}
         self._supersession_events: dict[str, str] = {}
+        self._shared_experience_envelopes: dict[str, str] = {}
+        self._multi_agent_governance_receipts: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -915,4 +1005,34 @@ class InMemoryStore:
         return [
             SupersessionEvent.model_validate_json(payload)
             for payload in self._supersession_events.values()
+        ]
+
+    def save_shared_experience_envelope(self, envelope: SharedExperienceEnvelope) -> None:
+        self._shared_experience_envelopes[envelope.envelope_id] = envelope.model_dump_json()
+
+    def get_shared_experience_envelope(self, envelope_id: str) -> SharedExperienceEnvelope:
+        payload = self._shared_experience_envelopes.get(envelope_id)
+        if payload is None:
+            raise KeyError(f"Shared experience envelope not found: {envelope_id}")
+        return SharedExperienceEnvelope.model_validate_json(payload)
+
+    def list_shared_experience_envelopes(self) -> list[SharedExperienceEnvelope]:
+        return [
+            SharedExperienceEnvelope.model_validate_json(payload)
+            for payload in self._shared_experience_envelopes.values()
+        ]
+
+    def save_multi_agent_governance_receipt(self, receipt: MultiAgentGovernanceReceipt) -> None:
+        self._multi_agent_governance_receipts[receipt.governance_receipt_id] = receipt.model_dump_json()
+
+    def get_multi_agent_governance_receipt(self, receipt_id: str) -> MultiAgentGovernanceReceipt:
+        payload = self._multi_agent_governance_receipts.get(receipt_id)
+        if payload is None:
+            raise KeyError(f"Multi-agent governance receipt not found: {receipt_id}")
+        return MultiAgentGovernanceReceipt.model_validate_json(payload)
+
+    def list_multi_agent_governance_receipts(self) -> list[MultiAgentGovernanceReceipt]:
+        return [
+            MultiAgentGovernanceReceipt.model_validate_json(payload)
+            for payload in self._multi_agent_governance_receipts.values()
         ]
