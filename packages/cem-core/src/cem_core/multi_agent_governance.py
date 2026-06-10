@@ -43,6 +43,18 @@ class MultiAgentGovernanceLayer:
                 reason=visibility_block,
             )
 
+        authority_block = _authority_blocks(envelope)
+        if authority_block is not None:
+            return _receipt(
+                envelope,
+                verdict="reject",
+                recipient_applicability="not_applicable",
+                promoted_scope=None,
+                scope_pollution_detected=True,
+                conflict_receipt_required=True,
+                reason=authority_block,
+            )
+
         pollution_reason = _scope_pollution_reason(envelope)
         if pollution_reason is not None:
             return _receipt(
@@ -87,6 +99,14 @@ def _visibility_blocks(envelope: SharedExperienceEnvelope) -> str | None:
         return "visibility constraint blocks private experience from cross-agent sharing"
     if envelope.ownership == "source_agent" and envelope.visibility == "private":
         return "ownership and visibility constrain recipient applicability"
+    return None
+
+
+def _authority_blocks(envelope: SharedExperienceEnvelope) -> str | None:
+    if envelope.requested_scope != "global_agent_behavior":
+        return None
+    if envelope.writer_authority in {"unknown", "logic"}:
+        return "context pollution: low-authority experience cannot become enforceable action control"
     return None
 
 

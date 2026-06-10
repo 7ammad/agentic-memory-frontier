@@ -114,7 +114,7 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
       invariants and skills through authority-ranked supersession.
 - [x] Phase 8 - Multi-agent experience governance: share governed experience
       across agents without scope pollution.
-- [ ] Phase 9 - V2 eval harness: run non-repeat, false-block,
+- [x] Phase 9 - V2 eval harness: run non-repeat, false-block,
       approved-experiment, skill-transfer, supersession, multi-agent conflict,
       and context-pollution evals.
 - [ ] Phase 10 - Operator proof and release lock: fresh-root V2 operator proof,

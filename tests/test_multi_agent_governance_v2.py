@@ -118,6 +118,26 @@ def test_conflicting_cross_agent_claim_surfaces_authority_ranked_receipt():
     assert incoming.writer_agent_id in receipt.conflict_agent_ids
 
 
+def test_low_authority_context_cannot_become_global_action_control():
+    envelope = SharedExperienceEnvelope(
+        writer_agent_id="untrusted-memory",
+        recipient_agent_id="codex",
+        experience=_invariant(scope="global_agent_behavior", authority="unknown"),
+        writer_authority="unknown",
+        visibility="all_agents",
+        ownership="shared",
+        requested_scope="global_agent_behavior",
+        provenance_ids=["untrusted_context_chunk"],
+    )
+
+    receipt = MultiAgentGovernanceLayer().evaluate(envelope)
+
+    assert receipt.verdict == "reject"
+    assert receipt.recipient_applicability == "not_applicable"
+    assert receipt.scope_pollution_detected is True
+    assert "low-authority" in receipt.reason
+
+
 def test_cem_govern_shared_experience_persists_envelope_and_receipt():
     store = InMemoryStore()
     cem = CEM(store=store)

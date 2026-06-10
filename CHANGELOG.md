@@ -49,6 +49,10 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `MultiAgentGovernanceLayer`, `CEM.govern_shared_experience()`, governance
   persistence, writer identity, cross-agent authority ranking, visibility and
   ownership constraints, scope-pollution rejection, and conflict receipts.
+- Added AMS V2 Phase 9 eval harness:
+  `V2EvalHarnessReport`, `V2EvalSuiteRow`, `V2EvalCaseResult`,
+  `run_v2_eval_harness()`, exported V2 eval constants, and
+  `scripts/run_ams_v2_eval.py` for the one-command Phase 9 acceptance battery.
 
 ### Changed
 
@@ -61,12 +65,16 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   supersession, multi-agent governance, and the V2 eval battery.
 - Updated monitor/dashboard phase status so AMS V2 Phase 9 is the active rail
   after Phase 8 multi-agent experience governance.
+- Tightened multi-agent governance so low-authority context claims with
+  `unknown` or pure `logic` authority cannot become enforceable global action
+  control.
+- Updated monitor/dashboard phase status so AMS V2 Phase 10 is the active rail
+  after the Phase 9 eval harness.
 
 ### Next
 
-- Start AMS V2 Phase 9: NonRepeatEval, FalseBlockEval,
-  ApprovedExperimentEval, SkillTransferEval, SupersessionEval,
-  MultiAgentConflictEval, and ContextPollutionEval.
+- Start AMS V2 Phase 10: one-command V2 operator proof, dashboard/monitor
+  release status, audit docs, review prompts, and product-lock update.
 
 ### Verified
 
@@ -246,6 +254,29 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   `AMS V2 Phase 9 - V2 eval harness`.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 8 multi-agent governance completion and Phase 9 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 9 next step.
+- `git diff --check` passed with only expected Windows CRLF warnings.
+- Phase 9 red proof:
+  `python -m pytest tests/test_v2_eval_harness.py -q` failed before
+  implementation because `cem_eval.v2_eval_harness` did not exist.
+- Phase 9 focused checks:
+  `python -m pytest tests/test_v2_eval_harness.py -q` -> passed.
+- Governance/context-pollution checks:
+  `python -m pytest tests/test_multi_agent_governance_v2.py tests/test_v2_eval_harness.py -q`
+  -> passed.
+- Phase 9 command receipt:
+  `python scripts/run_ams_v2_eval.py --root tmp\ams-v2-eval-phase9-smoke`
+  -> `AMS_V2_EVAL_PASS: 13/13 cases passed; false_blocks=0/0`.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-eval/src/cem_eval packages/cem-core/src/cem_core scripts/run_ams_v2_eval.py`
+  -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 10 - Operator proof and release lock`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 9 eval harness completion and Phase 10 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 10 next step.
 - `git diff --check` passed with only expected Windows CRLF warnings.
 
 ## 2026-06-09

@@ -523,6 +523,59 @@ Entry format:
   ApprovedExperimentEval, SkillTransferEval, SupersessionEval,
   MultiAgentConflictEval, and ContextPollutionEval.
 
+## LEDGER-20260610-011 - AMS V2 Phase 9 eval harness completed
+
+- Date: 2026-06-10
+- Type: implementation / verification
+- Status: resolved
+- Source: TODO AMS V2 Phase 9, V2 acceptance contract seed corpus, and blocking
+  acceptance battery.
+- Summary: Completed V2 Phase 9. Added `V2EvalHarnessReport`,
+  `V2EvalSuiteRow`, `V2EvalCaseResult`, `run_v2_eval_harness()`, exported V2
+  eval constants, and `scripts/run_ams_v2_eval.py`. The harness runs the seven
+  named Phase 9 suites: NonRepeatEval, FalseBlockEval,
+  ApprovedExperimentEval, SkillTransferEval, SupersessionEval,
+  MultiAgentConflictEval, and ContextPollutionEval. The report covers all
+  V2-SEED-001 through V2-SEED-013 acceptance ids, requires compact receipt ids,
+  reports a zero false-block budget, and returns a single pass/fail verdict.
+  Multi-agent governance was tightened so low-authority `unknown` or pure
+  `logic` context claims cannot become enforceable global action-control rules.
+- Files:
+  - `packages/cem-eval/src/cem_eval/v2_eval_harness.py`
+  - `packages/cem-eval/src/cem_eval/__init__.py`
+  - `scripts/run_ams_v2_eval.py`
+  - `packages/cem-core/src/cem_core/multi_agent_governance.py`
+  - `packages/cem-core/src/cem_core/operations.py`
+  - `tests/test_v2_eval_harness.py`
+  - `tests/test_multi_agent_governance_v2.py`
+  - `tests/test_ams_cli.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `AGENTS.md`
+- Verification: Red proof:
+  `python -m pytest tests/test_v2_eval_harness.py -q` failed because
+  `cem_eval.v2_eval_harness` did not exist. Green proof:
+  `python -m pytest tests/test_v2_eval_harness.py -q` -> **passed**.
+  Governance/context-pollution checks
+  `python -m pytest tests/test_multi_agent_governance_v2.py tests/test_v2_eval_harness.py -q`
+  -> **passed**. Phase 9 command receipt
+  `python scripts/run_ams_v2_eval.py --root tmp\ams-v2-eval-phase9-smoke`
+  -> **AMS_V2_EVAL_PASS**, 13/13 cases passed, false_blocks=0/0. Focused
+  phase-status regression
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> **passed**. Compile
+  `python -m compileall -q packages/cem-eval/src/cem_eval packages/cem-core/src/cem_core scripts/run_ams_v2_eval.py`
+  -> **passed**. Full suite
+  `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> **passed**. Live `python scripts/ams.py monitor --json` reports current
+  phase `AMS V2 Phase 10 - Operator proof and release lock`; live startup
+  brief for Phase 9 completion returns `status=allow` and the Phase 10 next
+  step. `git diff --check` -> clean with expected Windows CRLF warnings.
+- Follow-up: Start V2 Phase 10: implement one-command V2 operator proof,
+  dashboard/monitor V2 release status, audit docs, review prompts, and
+  product-lock update.
+
 ## LEDGER-20260528-001 - Canonical changelog and ledger added
 
 - Date: 2026-05-28

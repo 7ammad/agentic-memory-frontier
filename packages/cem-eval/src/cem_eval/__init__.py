@@ -74,6 +74,14 @@ from .synthetic_corruption import (
     run_synthetic_corruption_eval,
     workflow_report_row_from_run,
 )
+from .v2_eval_harness import (
+    V2_ACCEPTANCE_BATTERY_IDS,
+    V2_EVAL_SUITE_NAMES,
+    V2EvalCaseResult,
+    V2EvalHarnessReport,
+    V2EvalSuiteRow,
+    run_v2_eval_harness,
+)
 from .vertical_loop import VerticalLoopReport, run_vertical_loop
 from .workflow_gotchas import (
     WorkflowGotchaAttempt,
@@ -111,6 +119,11 @@ __all__ = [
     "SyntheticEvalReport",
     "SyntheticEvalResult",
     "VerticalLoopReport",
+    "V2_ACCEPTANCE_BATTERY_IDS",
+    "V2_EVAL_SUITE_NAMES",
+    "V2EvalCaseResult",
+    "V2EvalHarnessReport",
+    "V2EvalSuiteRow",
     "WorkflowGotchaAttempt",
     "WorkflowGotchaDemoResult",
     "WorkflowReportRow",
@@ -134,6 +147,7 @@ __all__ = [
     "run_memoryarena_cem0_eval",
     "run_memoryarena_cem0_eval_from_dataset",
     "run_synthetic_corruption_eval",
+    "run_v2_eval_harness",
     "run_vertical_loop",
     "run_workflow_gotcha_demo",
     "score_halumem_extraction",
