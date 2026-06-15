@@ -1,7 +1,8 @@
 # AMS Product Lock
 
 Date locked: 2026-05-31
-Status: canonical product acceptance lock; AMS v1 accepted on 2026-06-01
+Status: canonical product acceptance lock; AMS v1 accepted on 2026-06-01; AMS
+V2 accepted on 2026-06-10
 
 ## Product Line
 
@@ -205,6 +206,93 @@ Remaining AMS v1 gaps:
 
 - Nothing for AMS v1. Post-v1 work must be opened as a new named phase, not as a
   surprise continuation of this acceptance lock.
+
+Post-v1 phase opened:
+
+- AMS V2: Experience Enforcement Architecture.
+- Canonical plan: `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`.
+- Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
+- Scope lock: V2 is the full experience enforcement build. The non-repeat
+  enforcement kernel is included inside V2; it is not a V1.5 downgrade or
+  smaller substitute.
+- Status: accepted after the V2 terminal operator proof.
+
+Post-V2 phase opened:
+
+- External Benchmark Final Build.
+- Status: active as of 2026-06-15.
+- Scope: repair the real public benchmark zero-output finding by adding a
+  natural-language extraction lane, answer synthesis, zero-output gates, local
+  proxy metric labeling, and official evaluator provenance.
+- Boundary: AMS V2 governance remains accepted. Internal synthetic/V2 greens
+  prove governance-layer behavior, not official natural-language benchmark
+  performance. Official HaluMem, MemoryArena, and LongMemEval-V2 scores require
+  the released evaluator runtimes plus any required model/service credentials.
+
+## AMS V2 Acceptance Lock
+
+AMS V2 is accepted because the complete local experience-enforcement path has
+repo evidence:
+
+1. Consequential actions are captured as decision intents with authority,
+   approval/experiment state, runtime surface, expected outcome, and evidence.
+2. Outcomes are attributed as mistake, approved experiment failure, acceptable
+   tradeoff, success, or unresolved.
+3. Confirmed mistakes compile into behavior invariants; confirmed successes
+   compile into procedural skill candidates.
+4. Situation matching catches exact and paraphrased repeats while suppressing
+   valid neighbors and owner-approved changed contexts.
+5. Policy binding decides allow, steer, block, override, or degraded allow
+   before downstream action selection.
+6. Reasoning control keeps silent steering under the hood, makes blocks
+   visible, and requires explicit authority for downgrades.
+7. Supersession retires or restores stale/wrong invariants with audit events.
+8. Multi-agent governance preserves writer identity, authority, visibility,
+   ownership, provenance, and scope; low-authority or project-specific
+   experience cannot silently become global action control.
+9. The V2 eval harness passes all seed cases with zero false blocks.
+10. The fresh-root V2 operator proof composes the accepted v1 operator path with
+    the V2 eval harness and verifies final monitor/dashboard status.
+
+V2 terminal proof command:
+
+```powershell
+python scripts/run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final
+```
+
+Terminal proof result must include:
+
+```text
+AMS_V2_OPERATOR_PROOF_PASS
+v2_eval=PASS 13/13 false_blocks=0/0
+phase=AMS V2 Accepted ready=True
+```
+
+## AMS Agent Onboarding V2 Lock
+
+AMS Agent Onboarding V2 is the named post-V2 product layer for registering
+other agents as governed AMS participants.
+
+Acceptance contract:
+`docs/2026-06-11-ams-agent-onboarding-v2-contract.md`.
+
+Accepted local roster:
+
+- `codex`
+- `hermes`
+- `hessa`
+- `claude-code-cursor`
+- `cursor-agent`
+- `openclaw` as parked but counted
+
+Rejected stale topology:
+
+- `superbrembo` is not an active agent and must not be revived by default.
+
+AMS Agent Onboarding V2 is accepted only when agent identity, runtime surface,
+operational status, owner scope, capability contracts, AMS memory-lane
+commands, harness contracts, runtime checks, visibility/ownership, trust policy,
+persistence, CLI, MCP, and stale-roster rejection are implemented and tested.
 
 ## Planning Order
 

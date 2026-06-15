@@ -146,10 +146,11 @@ def test_resume_correction_refuses_clear_gate_phantom_receipt(tmp_path):
 
 def test_monitor0_bridge_hook_block_then_resume(tmp_path):
     # Single source of truth: the live hook and the manual CLI / session-start gate
-    # share ONE gate. A hook BLOCK must fail Monitor-0 exactly as a manual capture does.
+    # share ONE gate. Monitor-0 reports the armed gate without turning an
+    # intentional runtime-control block into degraded AMS infrastructure health.
     decision = hook_on_user_prompt_submit(tmp_path, BLOCKING_PROMPT)
     run = operations.run_monitor(tmp_path, deep=False)
-    assert _check_status(run, "correction_resume_gate_clear") == "fail"
+    assert _check_status(run, "correction_resume_gate_clear") == "pass"
     resume_correction(tmp_path, decision.event_id, approved_by="Hammad")
     run2 = operations.run_monitor(tmp_path, deep=False)
     assert _check_status(run2, "correction_resume_gate_clear") == "pass"

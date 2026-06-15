@@ -29,7 +29,7 @@ def test_external_benchmark_report_combines_runner_outputs(tmp_path):
     )
     markdown = render_external_benchmark_report_markdown(report)
 
-    assert report.suite_name == "cem0_external_benchmarks"
+    assert report.suite_name == "cem0_external_benchmarks_local_proxy"
     assert report.suite_count == 3
     assert report.total_proposed_count == 8
     assert report.total_trusted_count == 4
@@ -39,14 +39,14 @@ def test_external_benchmark_report_combines_runner_outputs(tmp_path):
         "memoryarena_cem0",
         "longmemeval_v2_cem0",
     ]
-    assert report.rows[0].primary_metric_name == "trusted_extraction_f1"
+    assert report.rows[0].primary_metric_name == "local_proxy_trusted_extraction_f1"
     assert round(report.rows[0].primary_metric_value, 3) == 0.8
     assert report.rows[1].primary_metric_value == 1.0
     assert report.rows[2].secondary_metrics["haystack_member_precision"] == 1.0
     assert report.rows[0].decision_reason_counts["assistant_hypothesis"] == 1
     assert report.rows[1].decision_reason_counts["assistant_hypothesis"] == 1
     assert report.rows[2].decision_reason_counts["assistant_hypothesis"] == 1
-    assert "| halumem_cem0 | 2 sessions | 4 | 2 | 1 | 2 | trusted_extraction_f1 | 0.8 |" in markdown
+    assert "| halumem_cem0 | local_proxy | 2 sessions | 4 | 2 | 1 | 2 | local_proxy_trusted_extraction_f1 | 0.8 |" in markdown
     assert "### longmemeval_v2_cem0" in markdown
 
 
@@ -76,7 +76,23 @@ def test_external_benchmark_report_loads_runner_json_outputs(tmp_path):
 
     assert report.suite_count == 3
     assert report.total_proposed_count == 8
-    assert report.rows[2].primary_metric_name == "exact_match_accuracy"
+    assert report.rows[2].primary_metric_name == "local_proxy_exact_match_accuracy"
+
+
+def test_external_benchmark_report_loads_windows_utf8_bom_runner_json(tmp_path):
+    halumem = run_halumem_cem0_eval(_write_halumem_fixture(tmp_path), tmp_path / "halumem-cem")
+    halumem_result = tmp_path / "halumem-result.json"
+    halumem_result.write_text(
+        json.dumps({"result": halumem.model_dump()}),
+        encoding="utf-8-sig",
+    )
+
+    report = build_external_benchmark_report_from_json_files(
+        halumem_result_path=halumem_result,
+    )
+
+    assert report.suite_count == 1
+    assert report.rows[0].suite_name == "halumem_cem0"
 
 
 def _write_halumem_fixture(tmp_path):

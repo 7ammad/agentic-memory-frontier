@@ -2,6 +2,8 @@ from cem_core.models import (
     ActionBriefRecord,
     ActionInfluenceEvent,
     ConfidenceInterval,
+    DecisionIntent,
+    ExperienceGraphRecord,
     VerificationProbe,
     VerificationResult,
 )
@@ -118,3 +120,85 @@ def test_old_shape_card_json_loads_with_defaults():
     card = ExperienceCard.model_validate_json(legacy)
     assert card.promotion_status == "candidate"
     assert card.measured_lift is None
+
+
+def test_v2_decision_intent_requires_attribution_fields():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        DecisionIntent(
+            agent_id="codex",
+            session_id="session_1",
+            proposed_action="answer from memory",
+            action_kind="message",
+            expected_outcome="answer respects owner correction",
+            applicable_authority="owner_instruction",
+            approval_state="not_required",
+            experiment_state="not_experiment",
+            evidence_ids=["directive_1"],
+        )
+
+    intent = DecisionIntent(
+        agent_id="codex",
+        session_id="session_1",
+        task_id="task_1",
+        proposed_action="route correction to codex-harness",
+        action_kind="decision",
+        expected_outcome="general behavior correction is not scoped to one project",
+        applicable_authority="owner_instruction",
+        authority_refs=["directive_808f20ac409845ac8d111e10ffe5ad0e"],
+        approval_state="not_required",
+        experiment_state="not_experiment",
+        runtime_surface="codex-desktop",
+        evidence_ids=["directive_808f20ac409845ac8d111e10ffe5ad0e"],
+    )
+
+    assert intent.decision_id.startswith("decision_")
+    assert intent.runtime_surface == "codex-desktop"
+    assert intent.authority_refs == ["directive_808f20ac409845ac8d111e10ffe5ad0e"]
+    assert DecisionIntent.model_validate_json(intent.model_dump_json()) == intent
+
+
+def test_v2_experience_graph_record_audit_summary_excludes_raw_reasoning():
+    intent = DecisionIntent(
+        agent_id="codex",
+        session_id="session_1",
+        task_id="task_1",
+        proposed_action="route correction to codex-harness",
+        action_kind="decision",
+        expected_outcome="general behavior correction is not scoped to one project",
+        applicable_authority="owner_instruction",
+        authority_refs=["directive_808f20ac409845ac8d111e10ffe5ad0e"],
+        approval_state="not_required",
+        experiment_state="not_experiment",
+        runtime_surface="codex-desktop",
+        evidence_ids=["directive_808f20ac409845ac8d111e10ffe5ad0e"],
+    )
+
+    record = ExperienceGraphRecord(
+        decision=intent,
+        actual_outcome="correction routed to codex-harness/AMS control-plane",
+        outcome_status="success",
+        scope_candidate="global_agent_behavior",
+        outcome_evidence_ids=["card_6808594fdd8a484bac8de52cb45865d9"],
+    )
+
+    audit = record.audit_summary()
+
+    assert record.record_id.startswith("experience_")
+    assert audit == {
+        "record_id": record.record_id,
+        "decision_id": intent.decision_id,
+        "agent_id": "codex",
+        "task_id": "task_1",
+        "applicable_authority": "owner_instruction",
+        "scope_candidate": "global_agent_behavior",
+        "outcome_status": "success",
+        "evidence_ids": [
+            "directive_808f20ac409845ac8d111e10ffe5ad0e",
+            "card_6808594fdd8a484bac8de52cb45865d9",
+        ],
+    }
+    assert "reasoning" not in audit
+    assert ExperienceGraphRecord.model_validate_json(record.model_dump_json()) == record

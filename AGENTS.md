@@ -12,10 +12,12 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 
 - Product line: **AMS**.
 - Canonical acceptance lock: `PRODUCT-LOCK.md`.
-- Current phase: **AMS v1 Accepted**.
-- Current status: complete for AMS v1.
-- Current next gap: none for AMS v1. Future work must be opened as a named post-v1 phase or a regression fix.
+- Current phase: **AMS V2 - Experience Enforcement Architecture**.
+- Current status: AMS v1 accepted; AMS V2 accepted after fresh-root V2 operator proof, V2 eval harness, audit docs, review prompts, and product-lock update.
+- Current next gap: none for AMS V2. Future work must be opened as a named post-V2 phase or a regression fix.
 - Current live rails: `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`.
+- V2 plan: `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`.
+- V2 acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
 
 ## Historical Design State (2026-05-26)
 
@@ -25,11 +27,11 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 - **D** ACS protocol design (A2A v1.0-compatible relay topology, signed envelopes, 5-message vocab, Jeffreys×Codex escalation, replay protection, 3 phases, 10-test acceptance battery) — DONE + VERIFIED (4 codex passes, 11 patches, READY)
 
 **Historical design state:** all 4 sub-projects were design-complete on 2026-05-26.
-**Current runtime state:** AMS v1 is accepted. `PRODUCT-LOCK.md` is the canonical acceptance lock; the live rails are `TODO.md`, `CLAUDE.md`, `CHANGELOG.md`, and `docs/PROJECT-LEDGER.md`. Terminal proof: `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final` passes fresh-root setup, primary AMS memory surface reconciliation, startup brief, maintenance review, Monitor-0 deep, audit, governed-run close, and Phase 4 frontier eval.
+**Current runtime state:** AMS v1 is accepted and AMS V2 is the active post-v1 rail. `PRODUCT-LOCK.md` is the canonical acceptance lock; the V2 plan and acceptance contract define the current build. Terminal v1 proof: `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final` passes fresh-root setup, primary AMS memory surface reconciliation, startup brief, maintenance review, Monitor-0 deep, audit, governed-run close, and Phase 4 frontier eval.
 
 ## To continue right now
 
-1. Run session-start hard gate before any implementation command: `powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1`. If it fails, stop and fix memory wiring first.
+1. Run session-start hard gate before any implementation command: `powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1`. If it fails, stop and fix memory wiring first. If Hermes Desktop was repaired, updated, or put its venv first on PATH, run `powershell -ExecutionPolicy Bypass -File scripts/ams-env-doctor.ps1`; AMS must use the repo workspace interpreter, not Hermes' ambient Python.
 2. Load project memories: `memory_search({query: "agentic memory system state", scope: "project:agentic-memory-system", limit: 10, mode: "hybrid"})` — returns the canonical state entry [mem_343df0ac, updated to reflect all 4 done] plus the rest. Don't rely on `memory_load_session` alone — verified in cold-start that it can return cross-scope results.
 3. Decide next phase. Options:
    - **Implement** in dependency order: SC v0.3 Phase 1 → Codex memory C Phase 0+1 → ACS D Phase 1. Each phase has its own acceptance battery in the spec.

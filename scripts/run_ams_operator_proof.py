@@ -37,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip the Phase 4 frontier eval rerun. Intended only for focused script tests.",
     )
+    parser.add_argument(
+        "--frontier-root",
+        type=Path,
+        default=None,
+        help="Directory for the Phase 4 frontier eval storage. Defaults to the eval script temp root.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable proof JSON.")
     args = parser.parse_args(argv)
 
@@ -119,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
 
         frontier_eval: dict[str, Any] | None = None
         if not args.skip_frontier_eval:
-            frontier_eval = _phase4(env, commands)
+            frontier_eval = _phase4(env, commands, root=args.frontier_root)
 
         proof = {
             "status": "pass",
@@ -218,8 +224,10 @@ def _ams(env: dict[str, str], root: Path, commands: list[dict[str, Any]], *args:
         raise RuntimeError(f"{record['name']} did not emit JSON: {process.stdout}") from exc
 
 
-def _phase4(env: dict[str, str], commands: list[dict[str, Any]]) -> dict[str, Any]:
+def _phase4(env: dict[str, str], commands: list[dict[str, Any]], *, root: Path | None = None) -> dict[str, Any]:
     command = [sys.executable, str(PHASE4)]
+    if root is not None:
+        command.extend(["--root", str(root)])
     process = subprocess.run(
         command,
         cwd=REPO_ROOT,

@@ -68,6 +68,483 @@ class AgentTrace(StrictModel):
     environment: dict[str, JsonValue] = Field(default_factory=dict)
 
 
+ActionKind = Literal["message", "tool_use", "file_edit", "command", "external_send", "decision", "other"]
+ApplicableAuthority = Literal[
+    "owner_instruction",
+    "system_instruction",
+    "developer_instruction",
+    "project_docs",
+    "verified_experience",
+    "best_practice",
+    "current_evidence",
+    "logic",
+    "unknown",
+]
+ApprovalState = Literal["not_required", "owner_approved", "owner_rejected", "pending", "implicit", "unknown"]
+ExperimentState = Literal["not_experiment", "approved_experiment", "unapproved_experiment", "unknown"]
+ExperienceScopeCandidate = Literal[
+    "global_agent_behavior",
+    "agent",
+    "project",
+    "task",
+    "multi_agent",
+    "unknown",
+]
+AttributionClass = Literal[
+    "mistake",
+    "approved_experiment_failure",
+    "acceptable_tradeoff",
+    "success",
+    "unresolved",
+]
+
+
+class DecisionIntent(StrictModel):
+    decision_id: str = Field(default_factory=lambda: new_id("decision"))
+    trace_id: str | None = None
+    turn_id: str | None = None
+    agent_id: str
+    session_id: str
+    task_id: str | None = None
+    proposed_action: str = Field(min_length=1)
+    action_kind: ActionKind
+    expected_outcome: str = Field(min_length=1)
+    applicable_authority: ApplicableAuthority
+    authority_refs: list[str] = Field(default_factory=list)
+    approval_state: ApprovalState
+    experiment_state: ExperimentState
+    runtime_surface: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    captured_at: datetime = Field(default_factory=utc_now)
+
+
+class ExperienceGraphRecord(StrictModel):
+    record_id: str = Field(default_factory=lambda: new_id("experience"))
+    decision: DecisionIntent
+    actual_outcome: str | None = None
+    outcome_status: Literal["success", "failure", "partial", "unknown"] = "unknown"
+    scope_candidate: ExperienceScopeCandidate = "unknown"
+    outcome_evidence_ids: list[str] = Field(default_factory=list)
+    attribution_status: Literal["unattributed", "pending", "attributed"] = "pending"
+    inference_receipt_id: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        evidence_ids = [*self.decision.evidence_ids, *self.outcome_evidence_ids]
+        return {
+            "record_id": self.record_id,
+            "decision_id": self.decision.decision_id,
+            "agent_id": self.decision.agent_id,
+            "task_id": self.decision.task_id,
+            "applicable_authority": self.decision.applicable_authority,
+            "scope_candidate": self.scope_candidate,
+            "outcome_status": self.outcome_status,
+            "evidence_ids": evidence_ids,
+        }
+
+
+class ExperienceAttribution(StrictModel):
+    attribution_id: str = Field(default_factory=lambda: new_id("attribution"))
+    record_id: str
+    decision_id: str
+    attribution_class: AttributionClass
+    scope_candidate: ExperienceScopeCandidate
+    authority_basis: ApplicableAuthority
+    authority_refs: list[str] = Field(default_factory=list)
+    non_repeat_candidate: bool = False
+    invariant_candidate: bool = False
+    skill_candidate: bool = False
+    approved_experiment_exclusion: bool = False
+    needs_owner_review: bool = False
+    confidence: float = Field(ge=0.0, le=1.0)
+    receipt_summary: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "attribution_id": self.attribution_id,
+            "record_id": self.record_id,
+            "decision_id": self.decision_id,
+            "attribution_class": self.attribution_class,
+            "scope_candidate": self.scope_candidate,
+            "authority_basis": self.authority_basis,
+            "non_repeat_candidate": self.non_repeat_candidate,
+            "invariant_candidate": self.invariant_candidate,
+            "skill_candidate": self.skill_candidate,
+            "approved_experiment_exclusion": self.approved_experiment_exclusion,
+            "needs_owner_review": self.needs_owner_review,
+            "confidence": self.confidence,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+InvariantEnforcement = Literal["steer", "block", "steer_or_block"]
+SupersessionStatus = Literal["active", "superseded", "retired"]
+SkillPromotionStatus = Literal["candidate", "verified", "rejected"]
+SupersessionSource = Literal[
+    "current_owner_instruction",
+    "updated_authoritative_docs",
+    "higher_priority_verified_evidence",
+    "failed_replay_evidence",
+    "owner_approved_override",
+]
+SharedExperienceVisibility = Literal["private", "team", "all_agents"]
+SharedExperienceOwnership = Literal["source_agent", "owner", "shared"]
+GovernanceVerdict = Literal["accept", "reject", "conflict"]
+RecipientApplicability = Literal["applicable", "not_applicable", "needs_review"]
+AgentRuntimeSurface = Literal[
+    "codex_desktop",
+    "hermes_desktop",
+    "hessa",
+    "openclaw",
+    "claude_code_cursor",
+    "cursor_agent",
+    "custom",
+]
+AgentOperationalStatus = Literal["active", "available", "parked", "retired"]
+AgentTrustLevel = Literal["owner", "trusted", "team", "untrusted", "retired"]
+CapabilityRiskLevel = Literal["low", "medium", "high", "critical"]
+CapabilityVerificationStatus = Literal["declared", "smoke_tested", "verified", "disabled"]
+AgentOnboardingStatus = Literal["accepted", "needs_review", "rejected"]
+SituationSourceType = Literal["invariant", "skill"]
+SituationMatchType = Literal[
+    "exact_repeat",
+    "paraphrase_repeat",
+    "skill_transfer",
+    "valid_neighbor",
+    "no_match",
+]
+PolicyVerdict = Literal[
+    "allow",
+    "steer",
+    "warn",
+    "ask",
+    "block",
+    "override_allowed",
+    "degraded_allow",
+]
+BoundaryStatus = Literal["interceptable", "non_interceptable", "unknown"]
+AMSEffect = Literal["none", "changed_action", "blocked_action", "visible_intervention", "override"]
+
+
+class BehaviorInvariant(StrictModel):
+    invariant_id: str = Field(default_factory=lambda: new_id("invariant"))
+    source_attribution_id: str
+    source_record_id: str
+    authority: ApplicableAuthority
+    scope: ExperienceScopeCandidate
+    trigger: str = Field(min_length=1)
+    forbidden_repeat: str = Field(min_length=1)
+    corrected_action: str = Field(min_length=1)
+    enforcement: InvariantEnforcement
+    evidence_ids: list[str] = Field(min_length=1)
+    supersession_status: SupersessionStatus = "active"
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "invariant_id": self.invariant_id,
+            "source_attribution_id": self.source_attribution_id,
+            "source_record_id": self.source_record_id,
+            "authority": self.authority,
+            "scope": self.scope,
+            "enforcement": self.enforcement,
+            "evidence_ids": self.evidence_ids,
+            "supersession_status": self.supersession_status,
+        }
+
+
+class SkillCandidate(StrictModel):
+    skill_id: str = Field(default_factory=lambda: new_id("skill"))
+    source_attribution_id: str
+    source_record_id: str
+    transfer_scope: ExperienceScopeCandidate
+    preconditions: list[str] = Field(default_factory=list)
+    procedure: list[str] = Field(min_length=1)
+    expected_result: str = Field(min_length=1)
+    failure_boundaries: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(min_length=1)
+    when_not_to_apply: list[str] = Field(default_factory=list)
+    promotion_status: SkillPromotionStatus = "candidate"
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "skill_id": self.skill_id,
+            "source_attribution_id": self.source_attribution_id,
+            "source_record_id": self.source_record_id,
+            "transfer_scope": self.transfer_scope,
+            "promotion_status": self.promotion_status,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class SupersessionEvent(StrictModel):
+    supersession_id: str = Field(default_factory=lambda: new_id("supersession"))
+    target_id: str
+    target_type: Literal["invariant", "skill"]
+    source: SupersessionSource
+    reason: str = Field(min_length=1)
+    reversible: bool = True
+    reverses_supersession_id: str | None = None
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "supersession_id": self.supersession_id,
+            "target_id": self.target_id,
+            "target_type": self.target_type,
+            "source": self.source,
+            "reversible": self.reversible,
+            "reverses_supersession_id": self.reverses_supersession_id,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class SharedExperienceEnvelope(StrictModel):
+    envelope_id: str = Field(default_factory=lambda: new_id("sharedexp"))
+    writer_agent_id: str = Field(min_length=1)
+    recipient_agent_id: str = Field(min_length=1)
+    experience: BehaviorInvariant
+    writer_authority: ApplicableAuthority
+    visibility: SharedExperienceVisibility
+    ownership: SharedExperienceOwnership
+    requested_scope: ExperienceScopeCandidate
+    provenance_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class MultiAgentGovernanceReceipt(StrictModel):
+    governance_receipt_id: str = Field(default_factory=lambda: new_id("governance"))
+    envelope_id: str
+    writer_agent_id: str
+    recipient_agent_id: str
+    verdict: GovernanceVerdict
+    recipient_applicability: RecipientApplicability
+    promoted_scope: ExperienceScopeCandidate | None = None
+    scope_pollution_detected: bool = False
+    conflict_receipt_required: bool = False
+    winning_authority: ApplicableAuthority | None = None
+    losing_authority: ApplicableAuthority | None = None
+    conflict_agent_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "governance_receipt_id": self.governance_receipt_id,
+            "envelope_id": self.envelope_id,
+            "writer_agent_id": self.writer_agent_id,
+            "recipient_agent_id": self.recipient_agent_id,
+            "verdict": self.verdict,
+            "recipient_applicability": self.recipient_applicability,
+            "promoted_scope": self.promoted_scope,
+            "scope_pollution_detected": self.scope_pollution_detected,
+            "conflict_receipt_required": self.conflict_receipt_required,
+            "winning_authority": self.winning_authority,
+            "losing_authority": self.losing_authority,
+            "conflict_agent_ids": self.conflict_agent_ids,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class AgentCapabilityContract(StrictModel):
+    capability_id: str = Field(default_factory=lambda: new_id("capability"))
+    name: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    input_contracts: list[str] = Field(min_length=1)
+    output_contracts: list[str] = Field(min_length=1)
+    permissions: list[str] = Field(default_factory=list)
+    risk_level: CapabilityRiskLevel
+    verification_commands: list[str] = Field(min_length=1)
+    status: CapabilityVerificationStatus = "declared"
+    evidence_ids: list[str] = Field(min_length=1)
+
+
+class AgentMemoryContract(StrictModel):
+    memory_lane: Literal["ams_primary"] = "ams_primary"
+    startup_brief_command: str = Field(min_length=1)
+    action_brief_command: str = Field(min_length=1)
+    remember_command: str = Field(min_length=1)
+    correction_capture_command: str = Field(min_length=1)
+    default_domain: str = Field(min_length=1)
+    allowed_scopes: list[ExperienceScopeCandidate] = Field(min_length=1)
+    legacy_memory_policy: str = Field(min_length=1)
+    automation_prompt_prefix: str = Field(min_length=1)
+
+
+class AgentOnboardingTrustPolicy(StrictModel):
+    trusted_agent_ids: list[str] = Field(default_factory=list)
+    require_sender_matches_trace_agent: bool = True
+    default_visibility: SharedExperienceVisibility
+    ownership: SharedExperienceOwnership
+    allowed_shared_scopes: list[ExperienceScopeCandidate] = Field(min_length=1)
+
+
+class AgentOnboardingContract(StrictModel):
+    contract_id: str = Field(default_factory=lambda: new_id("agent_contract"))
+    agent_id: str = Field(min_length=1)
+    display_name: str = Field(min_length=1)
+    runtime_surface: AgentRuntimeSurface
+    operational_status: AgentOperationalStatus
+    trust_level: AgentTrustLevel
+    owner_scope: str = Field(min_length=1)
+    memory_contract: AgentMemoryContract
+    capability_contracts: list[AgentCapabilityContract] = Field(min_length=1)
+    harness_contracts: list[str] = Field(min_length=1)
+    runtime_checks: list[str] = Field(min_length=1)
+    shared_trace_enabled: bool = True
+    default_visibility: SharedExperienceVisibility
+    ownership: SharedExperienceOwnership
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "contract_id": self.contract_id,
+            "agent_id": self.agent_id,
+            "display_name": self.display_name,
+            "runtime_surface": self.runtime_surface,
+            "operational_status": self.operational_status,
+            "trust_level": self.trust_level,
+            "capability_count": len(self.capability_contracts),
+            "harness_contracts": self.harness_contracts,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class AgentOnboardingReceipt(StrictModel):
+    receipt_id: str = Field(default_factory=lambda: new_id("agent_onboarding"))
+    contract_id: str
+    agent_id: str
+    status: AgentOnboardingStatus
+    reason: str = Field(min_length=1)
+    runtime_surface: AgentRuntimeSurface
+    operational_status: AgentOperationalStatus
+    trust_policy: AgentOnboardingTrustPolicy | None = None
+    capability_ids: list[str] = Field(default_factory=list)
+    memory_lane_ready: bool = False
+    missing_requirements: list[str] = Field(default_factory=list)
+    runtime_checks: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "receipt_id": self.receipt_id,
+            "contract_id": self.contract_id,
+            "agent_id": self.agent_id,
+            "status": self.status,
+            "runtime_surface": self.runtime_surface,
+            "memory_lane_ready": self.memory_lane_ready,
+            "missing_requirements": self.missing_requirements,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class SituationMatch(StrictModel):
+    match_id: str = Field(default_factory=lambda: new_id("match"))
+    decision_id: str
+    source_id: str
+    source_type: SituationSourceType
+    match_type: SituationMatchType
+    fires: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "match_id": self.match_id,
+            "decision_id": self.decision_id,
+            "source_id": self.source_id,
+            "source_type": self.source_type,
+            "match_type": self.match_type,
+            "fires": self.fires,
+            "confidence": self.confidence,
+            "reason": self.reason,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class RuntimeInterceptionBoundary(StrictModel):
+    boundary_id: str = Field(default_factory=lambda: new_id("boundary"))
+    action_kind: ActionKind
+    runtime_surface: str = Field(min_length=1)
+    interceptable: bool
+    supported_verdicts: list[PolicyVerdict] = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ActionDecisionReceipt(StrictModel):
+    receipt_id: str = Field(default_factory=lambda: new_id("receipt"))
+    decision_id: str
+    original_action: str = Field(min_length=1)
+    action_to_execute: str | None = None
+    verdict: PolicyVerdict
+    downstream_action_allowed: bool
+    user_visible: bool
+    boundary_status: BoundaryStatus
+    boundary_id: str | None = None
+    match_ids: list[str] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "receipt_id": self.receipt_id,
+            "decision_id": self.decision_id,
+            "verdict": self.verdict,
+            "downstream_action_allowed": self.downstream_action_allowed,
+            "user_visible": self.user_visible,
+            "boundary_status": self.boundary_status,
+            "boundary_id": self.boundary_id,
+            "match_ids": self.match_ids,
+            "source_ids": self.source_ids,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class ReasoningControlReceipt(StrictModel):
+    reasoning_receipt_id: str = Field(default_factory=lambda: new_id("reasoning"))
+    action_receipt_id: str
+    original_verdict: PolicyVerdict
+    final_verdict: PolicyVerdict
+    ams_effect: AMSEffect
+    matched_experience_ids: list[str] = Field(default_factory=list)
+    authority: ApplicableAuthority | None = None
+    user_visible: bool
+    receipt_available: bool = True
+    downgrade_allowed: bool = False
+    override_receipt_required: bool = False
+    summary: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "reasoning_receipt_id": self.reasoning_receipt_id,
+            "action_receipt_id": self.action_receipt_id,
+            "original_verdict": self.original_verdict,
+            "final_verdict": self.final_verdict,
+            "ams_effect": self.ams_effect,
+            "matched_experience_ids": self.matched_experience_ids,
+            "authority": self.authority,
+            "user_visible": self.user_visible,
+            "receipt_available": self.receipt_available,
+            "downgrade_allowed": self.downgrade_allowed,
+            "override_receipt_required": self.override_receipt_required,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
 class ExperienceAtom(StrictModel):
     atom_id: str = Field(default_factory=lambda: new_id("atom"))
     source_trace_ids: list[str]

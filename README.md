@@ -16,6 +16,18 @@ AMS v1 acceptance status: complete as of the terminal operator proof on
 2026-06-01. Post-v1 work should be named as a new phase, not appended as another
 hidden "one more thing" to the v1 TODO.
 
+Current post-v1 phase: **AMS V2: Experience Enforcement Architecture**.
+Canonical plan: [docs/2026-06-10-ams-v2-experience-enforcement-plan.md](docs/2026-06-10-ams-v2-experience-enforcement-plan.md).
+Acceptance contract: [docs/2026-06-10-ams-v2-acceptance-contract.md](docs/2026-06-10-ams-v2-acceptance-contract.md).
+Current V2 build status: **AMS V2 Accepted** after the terminal V2 operator
+proof. Future work should open a named post-V2 phase or fix a failing
+acceptance check.
+
+V2 includes the non-repeat enforcement kernel as a core subsystem, not a V1.5
+downgrade. The target is an under-the-hood experience layer that changes future
+agent action before the user has to catch repeated mistakes, while preserving
+valid work and surfacing compact inference receipts when needed.
+
 The default extractor and contradiction detector are deterministic strategies for reproducible AMS V0 fixtures. They are replaceable kernel interfaces, not the final reasoning layer.
 
 The public foundation is in [research/2026-05-27-plan-1-causal-experience-memory-foundation.md](research/2026-05-27-plan-1-causal-experience-memory-foundation.md).
@@ -71,6 +83,7 @@ python scripts/ams.py monitor --deep
 python scripts/ams.py startup-brief "continue building Agentic Memory System" --domain agentic-memory-system
 python scripts/ams.py runtime-control "continue building Agentic Memory System" --domain agentic-memory-system
 python scripts/ams.py governed-run close --outcome success --action-taken "ran focused and full pytest"
+powershell -ExecutionPolicy Bypass -File scripts/ams-env-doctor.ps1
 powershell -ExecutionPolicy Bypass -File scripts/ams-guarded-command.ps1 -Prompt "continue building Agentic Memory System" -Command python --version
 powershell -ExecutionPolicy Bypass -File scripts/install-ams-codex-entrypoint.ps1
 python scripts/ams.py correction capture "why are you building before planning" --affected-file package.json
@@ -130,6 +143,8 @@ It also prints the current phase and next step so the overnight monitor runs sho
 `startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, reports required startup directive presence, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns memory-readiness status. Missing, stale, contradicted, or failed memory returns `degraded` with warnings; it does not block fresh owner-directed work.
 
 `runtime-control` is the enforceable launcher-facing surface. It classifies the prompt, checks the correction resume gate, runs the startup brief, writes a runtime-control receipt, preserves startup degraded warnings, and exits non-zero only on a runtime-control/action-safety block. `scripts/ams-guarded-command.ps1` honors that exit code by refusing to invoke the downstream command when runtime-control blocks.
+
+`scripts/ams-env-doctor.ps1` checks the interpreter boundary before AMS work. It verifies that the workspace Python can import `pydantic`, reports the ambient `python` on PATH, warns when that ambient Python appears to come from Hermes Desktop, and runs a direct `python scripts/ams.py` smoke. A Hermes warning is not a failure by itself; AMS must keep using the workspace interpreter even when Hermes has repaired or changed its own venv.
 
 `governed-run close` finalizes the latest or named governed-run receipt with an observed outcome. It links the startup brief, action brief, and influence id, writes an observational `ActionInfluenceEvent`, and keeps observed outcome separate from verified lift.
 
@@ -391,6 +406,21 @@ AMS_OPERATOR_PROOF_PASS
 frontier_eval=PASS margin=75.0pp
 ```
 
+Run the complete AMS V2 operator proof from a fresh root:
+
+```powershell
+python scripts/run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final
+```
+
+This composes the accepted v1 operator path with the V2 eval harness. Expected
+terminal signal:
+
+```text
+AMS_V2_OPERATOR_PROOF_PASS
+v2_eval=PASS 13/13 false_blocks=0/0
+phase=AMS V2 Accepted ready=True
+```
+
 ## HaluMem Adapter Smoke
 
 Inspect a local HaluMem JSON or JSONL export:
@@ -408,6 +438,10 @@ python scripts/run_halumem_cem0_eval.py path\to\halumem.json
 ```
 
 The AMS-backed runner ingests HaluMem sessions as traces, proposes atoms, validates and promotes them, then scores both proposed candidates and final trusted memory against HaluMem reference memory points.
+Normal runner mode uses the grounded `NaturalLanguageExtractor`; use `--fixture-mode`
+only for legacy marker fixtures. The runner also synthesizes local proxy QA
+answers from retrieved trusted memory. Official HaluMem evaluation still requires
+the released HaluMem eval toolkit and model/service credentials.
 
 ## MemoryArena Adapter Smoke
 
@@ -425,7 +459,11 @@ Run AMS Action Brief scoring against a local MemoryArena export:
 python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
-The AMS-backed runner ingests MemoryArena tasks as traces, validates promoted experience, retrieves action briefs for each task, and scores the recommended actions against expected subtask answers.
+The AMS-backed runner ingests MemoryArena tasks as traces, validates promoted
+experience, retrieves action briefs for each task, synthesizes local proxy
+answers from retrieved memory, and scores those answers against expected subtask
+answers. Normal mode uses natural-language extraction; `--fixture-mode` is only
+for deterministic marker fixtures. This is not an official MemoryArena score.
 
 ## LongMemEval-V2 Adapter Smoke
 
@@ -443,7 +481,11 @@ Run AMS Action Brief scoring against a local LongMemEval-V2 dataset root:
 python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
 ```
 
-The AMS-backed runner ingests trajectories as traces, validates promoted experience, retrieves action briefs for each question, and scores both exact answer output and haystack-member trajectory retrieval.
+The AMS-backed runner ingests trajectories as traces, validates promoted
+experience, retrieves action briefs for each question, synthesizes local proxy
+answers from retrieved memory, and scores exact answer output plus haystack-member
+trajectory retrieval. Official LongMemEval-V2 scoring still requires the released
+evaluation environment, answer evaluator, checksum validation, and latency runner.
 
 ## External Benchmark Report
 
@@ -453,7 +495,12 @@ Combine saved JSON outputs from the AMS-backed external runners:
 python scripts/run_external_benchmark_report.py --halumem-result halumem.json --memoryarena-result memoryarena.json --longmemeval-v2-result longmemeval.json --markdown
 ```
 
-The report object normalizes runner outputs into one table with proposed/trusted/quarantined counts, the primary metric for each suite, secondary metric maps, and validation reason-code counts.
+The report object normalizes runner outputs into one table with
+proposed/trusted/quarantined counts, local-proxy primary metrics, secondary
+metric maps, validation reason-code counts, and official-evaluator provenance.
+It fails by default if any included real run has zero proposed or output counts;
+`--allow-zero-output --zero-output-mode fixture|proxy|no-extractor` is only for
+explicit diagnostics.
 
 ## Storage Backends
 
@@ -480,3 +527,28 @@ python scripts/run_cem_import_shared_trace.py envelope.json --root tmp\cem-share
 ```
 
 The protocol is documented in [docs/cem-0-multi-agent-protocol.md](docs/cem-0-multi-agent-protocol.md). It preserves untrusted shared traces as evidence but prevents them from becoming trusted operational memory by default.
+
+## Agent Onboarding V2
+
+AMS can now register agents as governed participants through explicit
+onboarding contracts instead of informal team names. The current roster is
+Codex, Hermes, Hessa, Claude Code, Cursor, and parked OpenClaw. SuperBrembo is
+intentionally rejected as stale historical topology.
+
+```powershell
+python scripts/ams.py --json agent seed-roster
+python scripts/ams.py --json agent list
+python scripts/ams.py --json agent audit hessa
+python scripts/ams.py --json agent onboard contract.json
+```
+
+Each `AgentOnboardingContract` includes identity, runtime surface, operational
+status, owner scope, capability contracts, AMS startup/action/remember/correction
+commands, harness contracts, runtime checks, visibility/ownership, and evidence
+ids. Accepted agents receive an onboarding receipt and trust policy that
+preserves sender identity and allowed shared scopes.
+
+The same path is exposed over MCP through `cem_onboard_agent`,
+`cem_seed_hammad_agent_roster`, and `cem_list_onboarded_agents`. The acceptance
+contract is documented in
+[docs/2026-06-11-ams-agent-onboarding-v2-contract.md](docs/2026-06-11-ams-agent-onboarding-v2-contract.md).

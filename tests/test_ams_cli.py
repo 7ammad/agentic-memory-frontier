@@ -16,6 +16,7 @@ from cem_core.local_memory import _active_product_directive_content
 
 ROOT = Path(__file__).resolve().parents[1]
 AMS = ROOT / "scripts" / "ams.py"
+ENV_DOCTOR = ROOT / "scripts" / "ams-env-doctor.ps1"
 
 
 def test_ams_cli_round_trip_persists_across_subprocesses(tmp_path):
@@ -329,6 +330,63 @@ def test_ams_cli_memory_surfaces_accept_ams_mcp_root_arg_without_env(tmp_path):
     assert surfaces["ams-memory"]["source_path"] == str(root.resolve())
 
 
+def test_ams_cli_memory_surfaces_reconcile_ams_only_when_native_memory_disabled(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = _legacy_memory_base(tmp_path)
+    config_path = _codex_config_with_ams_only_and_native_disabled(tmp_path, root)
+
+    report = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
+    surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+
+    assert report["reconciled"] is True
+    assert surfaces["ams-memory"]["role"] == "primary"
+    assert surfaces["ams-memory"]["status"] == "pass"
+    assert surfaces["codex-memory"]["role"] == "unconfigured"
+    assert surfaces["codex-memory"]["status"] == "warn"
+    assert surfaces["native-codex-memory"]["role"] == "secondary_import_source"
+    assert surfaces["native-codex-memory"]["status"] == "pass"
+    assert "disabled by Codex config" in surfaces["native-codex-memory"]["detail"]
+
+    _seed_runtime_records(root)
+    monitor = _ams(root, "--json", "monitor")
+    assert _check_status(monitor, "memory_surfaces_reconciled") == "pass"
+    assert "codex-memory optional bridge unconfigured" in _check_detail(monitor, "memory_surfaces_reconciled")
+    assert "native Codex memory disabled/import-only" in _check_detail(monitor, "memory_surfaces_reconciled")
+
+
+def test_ams_cli_memory_surfaces_reject_ams_only_when_native_memory_not_disabled(tmp_path):
+    root = tmp_path / "ams"
+    memory_base = tmp_path / "empty-memory-base"
+    memory_base.mkdir()
+    config_path = _codex_config_with_ams_only(tmp_path, root)
+
+    report = _ams(
+        root,
+        "--json",
+        "memory-surfaces",
+        "--config-path",
+        str(config_path),
+        "--memory-base",
+        str(memory_base),
+    )
+    surfaces = {surface["name"]: surface for surface in report["surfaces"]}
+
+    assert report["reconciled"] is False
+    assert surfaces["ams-memory"]["role"] == "primary"
+    assert surfaces["ams-memory"]["status"] == "pass"
+    assert surfaces["codex-memory"]["role"] == "unconfigured"
+    assert surfaces["native-codex-memory"]["role"] == "unconfigured"
+    assert "disabled by Codex config" not in surfaces["native-codex-memory"]["detail"]
+
+
 def test_ams_cli_memory_surfaces_warn_until_legacy_migration_applied(tmp_path):
     root = tmp_path / "ams"
     memory_base = _legacy_memory_base(tmp_path)
@@ -361,11 +419,12 @@ def test_ams_cli_monitor_and_dashboard_records_status(tmp_path):
 
     assert monitor["status"] == "pass"
     assert monitor["scope"]["ams_directive_count"] == 11
-    assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock")
-    assert monitor["phase"]["current_phase"] == "AMS v1 Accepted"
+    assert monitor["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
+    assert monitor["phase"]["current_phase"] == "AMS V2 Accepted"
+    assert monitor["phase"]["status"] == "accepted"
     assert (
         monitor["phase"]["next_step"]
-        == "none - AMS v1 terminal acceptance contract is complete"
+        == "none - AMS V2 terminal acceptance contract is complete"
     )
     assert "wire Correction Capture Controller" not in monitor["phase"]["next_step"]
     assert "reconcile legacy Codex memories" not in monitor["phase"]["next_step"]
@@ -666,7 +725,8 @@ def test_ams_cli_dashboard_separates_ams_and_global_behavior_records(tmp_path):
     assert dashboard["scope"]["ams_directive_count"] == 11
     assert dashboard["scope"]["global_behavior_directive_count"] == 1
     assert dashboard["scope"]["other_directive_count"] == 0
-    assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock")
+    assert dashboard["phase"]["completed_through"].startswith("AMS v1 product lock is accepted")
+    assert dashboard["phase"]["current_phase"] == "AMS V2 Accepted"
     assert dashboard["phase"]["ready_for_next_phase"] is True
     assert dashboard["phase"]["open_followups"] == []
 
@@ -969,18 +1029,98 @@ def test_ams_cli_runtime_trace_records_controlled_work_and_candidates(tmp_path):
     assert result["observed_exit_code"] == 0
     assert result["downstream_invoked"] is True
     assert result["proposed_atom_count"] == 1
+    assert result["decision_id"].startswith("decision_")
+    assert result["experience_record_id"].startswith("experience_")
+    assert result["attribution_id"].startswith("attribution_")
+    assert result["attribution_class"] == "success"
+    assert result["invariant_id"] is None
+    assert result["skill_id"].startswith("skill_")
     assert (root / "runtime-trace-runs.jsonl").exists()
     assert (root / "runtime-trace-latest.json").exists()
     assert (root / "runtime-trace-latest.md").exists()
+    assert (root / "experience-graph-runs.jsonl").exists()
+    assert (root / "experience-graph-latest.json").exists()
+    assert (root / "experience-graph-latest.md").exists()
+    assert (root / "experience-attribution-runs.jsonl").exists()
+    assert (root / "experience-attribution-latest.json").exists()
+    assert (root / "experience-attribution-latest.md").exists()
+    assert (root / "skill-candidate-runs.jsonl").exists()
+    assert (root / "skill-candidate-latest.json").exists()
+    assert (root / "skill-candidate-latest.md").exists()
 
     dashboard = _ams(root, "--json", "dashboard")
     assert dashboard["latest_runtime_trace"]["trace_id"] == result["trace_id"]
+    assert dashboard["latest_experience_graph_record"]["record_id"] == result["experience_record_id"]
+    assert dashboard["latest_experience_attribution"]["attribution_id"] == result["attribution_id"]
+    assert dashboard["latest_skill_candidate"]["skill_id"] == result["skill_id"]
     trace = CEM(root).store.get_trace(result["trace_id"])
     assert trace.final_outcome == "success"
     assert trace.environment["runtime_control_id"] == control["control_id"]
+    experience = CEM(root).store.get_experience_graph_record(result["experience_record_id"])
+    assert experience.decision.decision_id == result["decision_id"]
+    assert experience.decision.expected_outcome == "downstream command should complete successfully"
+    assert experience.decision.runtime_surface == "ams-guarded-command"
+    assert experience.decision.evidence_ids[:3] == [
+        control["control_id"],
+        control["startup_brief_id"],
+        control["monitor_id"],
+    ]
+    assert experience.attribution_status == "attributed"
+    assert experience.inference_receipt_id == result["attribution_id"]
+    assert experience.outcome_evidence_ids == [result["trace_id"]]
+    assert experience.audit_summary()["evidence_ids"][0] == control["control_id"]
+    attribution = CEM(root).store.get_experience_attribution(result["attribution_id"])
+    assert attribution.record_id == result["experience_record_id"]
+    assert attribution.attribution_class == "success"
+    assert attribution.skill_candidate is True
+    skill = CEM(root).store.get_skill_candidate(result["skill_id"])
+    assert skill.source_attribution_id == result["attribution_id"]
+    assert skill.transfer_scope == "task"
     atom = CEM(root).store.get_atom(result["proposed_atom_ids"][0])
     assert atom.source_trace_ids == [result["trace_id"]]
     assert atom.source_spans[0].text == "check startup brief before edits"
+
+
+def test_ams_cli_runtime_trace_compiles_failure_into_behavior_invariant(tmp_path):
+    root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
+    control = _ams(
+        root,
+        "--json",
+        "runtime-control",
+        "SKILL: do not repeat failed guarded command",
+        "--session-id",
+        "invariant_session",
+    )
+
+    result = _ams(
+        root,
+        "--json",
+        "runtime-trace",
+        "record",
+        "--control-id",
+        control["control_id"],
+        "--command",
+        "codex",
+        "--command-arg=--bad-flag",
+        "--exit-code",
+        "2",
+    )
+
+    assert result["final_outcome"] == "failure"
+    assert result["attribution_class"] == "mistake"
+    assert result["invariant_id"].startswith("invariant_")
+    assert result["skill_id"] is None
+    assert (root / "behavior-invariant-runs.jsonl").exists()
+    assert (root / "behavior-invariant-latest.json").exists()
+    assert (root / "behavior-invariant-latest.md").exists()
+
+    dashboard = _ams(root, "--json", "dashboard")
+    assert dashboard["latest_behavior_invariant"]["invariant_id"] == result["invariant_id"]
+    invariant = CEM(root).store.get_behavior_invariant(result["invariant_id"])
+    assert invariant.source_attribution_id == result["attribution_id"]
+    assert invariant.enforcement == "steer_or_block"
+    assert invariant.supersession_status == "active"
 
 
 def test_ams_cli_runtime_trace_rejects_missing_control_receipt(tmp_path):
@@ -1149,6 +1289,67 @@ def test_ams_guarded_command_runs_downstream_when_runtime_control_infrastructure
     assert "AMS_GUARD_BLOCKED" not in process.stdout
 
 
+def test_ams_guarded_command_prefers_workspace_python(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    sentinel = tmp_path / "workspace-python-used.txt"
+    downstream = tmp_path / "workspace-python-downstream-ran.txt"
+    (scripts / "ams.py").write_text(
+        "import json\n"
+        "import sys\n"
+        "if 'runtime-control' in sys.argv:\n"
+        "    print(json.dumps({'status': 'allow', 'control_id': 'control_1', 'governed_run_id': 'run_1'}))\n"
+        "elif 'runtime-trace' in sys.argv:\n"
+        "    print(json.dumps({'trace_id': 'trace_1'}))\n"
+        "elif 'governed-run' in sys.argv:\n"
+        "    print(json.dumps({'receipt_id': 'run_1', 'closed': True}))\n"
+        "else:\n"
+        "    raise SystemExit(2)\n",
+        encoding="utf-8",
+    )
+    _write_workspace_python_cmd(workspace, sentinel)
+    hermes_sentinel = tmp_path / "hermes-python-used.txt"
+    hermes_bin = _write_ambient_python_trap(tmp_path, hermes_sentinel)
+    env = os.environ.copy()
+    env["PATH"] = str(hermes_bin) + os.pathsep + env.get("PATH", "")
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(workspace),
+            "-Prompt",
+            "ordinary allowed prompt",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            f"echo ran>\"{downstream}\"",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "AMS_RUNTIME_CONTROL_EXIT: 0" in process.stdout
+    assert downstream.exists()
+    assert sentinel.exists()
+    assert not hermes_sentinel.exists()
+
+
 def test_ams_guarded_command_runs_downstream_when_ams_script_is_missing(tmp_path):
     powershell = shutil.which("powershell")
     if os.name != "nt" or powershell is None:
@@ -1308,6 +1509,95 @@ def test_session_start_gate_warns_and_allows_startup_brief_command_failure(tmp_p
     assert "startup brief database unavailable" in combined_output
     assert "unable to build AMS startup brief" in combined_output
     assert "SESSION_GATE_DEGRADED" in combined_output
+
+
+def test_session_start_gate_prefers_workspace_python(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    sentinel = tmp_path / "session-gate-workspace-python-used.txt"
+    (scripts / "ams.py").write_text(
+        "print('{\"status\":\"allow\",\"block_reasons\":[],\"degraded_reasons\":[],\"brief_id\":\"brief_1\",\"monitor_id\":\"monitor_1\",\"evidence_ids\":[]}')\n",
+        encoding="utf-8",
+    )
+    _write_workspace_python_cmd(workspace, sentinel)
+    hermes_sentinel = tmp_path / "session-gate-hermes-python-used.txt"
+    hermes_bin = _write_ambient_python_trap(tmp_path, hermes_sentinel)
+    env = os.environ.copy()
+    env["PATH"] = str(hermes_bin) + os.pathsep + env.get("PATH", "")
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "session-start-gate.ps1"),
+            "-Workspace",
+            str(workspace),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "SESSION_GATE_PASS" in process.stdout
+    assert sentinel.exists()
+    assert not hermes_sentinel.exists()
+
+
+def test_ams_env_doctor_warns_when_hermes_python_is_first_on_path(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "ams.py").write_text(
+        "print('{\"agent_id\":\"codex\",\"current_session_id\":\"session_test\"}')\n",
+        encoding="utf-8",
+    )
+    workspace_python_sentinel = tmp_path / "doctor-workspace-python-used.txt"
+    _write_workspace_python_cmd(workspace, workspace_python_sentinel)
+    hermes_sentinel = tmp_path / "doctor-hermes-python-used.txt"
+    hermes_bin = _write_ambient_python_forwarder(tmp_path, hermes_sentinel)
+    env = os.environ.copy()
+    env["PATH"] = str(hermes_bin) + os.pathsep + env.get("PATH", "")
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ENV_DOCTOR),
+            "-Workspace",
+            str(workspace),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "AMS_ENV_DOCTOR_STATUS: warn" in process.stdout
+    assert "AMS_ENV_DOCTOR_WARN: ambient python appears to come from Hermes" in process.stdout
+    assert workspace_python_sentinel.exists()
+    assert hermes_sentinel.exists()
 
 
 def test_ams_guarded_command_quietly_records_runtime_trace(tmp_path):
@@ -1506,6 +1796,7 @@ def test_active_product_directive_rewrite_removes_legacy_identity_tokens():
 
 def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resume(tmp_path):
     root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
     ledger = tmp_path / "PROJECT-LEDGER.md"
     ledger.write_text("# Project Ledger\n\n## Open Follow-Ups\n\n- existing follow-up\n", encoding="utf-8")
 
@@ -1561,14 +1852,12 @@ def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resu
     assert "Correction Capture Controller" in ledger_text
     assert ledger_text.index("LEDGER-CORRECTION") < ledger_text.index("## Open Follow-Ups")
     assert any("avoid continuing after live correction" in action for action in brief["recommended_next_actions"])
-    assert monitor["status"] == "fail"
-    assert _check_status(monitor, "correction_resume_gate_clear") == "fail"
-    assert startup["status"] == "degraded"
+    assert monitor["status"] == "pass"
+    assert _check_status(monitor, "correction_resume_gate_clear") == "pass"
+    assert "active runtime-control gate reported" in _check_detail(monitor, "correction_resume_gate_clear")
+    assert startup["status"] == "allow"
     assert startup["block_reasons"] == []
-    assert any(
-        reason.startswith("monitor_failed:")
-        for reason in startup["degraded_reasons"]
-    )
+    assert startup["degraded_reasons"] == []
 
     control_process = _ams_process(
         root,
@@ -1663,6 +1952,56 @@ def _ams_env(root: Path) -> dict[str, str]:
     if memory_base.exists():
         env["AMS_MEMORY_BASE"] = str(memory_base)
     return env
+
+
+def _write_workspace_python_cmd(workspace: Path, sentinel: Path) -> None:
+    scripts = workspace / ".venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "python.cmd").write_text(
+        "\n".join(
+            [
+                "@ECHO off",
+                f'echo used>"{sentinel}"',
+                f'"{sys.executable}" %*',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_ambient_python_trap(tmp_path: Path, sentinel: Path) -> Path:
+    hermes_bin = tmp_path / "Hermes Desktop" / "venv" / "Scripts"
+    hermes_bin.mkdir(parents=True)
+    (hermes_bin / "python.cmd").write_text(
+        "\n".join(
+            [
+                "@ECHO off",
+                f'echo used>"{sentinel}"',
+                "exit /b 88",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return hermes_bin
+
+
+def _write_ambient_python_forwarder(tmp_path: Path, sentinel: Path) -> Path:
+    hermes_bin = tmp_path / "Hermes Desktop" / "venv" / "Scripts"
+    hermes_bin.mkdir(parents=True)
+    (hermes_bin / "python.cmd").write_text(
+        "\n".join(
+            [
+                "@ECHO off",
+                f'echo used>"{sentinel}"',
+                f'"{sys.executable}" %*',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return hermes_bin
 
 
 def _check_status(monitor: dict, name: str) -> str:
@@ -1769,6 +2108,47 @@ def _codex_config_with_ams_root_arg(tmp_path: Path, root: Path) -> Path:
                 "",
                 "[mcp_servers.codex-memory.env]",
                 f"CODEX_MEMORY_DB_PATH = {json.dumps(str(codex_db))}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _codex_config_with_ams_only_and_native_disabled(tmp_path: Path, root: Path) -> Path:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[features]",
+                "memories = false",
+                "",
+                "[memories]",
+                "generate_memories = false",
+                "use_memories = false",
+                "disable_on_external_context = true",
+                "no_memories_if_mcp_or_web_search = true",
+                "",
+                "[mcp_servers.ams-memory]",
+                'command = "python"',
+                f"args = [{json.dumps(str(ROOT / 'scripts' / 'run_cem_mcp_stdio.py'))}, \"--root\", {json.dumps(str(root))}]",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _codex_config_with_ams_only(tmp_path: Path, root: Path) -> Path:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[mcp_servers.ams-memory]",
+                'command = "python"',
+                f"args = [{json.dumps(str(ROOT / 'scripts' / 'run_cem_mcp_stdio.py'))}, \"--root\", {json.dumps(str(root))}]",
                 "",
             ]
         ),

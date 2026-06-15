@@ -7,14 +7,23 @@ from pathlib import Path
 
 from .contradiction import ContradictionDetector, contradiction_pair
 from .extractor import DeterministicExtractor, MemoryExtractor
+from .matching import SituationMatcher
 from .models import (
     ActionBrief,
     ActionBriefRecord,
     ActionInfluenceEvent,
     AgentTrace,
+    ActionDecisionReceipt,
+    AgentOnboardingContract,
+    AgentOnboardingReceipt,
+    DecisionIntent,
     ExperienceAtom,
     ExperienceCard,
     MemoryAudit,
+    MultiAgentGovernanceReceipt,
+    ReasoningControlReceipt,
+    SharedExperienceEnvelope,
+    SituationMatch,
     TaskContext,
     TraceReceipt,
     ValidationDecision,
@@ -140,6 +149,75 @@ class CEM:
         self._supersede_stale_cards(atom, card)
         self._link_contradicting_cards(card)
         return card
+
+    def match_situation(self, decision: DecisionIntent) -> list[SituationMatch]:
+        invariants = [
+            invariant
+            for invariant in self.store.list_behavior_invariants()
+            if invariant.supersession_status == "active"
+        ]
+        skills = [
+            skill
+            for skill in self.store.list_skill_candidates()
+            if skill.promotion_status != "rejected"
+        ]
+        matches = SituationMatcher().match_decision(
+            decision,
+            invariants=invariants,
+            skills=skills,
+        )
+        for match in matches:
+            self.store.save_situation_match(match)
+        return matches
+
+    def decide_action(self, decision: DecisionIntent, *, boundaries: list) -> ActionDecisionReceipt:
+        from .policy import ActionDecisionPoint
+
+        return ActionDecisionPoint(self).decide(decision, boundaries=boundaries)
+
+    def control_reasoning(
+        self,
+        receipt: ActionDecisionReceipt,
+        *,
+        requested_verdict: str | None = None,
+        downgrade_reason: str | None = None,
+        downgrade_authority: str | None = None,
+    ) -> ReasoningControlReceipt:
+        from .reasoning import ReasoningController
+
+        control = ReasoningController().control(
+            receipt,
+            requested_verdict=requested_verdict,
+            downgrade_reason=downgrade_reason,
+            downgrade_authority=downgrade_authority,
+        )
+        self.store.save_reasoning_control_receipt(control)
+        return control
+
+    def govern_shared_experience(
+        self,
+        envelope: SharedExperienceEnvelope,
+    ) -> MultiAgentGovernanceReceipt:
+        from .multi_agent_governance import MultiAgentGovernanceLayer
+
+        existing = self.store.list_shared_experience_envelopes()
+        receipt = MultiAgentGovernanceLayer().evaluate(envelope, existing=existing)
+        self.store.save_shared_experience_envelope(envelope)
+        self.store.save_multi_agent_governance_receipt(receipt)
+        return receipt
+
+    def onboard_agent(self, contract: AgentOnboardingContract) -> AgentOnboardingReceipt:
+        from .agent_onboarding import onboard_agent
+
+        return onboard_agent(self.store, contract)
+
+    def list_onboarded_agents(self) -> list[AgentOnboardingContract]:
+        return self.store.list_agent_onboarding_contracts()
+
+    def audit_onboarded_agent(self, agent_id: str) -> dict[str, object]:
+        from .agent_onboarding import audit_onboarded_agent
+
+        return audit_onboarded_agent(self.store, agent_id)
 
     def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
         """Bidirectionally link active cards whose claims conflict without a

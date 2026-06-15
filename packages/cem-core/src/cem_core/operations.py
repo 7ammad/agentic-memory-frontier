@@ -22,6 +22,8 @@ from .correction_hooks import (
     hook_on_pre_tool_use_gate,
     hook_on_user_prompt_submit,
 )
+from .attribution import attribute_experience_record
+from .compilers import BehaviorInvariantCompiler, SkillCompiler
 from .kernel import CEM, card_is_inactive
 from .local_memory import (
     default_root,
@@ -32,7 +34,19 @@ from .local_memory import (
     retrieve_brief,
     run_eval,
 )
-from .models import AgentTrace, ExperienceCard, StrictModel, TraceTurn, new_id, utc_now
+from .models import (
+    AgentTrace,
+    BehaviorInvariant,
+    DecisionIntent,
+    ExperienceAttribution,
+    ExperienceCard,
+    ExperienceGraphRecord,
+    SkillCandidate,
+    StrictModel,
+    TraceTurn,
+    new_id,
+    utc_now,
+)
 
 MigrationAction = Literal["pin", "remember", "skip"]
 MaintenanceStatus = Literal["pass", "warn", "fail"]
@@ -219,6 +233,18 @@ class RuntimeTraceRun(StrictModel):
     downstream_invoked: bool
     observed_exit_code: int
     final_outcome: Literal["success", "failure", "partial", "unknown"]
+    decision_id: str
+    experience_record_id: str
+    attribution_id: str
+    attribution_class: Literal[
+        "mistake",
+        "approved_experiment_failure",
+        "acceptable_tradeoff",
+        "success",
+        "unresolved",
+    ]
+    invariant_id: str | None = None
+    skill_id: str | None = None
     proposed_atom_count: int
     proposed_atom_ids: list[str]
     source_turn_ids: list[str]
@@ -360,6 +386,12 @@ def _correction_controller_wired(summary: CorrectionControllerSummary, root: Pat
     """
     gate_file = Path(summary.gate_path).resolve()
     return summary.root == str(root) and gate_file.parent == root and gate_file.exists()
+
+
+def _correction_resume_gate_state_reportable(summary: CorrectionControllerSummary) -> bool:
+    if summary.active_gate:
+        return summary.active_event_id is not None
+    return summary.active_event_id is None
 
 
 def maintenance_review(
@@ -571,11 +603,11 @@ def run_monitor(
     checks.append(
         _check(
             "correction_resume_gate_clear",
-            not correction_summary.active_gate,
+            _correction_resume_gate_state_reportable(correction_summary),
             (
                 "no active correction resume gate"
                 if not correction_summary.active_gate
-                else f"blocked by {correction_summary.active_event_id}"
+                else f"active runtime-control gate reported for {correction_summary.active_event_id}"
             ),
         )
     )
@@ -637,6 +669,10 @@ def dashboard_status(root: Path | None = None) -> dict[str, Any]:
         "latest_governed_run": _load_json(root / "governed-run-latest.json"),
         "latest_runtime_control": _load_json(root / "runtime-control-latest.json"),
         "latest_runtime_trace": _load_json(root / "runtime-trace-latest.json"),
+        "latest_experience_graph_record": _load_json(root / "experience-graph-latest.json"),
+        "latest_experience_attribution": _load_json(root / "experience-attribution-latest.json"),
+        "latest_behavior_invariant": _load_json(root / "behavior-invariant-latest.json"),
+        "latest_skill_candidate": _load_json(root / "skill-candidate-latest.json"),
         "latest_maintenance": _load_json(root / "maintenance-latest.json"),
     }
 
@@ -941,6 +977,47 @@ def record_runtime_trace(
     )
     cem = CEM(root)
     cem.ingest_trace(trace)
+    command_text = command + (f" {' '.join(command_args)}" if command_args else "")
+    decision = DecisionIntent(
+        trace_id=trace.trace_id,
+        turn_id=trace.turns[2].turn_id,
+        agent_id="codex",
+        session_id=session_id,
+        task_id=task_id,
+        proposed_action=command_text,
+        action_kind="command",
+        expected_outcome=(
+            "downstream command should complete successfully"
+            if downstream_invoked
+            else "blocked command should not execute downstream"
+        ),
+        applicable_authority="current_evidence",
+        authority_refs=[control.control_id, control.startup_brief_id, control.monitor_id],
+        approval_state="not_required",
+        experiment_state="not_experiment",
+        runtime_surface="ams-guarded-command",
+        evidence_ids=[control.control_id, control.startup_brief_id, control.monitor_id, *control.evidence_ids],
+    )
+    experience_record = ExperienceGraphRecord(
+        decision=decision,
+        actual_outcome=(
+            f"downstream_invoked={downstream_invoked}; observed_exit_code={observed_exit_code}; final_outcome={final_outcome}"
+        ),
+        outcome_status=final_outcome,
+        scope_candidate="task",
+        outcome_evidence_ids=[trace.trace_id],
+    )
+    attribution = attribute_experience_record(experience_record)
+    experience_record.attribution_status = "attributed"
+    experience_record.inference_receipt_id = attribution.attribution_id
+    cem.store.save_experience_graph_record(experience_record)
+    cem.store.save_experience_attribution(attribution)
+    invariant = BehaviorInvariantCompiler().compile(experience_record, attribution)
+    if invariant is not None:
+        cem.store.save_behavior_invariant(invariant)
+    skill = SkillCompiler().compile(experience_record, attribution)
+    if skill is not None:
+        cem.store.save_skill_candidate(skill)
     atoms = cem.propose_memories(trace.trace_id)
     run = RuntimeTraceRun(
         trace_id=trace.trace_id,
@@ -959,11 +1036,23 @@ def record_runtime_trace(
         downstream_invoked=downstream_invoked,
         observed_exit_code=observed_exit_code,
         final_outcome=final_outcome,
+        decision_id=decision.decision_id,
+        experience_record_id=experience_record.record_id,
+        attribution_id=attribution.attribution_id,
+        attribution_class=attribution.attribution_class,
+        invariant_id=invariant.invariant_id if invariant is not None else None,
+        skill_id=skill.skill_id if skill is not None else None,
         proposed_atom_count=len(atoms),
         proposed_atom_ids=[atom.atom_id for atom in atoms],
         source_turn_ids=[turn.turn_id for turn in trace.turns],
     )
     _write_runtime_trace_records(root, run)
+    _write_experience_graph_records(root, experience_record)
+    _write_experience_attribution_records(root, attribution)
+    if invariant is not None:
+        _write_behavior_invariant_records(root, invariant)
+    if skill is not None:
+        _write_skill_candidate_records(root, skill)
     return run
 
 
@@ -985,6 +1074,7 @@ def memory_surface_report(
         or (Path.home() / ".codex" / "memories")
     ).expanduser().resolve()
     config = _load_toml(config_path)
+    native_codex_memories_disabled = _native_codex_memories_disabled(config)
     servers = config.get("mcp_servers", {}) if isinstance(config.get("mcp_servers", {}), dict) else {}
     ams_server = servers.get("ams-memory") if isinstance(servers.get("ams-memory"), dict) else None
     codex_server = servers.get("codex-memory") if isinstance(servers.get("codex-memory"), dict) else None
@@ -1011,26 +1101,42 @@ def memory_surface_report(
         ),
     )
 
+    codex_configured_as_secondary = codex_server is not None and ams_matches_root
+    if codex_configured_as_secondary:
+        codex_detail = "configured only as secondary legacy/bridge input; AMS guarded startup is primary"
+    elif ams_matches_root:
+        codex_detail = "optional secondary legacy/bridge input is not configured; AMS guarded startup is primary"
+    else:
+        codex_detail = "not configured or AMS primary root is not established"
     codex_surface = MemorySurface(
         name="codex-memory",
-        role="secondary" if codex_server is not None and ams_matches_root else "unconfigured",
-        status="pass" if codex_server is not None and ams_matches_root else "warn",
+        role="secondary" if codex_configured_as_secondary else "unconfigured",
+        status="pass" if codex_configured_as_secondary else "warn",
         configured=codex_server is not None,
         source_path=_server_env_string(codex_server, "CODEX_MEMORY_DB_PATH"),
-        detail=(
-            "configured only as secondary legacy/bridge input; AMS guarded startup is primary"
-            if codex_server is not None and ams_matches_root
-            else "not configured or AMS primary root is not established"
-        ),
+        detail=codex_detail,
     )
 
-    native_surface = MemorySurface(
-        name="native-codex-memory",
-        role="secondary_import_source" if legacy_registry.exists() else "unconfigured",
-        status="pass" if migration_matches_legacy else ("warn" if legacy_registry.exists() else "pass"),
-        configured=legacy_registry.exists(),
-        source_path=str(legacy_registry) if legacy_registry.exists() else None,
-        detail=(
+    native_role: Literal["secondary_import_source", "unconfigured"] = (
+        "secondary_import_source" if legacy_registry.exists() else "unconfigured"
+    )
+    if native_codex_memories_disabled:
+        native_status: Literal["pass", "warn", "fail"] = "pass"
+        if migration_matches_legacy and latest_migration:
+            native_detail = (
+                "native Codex Memories disabled by Codex config; "
+                f"latest applied migration imports this registry via {latest_migration['run_id']}"
+            )
+        elif legacy_registry.exists():
+            native_detail = (
+                "native Codex Memories disabled by Codex config; registry is inactive default memory "
+                "and may only be used as AMS-pointed evidence/migration input"
+            )
+        else:
+            native_detail = "native Codex Memories disabled by Codex config; legacy registry not present"
+    else:
+        native_status = "pass" if migration_matches_legacy else ("warn" if legacy_registry.exists() else "pass")
+        native_detail = (
             f"latest applied migration imports this registry via {latest_migration['run_id']}"
             if migration_matches_legacy and latest_migration
             else (
@@ -1038,11 +1144,21 @@ def memory_surface_report(
                 if legacy_registry.exists()
                 else "legacy registry not present"
             )
-        ),
+        )
+    native_surface = MemorySurface(
+        name="native-codex-memory",
+        role=native_role,
+        status=native_status,
+        configured=legacy_registry.exists(),
+        source_path=str(legacy_registry) if legacy_registry.exists() else None,
+        detail=native_detail,
     )
 
     surfaces = [ams_surface, codex_surface, native_surface]
-    reconciled = ams_surface.status == "pass" and codex_surface.role == "secondary" and native_surface.status == "pass"
+    reconciled = ams_surface.status == "pass" and (
+        native_codex_memories_disabled
+        or (codex_surface.role == "secondary" and native_surface.status == "pass")
+    )
     return MemorySurfaceReport(
         root=str(root),
         config_path=str(config_path),
@@ -1076,11 +1192,11 @@ def record_scope_summary(root: Path | None = None) -> RecordScopeSummary:
 def phase_status() -> PhaseStatus:
     return PhaseStatus(
         completed_through=(
-            "AMS v1 product lock: kernel, MCP bridge, startup gate, guarded Codex runtime, memory surface reconciliation, governed-run close/finalize, automatic runtime trace intake, aging/maintenance review, fresh operator proof, and frontier eval rerun are complete"
+            "AMS v1 product lock is accepted; AMS V2 terminal acceptance is complete through the fresh-root V2 operator proof, V2 eval harness, audit docs, review prompts, and product-lock update"
         ),
-        current_phase="AMS v1 Accepted",
-        status="complete",
-        next_step="none - AMS v1 terminal acceptance contract is complete",
+        current_phase="AMS V2 Accepted",
+        status="accepted",
+        next_step="none - AMS V2 terminal acceptance contract is complete",
         ready_for_next_phase=True,
         open_followups=[],
     )
@@ -1211,6 +1327,43 @@ def _write_runtime_trace_records(root: Path, run: RuntimeTraceRun) -> None:
     _append_jsonl(root / "runtime-trace-runs.jsonl", run.model_dump(mode="json"))
     _write_json(root / "runtime-trace-latest.json", run.model_dump(mode="json"))
     (root / "runtime-trace-latest.md").write_text(_render_runtime_trace_markdown(run), encoding="utf-8")
+
+
+def _write_experience_graph_records(root: Path, record: ExperienceGraphRecord) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "experience-graph-runs.jsonl", record.model_dump(mode="json"))
+    _write_json(root / "experience-graph-latest.json", record.model_dump(mode="json"))
+    (root / "experience-graph-latest.md").write_text(_render_experience_graph_markdown(record), encoding="utf-8")
+
+
+def _write_experience_attribution_records(root: Path, attribution: ExperienceAttribution) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "experience-attribution-runs.jsonl", attribution.model_dump(mode="json"))
+    _write_json(root / "experience-attribution-latest.json", attribution.model_dump(mode="json"))
+    (root / "experience-attribution-latest.md").write_text(
+        _render_experience_attribution_markdown(attribution),
+        encoding="utf-8",
+    )
+
+
+def _write_behavior_invariant_records(root: Path, invariant: BehaviorInvariant) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "behavior-invariant-runs.jsonl", invariant.model_dump(mode="json"))
+    _write_json(root / "behavior-invariant-latest.json", invariant.model_dump(mode="json"))
+    (root / "behavior-invariant-latest.md").write_text(
+        _render_behavior_invariant_markdown(invariant),
+        encoding="utf-8",
+    )
+
+
+def _write_skill_candidate_records(root: Path, skill: SkillCandidate) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    _append_jsonl(root / "skill-candidate-runs.jsonl", skill.model_dump(mode="json"))
+    _write_json(root / "skill-candidate-latest.json", skill.model_dump(mode="json"))
+    (root / "skill-candidate-latest.md").write_text(
+        _render_skill_candidate_markdown(skill),
+        encoding="utf-8",
+    )
 
 
 def _write_maintenance_records(root: Path, run: MaintenanceRun) -> None:
@@ -1385,12 +1538,88 @@ def _render_runtime_trace_markdown(run: RuntimeTraceRun) -> str:
         f"- session_id: `{run.session_id}`",
         f"- command: `{run.command}`",
         f"- command_args: `{len(run.command_args)}`",
+        f"- decision_id: `{run.decision_id}`",
+        f"- experience_record_id: `{run.experience_record_id}`",
+        f"- attribution_id: `{run.attribution_id}`",
+        f"- attribution_class: `{run.attribution_class}`",
+        f"- invariant_id: `{run.invariant_id}`",
+        f"- skill_id: `{run.skill_id}`",
         f"- proposed_atoms: `{run.proposed_atom_count}`",
     ]
     if run.proposed_atom_ids:
         lines.extend(["", "## Proposed Atoms", ""])
         for atom_id in run.proposed_atom_ids:
             lines.append(f"- `{atom_id}`")
+    return "\n".join(lines) + "\n"
+
+
+def _render_experience_graph_markdown(record: ExperienceGraphRecord) -> str:
+    audit = record.audit_summary()
+    lines = [
+        "# AMS V2 Experience Graph Latest",
+        "",
+        f"- record_id: `{record.record_id}`",
+        f"- decision_id: `{record.decision.decision_id}`",
+        f"- action_kind: `{record.decision.action_kind}`",
+        f"- authority: `{record.decision.applicable_authority}`",
+        f"- scope_candidate: `{record.scope_candidate}`",
+        f"- outcome_status: `{record.outcome_status}`",
+        f"- attribution_status: `{record.attribution_status}`",
+        f"- inference_receipt_id: `{record.inference_receipt_id}`",
+        f"- runtime_surface: `{record.decision.runtime_surface}`",
+        f"- evidence_ids: `{len(audit['evidence_ids'])}`",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _render_experience_attribution_markdown(attribution: ExperienceAttribution) -> str:
+    lines = [
+        "# AMS V2 Experience Attribution Latest",
+        "",
+        f"- attribution_id: `{attribution.attribution_id}`",
+        f"- record_id: `{attribution.record_id}`",
+        f"- decision_id: `{attribution.decision_id}`",
+        f"- attribution_class: `{attribution.attribution_class}`",
+        f"- scope_candidate: `{attribution.scope_candidate}`",
+        f"- authority_basis: `{attribution.authority_basis}`",
+        f"- non_repeat_candidate: `{attribution.non_repeat_candidate}`",
+        f"- invariant_candidate: `{attribution.invariant_candidate}`",
+        f"- skill_candidate: `{attribution.skill_candidate}`",
+        f"- approved_experiment_exclusion: `{attribution.approved_experiment_exclusion}`",
+        f"- needs_owner_review: `{attribution.needs_owner_review}`",
+        f"- evidence_ids: `{len(attribution.evidence_ids)}`",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _render_behavior_invariant_markdown(invariant: BehaviorInvariant) -> str:
+    lines = [
+        "# AMS V2 Behavior Invariant Latest",
+        "",
+        f"- invariant_id: `{invariant.invariant_id}`",
+        f"- source_attribution_id: `{invariant.source_attribution_id}`",
+        f"- authority: `{invariant.authority}`",
+        f"- scope: `{invariant.scope}`",
+        f"- enforcement: `{invariant.enforcement}`",
+        f"- supersession_status: `{invariant.supersession_status}`",
+        f"- evidence_ids: `{len(invariant.evidence_ids)}`",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _render_skill_candidate_markdown(skill: SkillCandidate) -> str:
+    lines = [
+        "# AMS V2 Skill Candidate Latest",
+        "",
+        f"- skill_id: `{skill.skill_id}`",
+        f"- source_attribution_id: `{skill.source_attribution_id}`",
+        f"- transfer_scope: `{skill.transfer_scope}`",
+        f"- promotion_status: `{skill.promotion_status}`",
+        f"- preconditions: `{len(skill.preconditions)}`",
+        f"- procedure_steps: `{len(skill.procedure)}`",
+        f"- when_not_to_apply: `{len(skill.when_not_to_apply)}`",
+        f"- evidence_ids: `{len(skill.evidence_ids)}`",
+    ]
     return "\n".join(lines) + "\n"
 
 
@@ -1464,7 +1693,21 @@ def _maintenance_check_detail(run: MaintenanceRun) -> str:
 
 def _memory_surface_check_detail(report: MemorySurfaceReport) -> str:
     if report.reconciled:
-        return "reconciled: ams-memory primary, codex-memory secondary, native import current"
+        details: list[str] = []
+        for surface in report.surfaces:
+            if surface.name == "ams-memory":
+                details.append(f"ams-memory {surface.role}")
+            elif surface.name == "codex-memory":
+                if surface.role == "secondary":
+                    details.append("codex-memory optional secondary configured")
+                else:
+                    details.append("codex-memory optional bridge unconfigured")
+            elif surface.name == "native-codex-memory":
+                if "disabled by Codex config" in surface.detail:
+                    details.append("native Codex memory disabled/import-only")
+                elif surface.status == "pass":
+                    details.append("native import current")
+        return "reconciled: " + "; ".join(details)
     details = [
         f"{surface.name}={surface.status}/{surface.role}: {surface.detail}"
         for surface in report.surfaces
@@ -1626,6 +1869,18 @@ def _server_configured_root(server: dict[str, Any] | None) -> Path | None:
         _server_env_path(server, "AMS_ROOT")
         or _server_env_path(server, "CEM_ROOT")
         or _server_arg_path(server, "--root")
+    )
+
+
+def _native_codex_memories_disabled(config: dict[str, Any]) -> bool:
+    features = config.get("features")
+    memories = config.get("memories")
+    features = features if isinstance(features, dict) else {}
+    memories = memories if isinstance(memories, dict) else {}
+    return (
+        features.get("memories") is False
+        and memories.get("generate_memories") is False
+        and memories.get("use_memories") is False
     )
 
 

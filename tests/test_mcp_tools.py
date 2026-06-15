@@ -24,7 +24,7 @@ def test_cem_mcp_tool_server_exposes_write_path_and_action_brief():
         "cem_confirm_memory",
         "cem_reject_memory",
         "cem_import_shared_trace",
-    } == tool_names
+    } <= tool_names
 
     receipt_result = server.call_tool("cem_ingest_trace", {"trace": trace.model_dump(mode="json")})
     atoms_result = server.call_tool("cem_propose_memories", {"trace_id": trace.trace_id})

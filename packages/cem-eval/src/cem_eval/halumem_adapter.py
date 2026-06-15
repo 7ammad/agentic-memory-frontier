@@ -86,6 +86,13 @@ class HaluMemExtractionScore(BaseModel):
     qa_evidence_recall: float
 
 
+class HaluMemAnswerScore(BaseModel):
+    question_count: int
+    answered_count: int
+    exact_match_count: int
+    exact_match_accuracy: float
+
+
 def load_halumem_dataset(path: str | Path) -> HaluMemDataset:
     source = Path(path)
     raw_users = _load_raw_records(source)
@@ -215,6 +222,34 @@ def score_halumem_reference_upper_bound(dataset: HaluMemDataset) -> HaluMemExtra
             for session in dataset.sessions
         },
     )
+
+
+def score_halumem_qa_answers(
+    dataset: HaluMemDataset,
+    answers_by_question: Mapping[str, str],
+) -> HaluMemAnswerScore:
+    question_count = 0
+    answered_count = 0
+    exact_match_count = 0
+    for session in dataset.sessions:
+        for question_index, question in enumerate(session.questions):
+            question_count += 1
+            key = halumem_question_key(session.session_id, question_index)
+            if key not in answers_by_question:
+                continue
+            answered_count += 1
+            if _normalize_text(answers_by_question[key]) == _normalize_text(question.answer or ""):
+                exact_match_count += 1
+    return HaluMemAnswerScore(
+        question_count=question_count,
+        answered_count=answered_count,
+        exact_match_count=exact_match_count,
+        exact_match_accuracy=_ratio(exact_match_count, question_count),
+    )
+
+
+def halumem_question_key(session_id: str, question_index: int) -> str:
+    return f"{session_id}:{question_index}"
 
 
 def _load_raw_records(source: Path) -> list[dict[str, Any]]:

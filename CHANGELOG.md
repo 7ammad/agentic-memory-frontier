@@ -4,6 +4,472 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-06-15
+
+### Added
+
+- Opened **Post-V2 External Benchmark Final Build** as the named follow-up
+  phase after AMS V2 governance acceptance.
+- Added a natural-language extraction lane behind the `MemoryExtractor`
+  protocol while preserving `DeterministicExtractor` for fixture/marker tests.
+- Added retrieve-to-answer local proxy synthesis for HaluMem QA,
+  MemoryArena, and LongMemEval-V2 so external adapters no longer compare
+  raw recommended actions as final answers.
+- Added zero-output hard gating for external benchmark reports: real runs fail
+  loudly when proposed/output counts are zero unless explicitly marked
+  fixture/proxy/no-extractor mode.
+- Added official-evaluator scaffolds with source, data, and credential
+  boundaries for HaluMem, MemoryArena, and LongMemEval-V2.
+- Added `docs/official-benchmark-smoke-receipt-2026-06-15.md` with exact
+  official setup, bounded smoke, evidence, and full-run command paths for
+  HaluMem, MemoryArena, and LongMemEval-V2.
+
+### Changed
+
+- Renamed external report suite/metrics to local proxy names:
+  `cem0_external_benchmarks_local_proxy`,
+  `local_proxy_trusted_extraction_f1`, `local_proxy_progress_score`, and
+  `local_proxy_exact_match_accuracy`.
+- Updated docs/product lock to state the true boundary: AMS V2 governance is
+  accepted, while public natural-language benchmark performance is a post-V2
+  capability track and local proxy scores are not official leaderboard scores.
+
+### Verified
+
+- Focused red proof failed first on missing natural extractor and zero-output
+  gate, then the focused benchmark/extractor suite passed.
+- Full suite: `.venv\Scripts\python.exe -m pytest -q` -> **passed**.
+- V2 operator proof:
+  `.venv\Scripts\python.exe scripts\run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final-build`
+  -> **passed**.
+- Synthetic eval: `.venv\Scripts\python.exe scripts\run_synthetic_eval.py`
+  -> **passed**, including false-memory resistance and contradiction metrics.
+- Deep monitor: `.venv\Scripts\python.exe scripts\ams.py monitor --deep --json`
+  -> **pass**.
+- Bounded real-data smoke produced nonzero extraction/output without using the
+  zero-output bypass: HaluMem proposed/trusted `4/4` with `3` QA answers,
+  MemoryArena proposed/trusted `517/329` with `147` local proxy predictions,
+  and LongMemEval-V2 proposed/trusted `59/37` with `3` local proxy answers.
+- Official bounded evaluator smokes executed with official repositories or
+  primary-source runner boundaries and real public rows:
+  HaluMem official scorer wrote
+  `tmp\official-evaluators\HaluMem\eval\results\memzero-ams-smoke\memzero_eval_stat_result.json`;
+  LongMemEval-V2 official harness wrote
+  `tmp\official-runs\longmemeval-v2-no-retrieval-smoke\aggregated_metrics.json`;
+  MemoryArena official formal-reasoning boundary wrote
+  `tmp\official-runs\memoryarena-formal-long-context-smoke\json\long_context_grok-4.20-0309-non-reasoning\all_results.json`.
+- Focused official-evaluator repair tests passed:
+  `.venv\Scripts\python.exe -m pytest tests\test_official_evaluator_scaffolds.py tests\test_external_benchmark_natural_language.py tests\test_external_benchmark_report.py tests\test_halumem_runner.py tests\test_memoryarena_runner.py tests\test_longmemeval_v2_runner.py -q`.
+
+## 2026-06-12
+
+### Fixed
+
+- Promoted Claude Code and Cursor from implied "active coding agents" to
+  first-class AMS Agent Onboarding V2 roster entries with accepted contracts,
+  capability contracts, memory-lane contracts, runtime surfaces, trust policy,
+  CLI seed/audit proof, and tests.
+
+### Verified
+
+- Focused proof:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py tests/test_mcp_tools.py -q`
+  -> **9 passed**.
+- Live CLI smoke:
+  `.venv\Scripts\python.exe scripts\ams.py --root tmp\ams-agent-onboarding-six-smoke --json agent seed-roster`
+  -> `accepted_count=6` with Codex, Hermes, Hessa, Claude Code, Cursor, and
+  OpenClaw. Sequential audits for `claude-code-cursor` and `cursor-agent`
+  returned accepted contracts and receipts.
+- Onboarding/storage/MCP cluster:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py tests/test_mcp_tools.py tests/test_storage_evidence.py -q`
+  -> **22 passed**.
+- Full suite: `.venv\Scripts\python.exe -m pytest -q` -> **passed**.
+
+## 2026-06-11
+
+### Added
+
+- Built **AMS Agent Onboarding V2** as the named post-V2 local onboarding layer
+  for governed agents: identity, runtime surface, operational status, owner
+  scope, capability contracts, AMS memory-lane contracts, harness contracts,
+  runtime checks, visibility/ownership, trust policy, persistence, CLI, MCP, and
+  tests.
+- Added `docs/2026-06-11-ams-agent-onboarding-v2-contract.md` as the acceptance
+  contract for onboarding Codex, Hermes, Hessa, Claude Code, Cursor, and parked
+  OpenClaw.
+- Added `AgentOnboardingContract`, `AgentCapabilityContract`,
+  `AgentMemoryContract`, `AgentOnboardingTrustPolicy`, and
+  `AgentOnboardingReceipt`.
+- Added `packages/cem-core/src/cem_core/agent_onboarding.py` with the current
+  Hammad roster builder and stale-agent rejection.
+- Added `python scripts/ams.py agent seed-roster|list|audit|onboard`.
+- Added MCP tools `cem_onboard_agent`, `cem_seed_hammad_agent_roster`, and
+  `cem_list_onboarded_agents`.
+
+### Changed
+
+- Corrected Codex global harness identity: SuperBrembo is not an active agent;
+  Hermes, Hessa, OpenClaw, Claude Code, Cursor, and Codex are the current
+  constellation.
+
+### Verified
+
+- Red proof before implementation:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py -q`
+  failed on missing `cem_core.agent_onboarding`.
+- Focused green proof:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py tests/test_mcp_tools.py tests/test_storage_evidence.py -q`
+  -> **22 passed**.
+- Live CLI smoke:
+  `.venv\Scripts\python.exe scripts\ams.py --root tmp\ams-agent-onboarding-smoke --json agent seed-roster`
+  accepted Codex, Hermes, Hessa, Claude Code, Cursor, and OpenClaw; sequential
+  `agent audit hessa` returned the accepted Hessa contract and receipt.
+- Full suite: `.venv\Scripts\python.exe -m pytest -q` -> **passed**.
+- V2 operator proof:
+  `.venv\Scripts\python.exe scripts\run_ams_v2_operator_proof.py --root tmp\ams-v2-onboarding-proof`
+  -> `AMS_V2_OPERATOR_PROOF_PASS`, `v2_eval=PASS 13/13 false_blocks=0/0`.
+
+## 2026-06-10
+
+### Added
+
+- Opened **AMS V2: Experience Enforcement Architecture** as the named post-v1
+  phase in `TODO.md`.
+- Added `docs/2026-06-10-ams-v2-experience-enforcement-plan.md` as the canonical
+  full-scope V2 execution plan.
+- Added `docs/2026-06-10-ams-v2-acceptance-contract.md` with the Phase 0
+  acceptance axes, seed corpus, false-block budget shape, red-test rule, and
+  receipt rule.
+- Added the first AMS V2 Phase 1 schema models: `DecisionIntent` and
+  `ExperienceGraphRecord`, including required attribution fields and a compact
+  audit summary.
+- Wired guarded runtime traces to persist V2 experience graph records and expose
+  the latest record through dashboard/operator files.
+- Added AMS V2 Phase 2 attribution: `ExperienceAttribution`,
+  `ErrorAttributor`, `SuccessAttributor`, the owner-labeled attribution seed
+  corpus, attribution storage, runtime attribution receipts, and dashboard
+  exposure for the latest attribution.
+- Added AMS V2 Phase 3 compilation: `BehaviorInvariant`,
+  `SkillCandidate`, `BehaviorInvariantCompiler`, `SkillCompiler`,
+  `AuthorityScopeResolver`, invariant/skill storage, runtime compiler calls,
+  and dashboard/operator files for latest invariant and skill candidates.
+- Added AMS V2 Phase 4 situation matching: `SituationMatch`,
+  `SituationMatcher`, exact repeat matching, paraphrase repeat matching,
+  valid-neighbor suppression, owner-approved changed-context suppression, skill
+  precondition matching, match persistence, and `CEM.match_situation()`.
+- Added AMS V2 Phase 5 policy binding: `RuntimeInterceptionBoundary`,
+  `ActionDecisionReceipt`, `PolicyBindingLayer`, `ActionDecisionPoint`,
+  persisted runtime boundary maps, persisted decision receipts, and
+  `CEM.decide_action()` for pre-action verdicts.
+- Added AMS V2 Phase 6 reasoning control: `ReasoningControlReceipt`,
+  `ReasoningController`, `CEM.control_reasoning()`, constrained downgrade rules,
+  visible override/block receipts, silent-steer UX, and persisted reasoning
+  control receipts.
+- Added AMS V2 Phase 7 supersession: `SupersessionEvent`,
+  `SupersessionLedger`, supersession/reversal/owner-override events,
+  supersession storage, and active filtering so superseded invariants stop
+  firing on equivalent future decisions.
+- Added AMS V2 Phase 8 multi-agent governance:
+  `SharedExperienceEnvelope`, `MultiAgentGovernanceReceipt`,
+  `MultiAgentGovernanceLayer`, `CEM.govern_shared_experience()`, governance
+  persistence, writer identity, cross-agent authority ranking, visibility and
+  ownership constraints, scope-pollution rejection, and conflict receipts.
+- Added AMS V2 Phase 9 eval harness:
+  `V2EvalHarnessReport`, `V2EvalSuiteRow`, `V2EvalCaseResult`,
+  `run_v2_eval_harness()`, exported V2 eval constants, and
+  `scripts/run_ams_v2_eval.py` for the one-command Phase 9 acceptance battery.
+- Added AMS V2 Phase 10 release lock:
+  `scripts/run_ams_v2_operator_proof.py`, V2 product-lock audit,
+  V2 review prompts, final product-lock update, and terminal
+  monitor/dashboard phase status.
+
+### Changed
+
+- Locked the correction that the non-repeat enforcement kernel is part of AMS
+  V2, not a V1.5 downgrade or smaller substitute.
+- Expanded V2 scope to include experience graph and decision intent capture,
+  error/success attribution, authority and scope resolution, behavior
+  invariants, procedural skill memory, situation matching, policy binding,
+  action decision points, reasoning control, under-the-hood inference receipts,
+  supersession, multi-agent governance, and the V2 eval battery.
+- Updated monitor/dashboard phase status so AMS V2 Phase 9 is the active rail
+  after Phase 8 multi-agent experience governance.
+- Tightened multi-agent governance so low-authority context claims with
+  `unknown` or pure `logic` authority cannot become enforceable global action
+  control.
+- Updated monitor/dashboard phase status so AMS V2 Phase 10 is the active rail
+  after the Phase 9 eval harness.
+- Updated monitor/dashboard phase status to `AMS V2 Accepted` after the
+  Phase 10 operator proof and release lock.
+- Updated `PRODUCT-LOCK.md` to record AMS V2 as accepted with the terminal proof
+  command and expected receipt.
+
+### Fixed
+
+- Fixed AMS CLI environment bootstrapping after live `correction capture`
+  failed under an unrelated PATH `python` without `pydantic`. The root project
+  now declares its Python dependencies for `uv sync`, `scripts/ams.py`
+  bootstraps through the repo `.venv`, and the session/guarded PowerShell
+  launchers prefer the workspace interpreter before ambient `python`.
+- Added `scripts/ams-env-doctor.ps1` and Hermes-style PATH regression coverage
+  so a repaired Hermes Desktop venv can be detected without breaking AMS.
+
+### Next
+
+- None for AMS V2. Future work must be opened as a named post-V2 phase or as a
+  regression fix from a failing acceptance check.
+
+### Verified
+
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> `2 passed`.
+- Full AMS CLI test file: `python -m pytest tests/test_ams_cli.py -q` -> passed.
+- Phase 1 red->green proof: `python -m pytest tests/test_evidence_models.py -q`
+  failed before implementation because `DecisionIntent` was missing, then
+  passed after adding the schema models.
+- `python -m compileall -q packages/cem-core/src/cem_core` passed.
+- Export smoke:
+  `$env:PYTHONPATH='packages/cem-core/src'; python -c "from cem_core import DecisionIntent, ExperienceGraphRecord; print(DecisionIntent.__name__, ExperienceGraphRecord.__name__)"`
+  -> `DecisionIntent ExperienceGraphRecord`.
+- Full suite: `python -m pytest -q` -> passed.
+- Runtime capture red->green proof:
+  `python -m pytest tests/test_storage_evidence.py::test_experience_graph_record_roundtrip_in_both_backends -q`
+  failed before persistence existed, then passed.
+- Runtime trace red->green proof:
+  `python -m pytest tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates -q`
+  failed before `decision_id` existed, then passed.
+- Affected files:
+  `python -m pytest tests/test_storage_evidence.py tests/test_ams_cli.py tests/test_evidence_models.py -q`
+  -> passed.
+- Full suite after Phase 1 runtime capture: `python -m pytest -q` -> passed.
+- `git diff --check` passed with only expected Windows CRLF warnings.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 2 - Error and success attribution`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 0 status wiring after contract lock" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 1 next step.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 1 runtime capture completion and Phase 2 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 2 next step.
+- Missing-`pydantic` live failure proof: direct
+  `python scripts/ams.py startup-brief "Fix AMS correction capture missing pydantic failure reported from Hessa new build" --domain agentic-memory-system --json`
+  and `scripts/session-start-gate.ps1` initially failed before the environment
+  bootstrap fix; after the fix both pass.
+- Environment regression group:
+  `.venv\Scripts\python.exe -m pytest tests\test_ams_cli.py -k "workspace_python or startup_brief_command_failure or runtime_control_infrastructure_fails" -q`
+  -> `4 passed`.
+- Hermes conflict regression group:
+  `.venv\Scripts\python.exe -m pytest tests\test_ams_cli.py -k "workspace_python or ams_env_doctor" -q`
+  -> `3 passed` with fake `Hermes Desktop\venv\Scripts\python.cmd` ahead of
+  AMS on PATH.
+- Live environment doctor:
+  `powershell -ExecutionPolicy Bypass -File scripts\ams-env-doctor.ps1`
+  -> `AMS_ENV_DOCTOR_STATUS: warn`, workspace Python
+  `C:\Dev\Builds\Agentic Memory System\.venv\Scripts\python.exe`, ambient
+  Python `C:\Users\7amma\AppData\Local\hermes\hermes-agent\venv\Scripts\python.exe`.
+- Full suite after Hermes isolation hardening:
+  `.venv\Scripts\python.exe -m pytest -q` -> passed.
+- Full suite after the environment/bootstrap fix:
+  `.venv\Scripts\python.exe -m pytest -q` -> passed.
+- Correction capture smoke:
+  `python scripts\ams.py --root tmp\ams-correction-capture-pydantic-smoke --json correction capture "we already said no to treating missing pydantic as unsavable; save this to memory" ...`
+  -> `correction_07f0c32f180946d9ad16dc319a9c38b6`.
+- Phase 2 red->green proof:
+  `python -m pytest tests/test_attribution.py -q` failed before implementation
+  because `cem_core.attribution` did not exist, then passed after adding
+  deterministic attribution.
+- Scope-trap canary:
+  `python -m pytest tests/test_attribution.py::test_error_attributor_marks_general_owner_correction_as_non_repeat_mistake -q`
+  failed while the attributor preserved `project` scope, then passed after
+  general Codex/AMS correction evidence promoted the scope candidate to
+  `global_agent_behavior`.
+- Phase 2 focused checks:
+  `python -m pytest tests/test_attribution.py -q` -> passed.
+- Runtime attribution checks:
+  `python -m pytest tests/test_storage_evidence.py tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed. An earlier default-timeout full-suite attempt was interrupted by
+  the command timeout and pytest's Windows stdout flush error during shutdown,
+  then the longer quiet rerun passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 3 - Invariants, skills, and authority scope`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 2 attribution completion and Phase 3 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 3 next step.
+- Phase 3 red->green proof:
+  `python -m pytest tests/test_phase3_compilers.py -q` failed before
+  implementation because `cem_core.compilers` did not exist, then passed after
+  adding invariant, skill, and authority compilers.
+- Phase 3 focused checks:
+  `python -m pytest tests/test_phase3_compilers.py tests/test_storage_evidence.py -q`
+  -> passed.
+- Runtime compiler checks:
+  `python -m pytest tests/test_ams_cli.py::test_ams_cli_runtime_trace_records_controlled_work_and_candidates tests/test_ams_cli.py::test_ams_cli_runtime_trace_compiles_failure_into_behavior_invariant -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 4 - Situation matching`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 3 compiler completion and Phase 4 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 4 next step.
+- Phase 4 red->green proof:
+  `python -m pytest tests/test_situation_matching.py -q` failed before
+  implementation because `cem_core.matching` did not exist, then passed after
+  adding match receipts and `SituationMatcher`.
+- Phase 4 focused checks:
+  `python -m pytest tests/test_situation_matching.py -q` -> passed.
+- Situation match storage:
+  `python -m pytest tests/test_storage_evidence.py::test_situation_match_roundtrip_in_both_backends -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 5 - Action decision point and policy binding`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 4 situation matching completion and Phase 5 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 5 next step.
+- Phase 5 red->green proof:
+  `python -m pytest tests/test_policy_binding.py -q` failed before
+  implementation because `RuntimeInterceptionBoundary` did not exist, then
+  passed after adding the policy binding layer.
+- Phase 5 focused checks:
+  `python -m pytest tests/test_policy_binding.py -q` -> passed.
+- Boundary and receipt storage checks:
+  `python -m pytest tests/test_storage_evidence.py::test_action_decision_receipt_roundtrip_in_both_backends tests/test_storage_evidence.py::test_runtime_interception_boundary_roundtrip_in_both_backends -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 6 - Reasoning controller and under-the-hood UX`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 5 action decision point completion and Phase 6 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 6 next step.
+- Phase 6 red->green proof:
+  `python -m pytest tests/test_reasoning_controller.py -q` failed before
+  implementation because `ReasoningControlReceipt` did not exist, then passed
+  after adding reasoning control.
+- Phase 6 focused checks:
+  `python -m pytest tests/test_reasoning_controller.py -q` -> passed.
+- Reasoning receipt storage:
+  `python -m pytest tests/test_storage_evidence.py::test_reasoning_control_receipt_roundtrip_in_both_backends -q`
+  -> passed.
+- Policy-to-reasoning chain:
+  `python -m pytest tests/test_policy_binding.py tests/test_reasoning_controller.py -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 7 - Supersession and active forgetting`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 6 reasoning controller completion and Phase 7 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 7 next step.
+- Phase 7 red->green proof:
+  `python -m pytest tests/test_supersession.py -q` failed before
+  implementation because `cem_core.supersession` did not exist, then passed
+  after adding supersession events and active filtering.
+- Phase 7 focused checks:
+  `python -m pytest tests/test_supersession.py -q` -> passed.
+- Supersession storage:
+  `python -m pytest tests/test_storage_evidence.py::test_supersession_event_roundtrip_in_both_backends -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 8 - Multi-agent experience governance`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 7 supersession completion and Phase 8 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 8 next step.
+- Phase 8 red->green proof:
+  `python -m pytest tests/test_multi_agent_governance_v2.py -q` failed before
+  implementation because `cem_core.multi_agent_governance` did not exist, then
+  passed after adding shared-experience governance.
+- Phase 8 focused checks:
+  `python -m pytest tests/test_multi_agent_governance_v2.py -q` -> passed.
+- Governance storage:
+  `python -m pytest tests/test_storage_evidence.py::test_shared_experience_governance_roundtrip_in_both_backends -q`
+  -> passed.
+- Phase 8 combined focused checks:
+  `python -m pytest tests/test_multi_agent_governance_v2.py tests/test_storage_evidence.py::test_shared_experience_governance_roundtrip_in_both_backends -q`
+  -> passed.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-core/src/cem_core` -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 9 - V2 eval harness`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 8 multi-agent governance completion and Phase 9 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 9 next step.
+- `git diff --check` passed with only expected Windows CRLF warnings.
+- Phase 9 red proof:
+  `python -m pytest tests/test_v2_eval_harness.py -q` failed before
+  implementation because `cem_eval.v2_eval_harness` did not exist.
+- Phase 9 focused checks:
+  `python -m pytest tests/test_v2_eval_harness.py -q` -> passed.
+- Governance/context-pollution checks:
+  `python -m pytest tests/test_multi_agent_governance_v2.py tests/test_v2_eval_harness.py -q`
+  -> passed.
+- Phase 9 command receipt:
+  `python scripts/run_ams_v2_eval.py --root tmp\ams-v2-eval-phase9-smoke`
+  -> `AMS_V2_EVAL_PASS: 13/13 cases passed; false_blocks=0/0`.
+- Focused phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q packages/cem-eval/src/cem_eval packages/cem-core/src/cem_core scripts/run_ams_v2_eval.py`
+  -> passed.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports current phase
+  `AMS V2 Phase 10 - Operator proof and release lock`.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 9 eval harness completion and Phase 10 active status" --domain codex-harness --json`
+  returns `status=allow` and the V2 Phase 10 next step.
+- `git diff --check` passed with only expected Windows CRLF warnings.
+- Phase 10 red proof:
+  `python -m pytest tests/test_ams_v2_operator_proof.py -q` failed before
+  implementation because `scripts/run_ams_v2_operator_proof.py` did not exist.
+- Phase 10 focused checks:
+  `python -m pytest tests/test_ams_v2_operator_proof.py -q` -> passed.
+- Focused final phase-status regression:
+  `python -m pytest tests/test_ams_cli.py -k "monitor_and_dashboard_records_status or dashboard_separates_ams_and_global_behavior_records" -q`
+  -> passed.
+- `python -m compileall -q scripts/run_ams_v2_operator_proof.py packages/cem-core/src/cem_core/operations.py`
+  -> passed.
+- Full terminal V2 operator proof:
+  `python scripts/run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final`
+  -> `AMS_V2_OPERATOR_PROOF_PASS`; v1 operator pass; V2 eval PASS 13/13;
+  false_blocks=0/0; phase `AMS V2 Accepted ready=True`.
+- Full suite: `$env:PYTHONIOENCODING='utf-8'; python -m pytest -q --tb=short --disable-warnings`
+  -> passed.
+- Live `python scripts/ams.py monitor --json` reports `AMS V2 Accepted`,
+  `ready_for_next_phase=true`, and no open follow-ups.
+- Live `python scripts/ams.py startup-brief "verify AMS V2 terminal acceptance after operator proof" --domain codex-harness --json`
+  returns `status=allow` and terminal accepted phase state.
+- Independent release reviews found and then cleared blocking release-proof
+  issues: unique proof root isolation, Phase 4 storage under the supplied proof
+  root, executed-case seed coverage, persisted V2 proof receipt, artifact
+  manifest completeness, and stale ledger follow-up wording. Final staged-diff
+  review returned no P0/P1/P2 findings.
+
 ## 2026-06-09
 
 ### Fixed
@@ -16,6 +482,8 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Converted `scripts/session-start-gate.ps1` from a hard startup gate into a warning surface: missing `ams.py`, startup-brief command failure, malformed output, unknown status, or startup `block` now report `SESSION_GATE_DEGRADED` and exit 0.
 - Converted `scripts/ams-guarded-command.ps1` missing-`ams.py` handling from fail-closed to degraded/non-blocking so an absent AMS script cannot stop an unrelated owner command.
 - Superseded stale live AMS card `card_3b90d70eb3ac475286cc96cb59646011`, which still claimed safety-critical missing directives could block, and recorded replacement card `card_db1b028bfc664fa097f2dd7f01598d92`.
+- Corrected memory-surface reconciliation for the AMS-only Codex default: `ams-memory` as primary plus native Codex Memories disabled now reconciles even when the unfinished `codex-memory` bridge is not configured. The bridge is reported as an optional warning, not a readiness dependency.
+- Corrected the live Codex memory wiring: native Codex Memories are explicitly disabled in `C:\Users\7amma\.codex\config.toml`, `ams-memory` is registered as the primary MCP, and existing Codex automations now start from AMS startup/action briefs instead of old Markdown/native memory defaults.
 
 ### Verified
 
@@ -33,6 +501,13 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Live MTM incident replay from `C:\Dev\MTM Final AI approach\MTM OS\mtm-os`: `startup-brief "Review third meeting transcript, Claude analysis, and low-quality voice-note transcription options" --domain mtm-os --json` -> `status=degraded`, `block_reasons=[]`, `degraded_reasons=["monitor_failed:*"]`.
 - Live AMS retrieval check no longer surfaces the stale missing-directives blocking card; audit shows `card_3b90d70eb3ac475286cc96cb59646011` as `promotion_status=superseded`.
 - Independent Codex review found two issues: active correction gates were degraded and degraded trace/close surfaces lacked tests. Both were fixed. Re-review then found session-start could still fail-closed on unknown startup status; that was fixed with a degrade/allow PowerShell regression. Later review found a missing-`ams.py` fail-closed launcher path plus stale docs; both were fixed. Final independent re-review reported no actionable findings, with the caveat that its read-only sandbox could not run tests. Local final affected suite passed (`24 passed`) and full suite passed (`211 passed`).
+- AMS-only default red proof: `python -m pytest tests/test_ams_cli.py::test_ams_cli_memory_surfaces_reconcile_ams_only_when_native_memory_disabled -q` failed before the reconciliation fix because `report["reconciled"]` was `False`.
+- AMS-only default green proof: the same focused regression passed, and the affected memory/startup/runtime cluster passed (`6 passed`).
+- Live global memory proof: `python scripts/ams.py memory-surfaces --json` -> `reconciled=true`, `ams-memory=primary/pass`, `codex-memory=unconfigured/warn`, `native-codex-memory=secondary_import_source/pass` with native Codex Memories disabled/import-only.
+- Live Codex config proof: TOML parse showed `features.memories=False`, `memories.generate_memories=False`, `memories.use_memories=False`, and `ams-memory.command=python`; `codex mcp list` showed `ams-memory` enabled; `codex features list` showed `memories experimental false`; direct MCP stdio initialize/tools-list returned the CEM tool list.
+- Refreshed live Monitor-0 after the config repair -> `status=pass`, `memory_surfaces_reconciled=pass`, detail `ams-memory primary; codex-memory optional bridge unconfigured; native Codex memory disabled/import-only`.
+- Independent local `codex review --base staging` found one P2: AMS-only reconciliation would pass if native Codex Memories were not disabled but no `MEMORY.md` existed yet. Added a regression for that exact case and tightened reconciliation to require native-memory disablement for AMS-only mode, or the old secondary bridge plus imported native registry for bridge mode.
+- Final AMS-only verification: `python -m pytest -q` passed; `python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-ams-only-memory-p2` -> `AMS_OPERATOR_PROOF_PASS`.
 - `git diff --check` -> clean aside from expected Windows CRLF warnings.
 
 ## 2026-06-01

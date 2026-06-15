@@ -1,13 +1,16 @@
 from .halumem_adapter import (
+    HaluMemAnswerScore,
     HaluMemDataset,
     HaluMemDatasetSummary,
     HaluMemExtractionScore,
     HaluMemMemoryPoint,
     HaluMemQuestion,
     HaluMemSession,
+    halumem_question_key,
     halumem_sessions_to_agent_traces,
     load_halumem_dataset,
     score_halumem_extraction,
+    score_halumem_qa_answers,
     score_halumem_reference_upper_bound,
     summarize_halumem_dataset,
 )
@@ -56,13 +59,20 @@ from .memoryarena_runner import (
     run_memoryarena_cem0_eval,
     run_memoryarena_cem0_eval_from_dataset,
 )
+from .official_evaluators import (
+    OFFICIAL_EVALUATOR_SCAFFOLDS,
+    OfficialEvaluatorScaffold,
+    official_evaluator_scaffold,
+)
 from .reports import (
+    BenchmarkZeroOutputError,
     ExternalBenchmarkReport,
     ExternalBenchmarkReportRow,
     build_external_benchmark_report,
     build_external_benchmark_report_from_json_files,
     render_external_benchmark_report_markdown,
     render_synthetic_eval_markdown,
+    validate_external_benchmark_report_outputs,
 )
 from .synthetic_corruption import (
     EvalReportRow,
@@ -73,6 +83,14 @@ from .synthetic_corruption import (
     WorkflowReportRow,
     run_synthetic_corruption_eval,
     workflow_report_row_from_run,
+)
+from .v2_eval_harness import (
+    V2_ACCEPTANCE_BATTERY_IDS,
+    V2_EVAL_SUITE_NAMES,
+    V2EvalCaseResult,
+    V2EvalHarnessReport,
+    V2EvalSuiteRow,
+    run_v2_eval_harness,
 )
 from .vertical_loop import VerticalLoopReport, run_vertical_loop
 from .workflow_gotchas import (
@@ -85,6 +103,8 @@ __all__ = [
     "EvalReportRow",
     "ExternalBenchmarkReport",
     "ExternalBenchmarkReportRow",
+    "BenchmarkZeroOutputError",
+    "HaluMemAnswerScore",
     "HaluMemDataset",
     "HaluMemDatasetSummary",
     "HaluMemExtractionScore",
@@ -108,9 +128,16 @@ __all__ = [
     "MemoryArenaScore",
     "MemoryArenaSubtask",
     "MemoryArenaTask",
+    "OFFICIAL_EVALUATOR_SCAFFOLDS",
+    "OfficialEvaluatorScaffold",
     "SyntheticEvalReport",
     "SyntheticEvalResult",
     "VerticalLoopReport",
+    "V2_ACCEPTANCE_BATTERY_IDS",
+    "V2_EVAL_SUITE_NAMES",
+    "V2EvalCaseResult",
+    "V2EvalHarnessReport",
+    "V2EvalSuiteRow",
     "WorkflowGotchaAttempt",
     "WorkflowGotchaDemoResult",
     "WorkflowReportRow",
@@ -118,12 +145,14 @@ __all__ = [
     "build_external_benchmark_report",
     "build_external_benchmark_report_from_json_files",
     "halumem_facsimile_from_synthetic",
+    "halumem_question_key",
     "halumem_sessions_to_agent_traces",
     "load_halumem_dataset",
     "load_longmemeval_v2_dataset",
     "load_memoryarena_dataset",
     "longmemeval_v2_trajectories_to_agent_traces",
     "memoryarena_tasks_to_agent_traces",
+    "official_evaluator_scaffold",
     "render_external_benchmark_report_markdown",
     "render_synthetic_eval_markdown",
     "run_halumem_cem0_eval",
@@ -134,9 +163,11 @@ __all__ = [
     "run_memoryarena_cem0_eval",
     "run_memoryarena_cem0_eval_from_dataset",
     "run_synthetic_corruption_eval",
+    "run_v2_eval_harness",
     "run_vertical_loop",
     "run_workflow_gotcha_demo",
     "score_halumem_extraction",
+    "score_halumem_qa_answers",
     "score_halumem_reference_upper_bound",
     "score_longmemeval_v2_answers",
     "score_longmemeval_v2_reference_upper_bound",
@@ -146,5 +177,6 @@ __all__ = [
     "summarize_halumem_dataset",
     "summarize_longmemeval_v2_dataset",
     "summarize_memoryarena_dataset",
+    "validate_external_benchmark_report_outputs",
     "workflow_report_row_from_run",
 ]

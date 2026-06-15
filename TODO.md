@@ -40,27 +40,152 @@ Do not stop at "task complete" when the next unchecked item is clear.
 
 - `IDEA.md`
 - `PRODUCT-LOCK.md`
+- `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`
+- `docs/2026-06-10-ams-v2-acceptance-contract.md`
+- `docs/2026-06-11-ams-agent-onboarding-v2-contract.md`
 - `research/2026-05-27-plan-1-causal-experience-memory-foundation.md`
 - `specs/2026-05-27-cem-0-memguard-kernel-spec.md`
 - `sessions/2026-05-27-cem-0-session-handoff.md`
 
-`PRODUCT-LOCK.md` defines what counts as product-complete. The old A/B/C/D work remains historical infrastructure context. The active dependency order is:
+`PRODUCT-LOCK.md` defines what counted as AMS v1 product-complete. The old
+A/B/C/D work remains historical infrastructure context. For post-v1 work, the
+active dependency order is AMS V2 Phase 0 through Phase 10 in the V2 plan:
 
 ```text
-Plan 1 foundation -> AMS write-path proof -> backend adapters -> MCP integration -> multi-agent protocol
+V2 contract -> experience graph -> attribution -> invariants/skills -> matching
+-> action decision -> reasoning UX -> supersession -> multi-agent governance
+-> V2 eval -> operator proof
 ```
 
-Backend adapters, MCP integration, and multi-agent protocol stay gated until the AMS proof is stronger.
+Older backend adapters and MCP integration remain infrastructure. They should be
+used only where they serve the V2 experience-enforcement proof.
+
+Post-V2 work now has one active named phase: external benchmark final build.
+AMS V2 governance remains accepted; this phase measures and repairs
+natural-language memory capability on real public benchmark data.
 
 ## Guardrails
 
-- Stay on AMS write-path quality and eval strength.
-- Do not drift into MCP, database adapters, dashboards, or platform integrations before the proof work below is done.
-- Keep deterministic fixtures until the eval primitive is stronger.
+- Preserve the full AMS V2 scope; do not rename it, downgrade it, or trim it
+  into V1.5.
+- Keep every V2 subsystem tied to the experience-enforcement proof: behavior
+  changes under the hood, receipts prove why, and evals verify the result.
+- Do not drift into dashboard, database, MCP, or platform work unless it is
+  required for a listed V2 phase or acceptance test.
+- Keep deterministic fixtures and failure canaries until the V2 eval primitive
+  is stronger.
 - Do not claim state-of-the-art.
 - Never read or write `C:\Dev\Builds\Waki`.
 
 ## Ordered Build Queue
+
+### 15. AMS V2 Experience Enforcement Architecture
+
+AMS V2 is the named post-v1 phase. This is not V1.5 and not a smaller proof
+kernel. The non-repeat enforcement kernel is a core subsystem inside the full V2
+plan alongside reasoning, experience graph, procedural skill memory,
+supersession, multi-agent governance, under-the-hood inference receipts, and the
+V2 evaluation battery.
+
+Canonical plan: `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`.
+Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
+
+- [x] Phase 0 - V2 contract lock: accept the full V2 plan, add V2 acceptance
+      criteria, define the seed corpus, and lock the no-trimming rule.
+- [x] Phase 1 - Experience graph and decision intent: capture expected outcome,
+      authority, approval/experiment state, runtime surface, and evidence ids
+      for consequential actions.
+  - [x] Add V2 `DecisionIntent` and `ExperienceGraphRecord` schema models with
+        audit summary and required attribution fields.
+  - [x] Wire runtime capture so consequential actions persist V2 decision
+        intent records.
+  - [x] Add persistence/audit path for experience graph records.
+- [x] Phase 2 - Error and success attribution: classify mistake,
+      approved-experiment failure, acceptable tradeoff, success, and unresolved
+      outcomes, including owner-labeled seed cases.
+- [x] Phase 3 - Invariants, skills, and authority scope: compile confirmed
+      mistakes into behavior invariants, confirmed successes into skill
+      candidates, and retrieve them through authority-ranked lanes.
+- [x] Phase 4 - Situation matching: catch exact and paraphrased repeats while
+      suppressing valid neighbors according to the false-block budget.
+- [x] Phase 5 - Action decision point and policy binding: intercept
+      consequential decisions and return allow, steer, warn, ask, block,
+      override, or degraded-allow verdicts.
+- [x] Phase 6 - Reasoning controller and under-the-hood UX: allow reasoning with
+      experience while preventing silent rationalization past confirmed
+      mistakes; surface concise inference receipts instead of raw hidden
+      reasoning.
+- [x] Phase 7 - Supersession and active forgetting: retire stale or wrong
+      invariants and skills through authority-ranked supersession.
+- [x] Phase 8 - Multi-agent experience governance: share governed experience
+      across agents without scope pollution.
+- [x] Phase 9 - V2 eval harness: run non-repeat, false-block,
+      approved-experiment, skill-transfer, supersession, multi-agent conflict,
+      and context-pollution evals.
+- [x] Phase 10 - Operator proof and release lock: fresh-root V2 operator proof,
+      dashboard/monitor V2 status, review receipts, and product-lock update.
+
+### 16. AMS Agent Onboarding V2
+
+AMS Agent Onboarding V2 is the named post-V2 product layer for bringing other
+agents into AMS without scope pollution or stale topology. It is not a skeleton,
+not the old universal API idea, and not the deferred ACS relay. It is the full
+local onboarding path: identity, capability contracts, AMS memory-lane
+contracts, harness contracts, runtime checks, trust policy, persistence, CLI,
+MCP, docs, and tests.
+
+Acceptance contract:
+`docs/2026-06-11-ams-agent-onboarding-v2-contract.md`.
+
+- [x] Current roster corrected: Codex, Hermes, Hessa, Claude Code, Cursor, and
+      parked OpenClaw.
+      SuperBrembo is rejected as stale historical topology.
+- [x] Added `AgentOnboardingContract`, `AgentCapabilityContract`,
+      `AgentMemoryContract`, `AgentOnboardingTrustPolicy`, and
+      `AgentOnboardingReceipt`.
+- [x] Added default roster builder with capability, permission, risk,
+      verification, memory-lane, harness, and evidence contracts.
+- [x] Added stale-agent rejection so SuperBrembo cannot become an active AMS
+      onboarding participant.
+- [x] Added SQLite and in-memory persistence for onboarding contracts and
+      receipts.
+- [x] Added CEM methods for onboarding, listing, and auditing agents.
+- [x] Added MCP tools: `cem_onboard_agent`, `cem_seed_hammad_agent_roster`,
+      and `cem_list_onboarded_agents`.
+- [x] Added CLI commands: `agent seed-roster`, `agent list`, `agent audit`,
+      and `agent onboard`.
+- [x] Added focused tests for roster correctness, stale rejection, contract
+      validation, persistence, CLI, and MCP.
+
+### 17. Post-V2 External Benchmark Final Build
+
+The 2026-06-15 real downloaded public-data run proved that the old external
+runner layer could ingest benchmark rows while producing zero memory/output,
+because it silently used the marker-only fixture extractor. This phase repairs
+that structural zero and keeps local proxy results separate from official
+benchmark scores.
+
+- [x] Record the real-data zero finding as a post-V2 capability gap, not as an
+      AMS V2 governance regression.
+- [x] Add `NaturalLanguageExtractor` behind the existing `MemoryExtractor`
+      protocol while keeping `DeterministicExtractor` for fixtures.
+- [x] Make non-fixture external runners default to natural-language extraction;
+      expose `--fixture-mode` for legacy marker fixtures.
+- [x] Add retrieve-to-answer local proxy synthesis for HaluMem QA,
+      MemoryArena, and LongMemEval-V2.
+- [x] Add a zero-output hard gate to unified external reports.
+- [x] Prefix local proxy metrics with `local_proxy_*` and include official
+      evaluator source/status fields in JSON and markdown reports.
+- [x] Add official-evaluator scaffolds for HaluMem, MemoryArena, and
+      LongMemEval-V2 with source URLs and remaining credential/runtime notes.
+- [x] Execute official bounded evaluator smokes for HaluMem, MemoryArena, and
+      LongMemEval-V2 using official repositories or primary-source runner
+      boundaries, real public rows, inspected setup paths, local credentials,
+      and recorded full-run commands.
+- [ ] Run full-scale official CEM backend integrations. This remains open until
+      leaderboard-grade CEM memory backends, full dataset/resource budgets, and
+      large-runtime requirements are exercised for HaluMem, MemoryArena, and
+      LongMemEval-V2.
 
 ### 0. Foundation Lock
 

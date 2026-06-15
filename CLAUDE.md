@@ -26,6 +26,7 @@ python scripts/ams.py monitor --deep              # Monitor-0
 python scripts/ams.py dashboard                   # phase + next step + record layers
 python scripts/run_synthetic_eval.py              # AMS V0 corruption eval smoke
 python scripts/run_ams_operator_proof.py --root tmp\ams-operator-proof-final  # terminal v1 acceptance proof
+powershell -ExecutionPolicy Bypass -File scripts/ams-env-doctor.ps1       # verify AMS is isolated from ambient/Hermes Python
 powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1   # mandatory before implementation/status claims
 ```
 
@@ -50,7 +51,8 @@ research/ specs/ sessions/        plan + spec + handoffs (incl. historical A/B/C
 2. Record changes: `CHANGELOG.md` (timeline) + `docs/PROJECT-LEDGER.md` (decisions/gaps/mistakes/verification) — before or alongside the change.
 3. Follow `TODO.md`: after a verified item, run checks → commit → update TODO → continue to the next unchecked item unless blocked/redirected.
 4. Verify before claiming done: `python -m pytest`, then the relevant smoke command.
-5. Keep `AGENTS.md` (Codex twin) in sync with this file.
+5. If Hermes Desktop was repaired, updated, or put its venv first on PATH, run `scripts/ams-env-doctor.ps1`; AMS must use the repo workspace interpreter, not Hermes' ambient Python.
+6. Keep `AGENTS.md` (Codex twin) in sync with this file.
 
 ## Codex CLI gotchas on this Windows box
 

@@ -21,10 +21,20 @@ def main() -> int:
     parser.add_argument("dataset", help="Path to a MemoryArena JSON, JSONL, or directory of JSON/JSONL files.")
     parser.add_argument("--domain", default=None, help="Optional MemoryArena domain/config name.")
     parser.add_argument("--root", default=None, help="Directory for temporary CEM-0 eval storage.")
+    parser.add_argument(
+        "--fixture-mode",
+        action="store_true",
+        help="Use the deterministic marker extractor for legacy fixtures instead of natural-language extraction.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root) if args.root else Path(tempfile.mkdtemp(prefix="cem-memoryarena-"))
-    result = run_memoryarena_cem0_eval(args.dataset, root, domain=args.domain)
+    result = run_memoryarena_cem0_eval(
+        args.dataset,
+        root,
+        domain=args.domain,
+        fixture_mode=args.fixture_mode,
+    )
     print(json.dumps({"root": str(root), "result": result.model_dump()}, indent=2))
     return 0
 

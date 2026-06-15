@@ -4,8 +4,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from cem_core import CEM, MemoryExtractor, TaskContext
+from cem_core import CEM, DeterministicExtractor, MemoryExtractor, NaturalLanguageExtractor, TaskContext
 
+from .answering import ANSWER_SYNTHESIS_PROMPT_VERSION, synthesize_answer
 from .longmemeval_v2_adapter import (
     LongMemEvalV2AnswerScore,
     LongMemEvalV2Dataset,
@@ -15,11 +16,16 @@ from .longmemeval_v2_adapter import (
     score_longmemeval_v2_answers,
     score_longmemeval_v2_retrieval,
 )
+from .official_evaluators import official_evaluator_scaffold
 
 
 class LongMemEvalV2CEM0EvalResult(BaseModel):
     suite_name: str
     source_path: str
+    metric_scope: str = "local_proxy"
+    official_evaluator_status: str = "official_bounded_smoke_passed"
+    official_evaluator_name: str
+    official_evaluator_source: str
     question_count: int
     trajectory_count: int
     proposed_count: int
@@ -30,6 +36,7 @@ class LongMemEvalV2CEM0EvalResult(BaseModel):
     retrieval_score: LongMemEvalV2RetrievalScore
     answers_by_question: dict[str, str]
     retrieved_trajectory_ids_by_question: dict[str, list[str]]
+    answer_synthesis_prompt_version: str = ANSWER_SYNTHESIS_PROMPT_VERSION
     decision_reason_codes: dict[str, list[str]]
 
 
@@ -39,6 +46,7 @@ def run_longmemeval_v2_cem0_eval(
     *,
     haystack_name: str = "lme_v2_small",
     extractor: MemoryExtractor | None = None,
+    fixture_mode: bool = False,
 ) -> LongMemEvalV2CEM0EvalResult:
     dataset = load_longmemeval_v2_dataset(dataset_path)
     return run_longmemeval_v2_cem0_eval_from_dataset(
@@ -46,6 +54,7 @@ def run_longmemeval_v2_cem0_eval(
         root,
         haystack_name=haystack_name,
         extractor=extractor,
+        fixture_mode=fixture_mode,
     )
 
 
@@ -55,8 +64,9 @@ def run_longmemeval_v2_cem0_eval_from_dataset(
     *,
     haystack_name: str = "lme_v2_small",
     extractor: MemoryExtractor | None = None,
+    fixture_mode: bool = False,
 ) -> LongMemEvalV2CEM0EvalResult:
-    cem = CEM(root, extractor=extractor)
+    cem = CEM(root, extractor=extractor or _default_extractor(fixture_mode=fixture_mode))
     proposed_count = 0
     decision_reason_codes: dict[str, list[str]] = {}
 
@@ -81,8 +91,9 @@ def run_longmemeval_v2_cem0_eval_from_dataset(
             ),
             max_cards=5,
         )
-        if brief.recommended_next_actions:
-            answers_by_question[question.question_id] = brief.recommended_next_actions[0]
+        answer = synthesize_answer(question.question, brief.recommended_next_actions)
+        if answer is not None:
+            answers_by_question[question.question_id] = answer
         retrieved_by_question[question.question_id] = _trajectory_ids_from_evidence(cem, brief.evidence_links)
 
     stored_atoms = cem.store.list_atoms()
@@ -92,9 +103,14 @@ def run_longmemeval_v2_cem0_eval_from_dataset(
     quarantined_count = len(
         [atom for atom in stored_atoms if atom.promotion_status == "quarantined"]
     )
+    scaffold = official_evaluator_scaffold("longmemeval_v2_cem0")
     return LongMemEvalV2CEM0EvalResult(
         suite_name="longmemeval_v2_cem0",
         source_path=dataset.source_path,
+        metric_scope="local_proxy",
+        official_evaluator_status=scaffold.status,
+        official_evaluator_name=scaffold.official_evaluator_name,
+        official_evaluator_source=scaffold.official_evaluator_source,
         question_count=len(dataset.questions),
         trajectory_count=len(dataset.trajectories),
         proposed_count=proposed_count,
@@ -109,6 +125,7 @@ def run_longmemeval_v2_cem0_eval_from_dataset(
         ),
         answers_by_question=answers_by_question,
         retrieved_trajectory_ids_by_question=retrieved_by_question,
+        answer_synthesis_prompt_version=ANSWER_SYNTHESIS_PROMPT_VERSION,
         decision_reason_codes=decision_reason_codes,
     )
 
@@ -121,3 +138,7 @@ def _trajectory_ids_from_evidence(cem: CEM, evidence_links: list[str]) -> list[s
             if trace_id.startswith("lme-v2-"):
                 trajectory_ids.append(trace_id.removeprefix("lme-v2-"))
     return sorted(set(trajectory_ids))
+
+
+def _default_extractor(*, fixture_mode: bool) -> MemoryExtractor:
+    return DeterministicExtractor() if fixture_mode else NaturalLanguageExtractor()
