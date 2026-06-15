@@ -79,6 +79,22 @@ def test_external_benchmark_report_loads_runner_json_outputs(tmp_path):
     assert report.rows[2].primary_metric_name == "exact_match_accuracy"
 
 
+def test_external_benchmark_report_loads_windows_utf8_bom_runner_json(tmp_path):
+    halumem = run_halumem_cem0_eval(_write_halumem_fixture(tmp_path), tmp_path / "halumem-cem")
+    halumem_result = tmp_path / "halumem-result.json"
+    halumem_result.write_text(
+        json.dumps({"result": halumem.model_dump()}),
+        encoding="utf-8-sig",
+    )
+
+    report = build_external_benchmark_report_from_json_files(
+        halumem_result_path=halumem_result,
+    )
+
+    assert report.suite_count == 1
+    assert report.rows[0].suite_name == "halumem_cem0"
+
+
 def _write_halumem_fixture(tmp_path):
     dataset_path = tmp_path / "halumem_report_sample.json"
     dataset_path.write_text(json.dumps([_halumem_record()]), encoding="utf-8")

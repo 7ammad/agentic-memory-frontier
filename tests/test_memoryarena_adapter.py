@@ -91,6 +91,29 @@ def test_memoryarena_reference_upper_bound_scores_clean(tmp_path):
     assert score.task_success_rate == 1.0
 
 
+def test_memoryarena_reference_upper_bound_handles_duplicate_ids_across_domains(tmp_path):
+    dataset_dir = tmp_path / "memoryarena"
+    dataset_dir.mkdir()
+    (dataset_dir / "bundled_shopping.json").write_text(
+        json.dumps([_task_with_id("0", "Find almond flour.", "almond flour")]),
+        encoding="utf-8",
+    )
+    (dataset_dir / "progressive_search.json").write_text(
+        json.dumps([_task_with_id("0", "Find the cited player.", "Tulsidas Balaram")]),
+        encoding="utf-8",
+    )
+    dataset = load_memoryarena_dataset(dataset_dir)
+
+    score = score_memoryarena_reference_upper_bound(dataset)
+
+    assert score.task_count == 2
+    assert score.subtask_count == 2
+    assert score.correct_subtask_count == 2
+    assert score.fully_solved_task_count == 2
+    assert score.progress_score == 1.0
+    assert score.task_success_rate == 1.0
+
+
 def _bundled_shopping_task():
     return {
         "id": 42,
@@ -127,4 +150,12 @@ def _formal_reasoning_task():
             "x = 2",
             "y = 3",
         ],
+    }
+
+
+def _task_with_id(task_id, question, answer):
+    return {
+        "id": task_id,
+        "questions": [question],
+        "answers": [answer],
     }

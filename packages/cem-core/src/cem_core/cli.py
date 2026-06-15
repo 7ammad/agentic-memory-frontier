@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .agent_onboarding import build_hammad_agent_roster
 from .correction_capture import (
     capture_correction,
     correction_gate_status,
@@ -14,6 +15,7 @@ from .correction_capture import (
     resume_correction,
 )
 from .correction_hooks import hook_on_pre_tool_use_gate, hook_on_user_prompt_submit
+from .kernel import CEM
 from .local_memory import (
     audit_memory,
     bootstrap_codex,
@@ -26,6 +28,7 @@ from .local_memory import (
     retrieve_brief,
     run_eval,
 )
+from .models import AgentOnboardingContract
 from .operations import (
     apply_codex_memory_migration,
     build_codex_memory_migration_run,
@@ -329,6 +332,39 @@ def build_parser() -> argparse.ArgumentParser:
     )
     correction_hook_gate_parser.set_defaults(handler=_cmd_correction_hook_gate)
 
+    agent_parser = subparsers.add_parser(
+        "agent",
+        parents=[json_parent],
+        help="Onboard and audit agents against AMS capability and memory-lane contracts.",
+    )
+    agent_subparsers = agent_parser.add_subparsers(dest="agent_command", required=True)
+    agent_seed_parser = agent_subparsers.add_parser(
+        "seed-roster",
+        parents=[json_parent],
+        help="Seed Hammad's current agent roster: Codex, Hermes, Hessa, Claude Code, Cursor, and parked OpenClaw.",
+    )
+    agent_seed_parser.set_defaults(handler=_cmd_agent_seed_roster)
+    agent_list_parser = agent_subparsers.add_parser(
+        "list",
+        parents=[json_parent],
+        help="List persisted agent onboarding contracts.",
+    )
+    agent_list_parser.set_defaults(handler=_cmd_agent_list)
+    agent_audit_parser = agent_subparsers.add_parser(
+        "audit",
+        parents=[json_parent],
+        help="Audit one onboarded agent by agent id or contract id.",
+    )
+    agent_audit_parser.add_argument("agent_id")
+    agent_audit_parser.set_defaults(handler=_cmd_agent_audit)
+    agent_onboard_parser = agent_subparsers.add_parser(
+        "onboard",
+        parents=[json_parent],
+        help="Onboard an agent from an AgentOnboardingContract JSON file.",
+    )
+    agent_onboard_parser.add_argument("contract", type=Path)
+    agent_onboard_parser.set_defaults(handler=_cmd_agent_onboard)
+
     dashboard_parser = subparsers.add_parser("dashboard", parents=[json_parent], help="Show latest AMS operator status.")
     dashboard_parser.set_defaults(handler=_cmd_dashboard)
 
@@ -555,6 +591,34 @@ def _cmd_correction_hook_prompt(args: argparse.Namespace) -> dict[str, Any]:
 
 def _cmd_correction_hook_gate(args: argparse.Namespace) -> dict[str, Any]:
     return hook_on_pre_tool_use_gate(args.root).model_dump(mode="json")
+
+
+def _cmd_agent_seed_roster(args: argparse.Namespace) -> dict[str, Any]:
+    cem = CEM(args.root)
+    receipts = [cem.onboard_agent(contract) for contract in build_hammad_agent_roster()]
+    return {
+        "accepted_count": sum(receipt.status == "accepted" for receipt in receipts),
+        "rejected_count": sum(receipt.status == "rejected" for receipt in receipts),
+        "needs_review_count": sum(receipt.status == "needs_review" for receipt in receipts),
+        "agent_ids": [receipt.agent_id for receipt in receipts if receipt.status == "accepted"],
+        "receipts": [receipt.model_dump(mode="json") for receipt in receipts],
+    }
+
+
+def _cmd_agent_list(args: argparse.Namespace) -> dict[str, Any]:
+    cem = CEM(args.root)
+    return {"agents": [contract.model_dump(mode="json") for contract in cem.list_onboarded_agents()]}
+
+
+def _cmd_agent_audit(args: argparse.Namespace) -> dict[str, Any]:
+    cem = CEM(args.root)
+    return cem.audit_onboarded_agent(args.agent_id)
+
+
+def _cmd_agent_onboard(args: argparse.Namespace) -> dict[str, Any]:
+    contract = AgentOnboardingContract.model_validate_json(args.contract.read_text(encoding="utf-8"))
+    receipt = CEM(args.root).onboard_agent(contract)
+    return {"receipt": receipt.model_dump(mode="json")}
 
 
 def _cmd_dashboard(args: argparse.Namespace) -> dict[str, Any]:

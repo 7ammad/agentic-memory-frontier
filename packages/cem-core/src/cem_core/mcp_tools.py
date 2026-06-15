@@ -5,8 +5,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .agent_onboarding import build_hammad_agent_roster
 from .kernel import CEM
-from .models import AgentTrace, TaskContext
+from .models import AgentOnboardingContract, AgentTrace, TaskContext
 from .multi_agent import MultiAgentTrustPolicy, SharedTraceEnvelope, import_shared_trace
 
 
@@ -69,6 +70,29 @@ class CEMMCPToolServer:
             policy = MultiAgentTrustPolicy.model_validate(arguments.get("trust_policy", {}))
             receipt = import_shared_trace(self.cem, envelope, trust_policy=policy)
             return _tool_result({"receipt": receipt.model_dump(mode="json")})
+        if name == "cem_onboard_agent":
+            contract = AgentOnboardingContract.model_validate(arguments["contract"])
+            receipt = self.cem.onboard_agent(contract)
+            return _tool_result({"receipt": receipt.model_dump(mode="json")})
+        if name == "cem_seed_hammad_agent_roster":
+            receipts = [self.cem.onboard_agent(contract) for contract in build_hammad_agent_roster()]
+            return _tool_result(
+                {
+                    "accepted_count": sum(receipt.status == "accepted" for receipt in receipts),
+                    "rejected_count": sum(receipt.status == "rejected" for receipt in receipts),
+                    "agent_ids": [receipt.agent_id for receipt in receipts if receipt.status == "accepted"],
+                    "receipts": [receipt.model_dump(mode="json") for receipt in receipts],
+                }
+            )
+        if name == "cem_list_onboarded_agents":
+            return _tool_result(
+                {
+                    "agents": [
+                        contract.model_dump(mode="json")
+                        for contract in self.cem.list_onboarded_agents()
+                    ]
+                }
+            )
         raise KeyError(f"Unknown CEM MCP tool: {name}")
 
 
@@ -175,6 +199,26 @@ def _tool_definitions() -> list[MCPToolDefinition]:
                 "required": ["envelope"],
                 "additionalProperties": False,
             },
+        ),
+        MCPToolDefinition(
+            name="cem_onboard_agent",
+            description="Register an agent onboarding contract with capability, memory-lane, trust, and runtime check requirements.",
+            inputSchema={
+                "type": "object",
+                "properties": {"contract": AgentOnboardingContract.model_json_schema()},
+                "required": ["contract"],
+                "additionalProperties": False,
+            },
+        ),
+        MCPToolDefinition(
+            name="cem_seed_hammad_agent_roster",
+            description="Seed the current Hammad agent roster: Codex, Hermes, Hessa, Claude Code, Cursor, and parked OpenClaw.",
+            inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
+        ),
+        MCPToolDefinition(
+            name="cem_list_onboarded_agents",
+            description="List persisted agent onboarding contracts.",
+            inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
         ),
     ]
 

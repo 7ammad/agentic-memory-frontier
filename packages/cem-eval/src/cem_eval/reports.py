@@ -438,7 +438,7 @@ def _longmemeval_v2_report_row(result: LongMemEvalV2CEM0EvalResult) -> ExternalB
 
 
 def _load_runner_result(path: str | Path, model: type[TReportResult]) -> TReportResult:
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     payload = raw.get("result", raw) if isinstance(raw, dict) else raw
     return model.model_validate(payload)
 

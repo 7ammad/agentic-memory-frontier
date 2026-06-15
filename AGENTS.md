@@ -31,7 +31,7 @@ Thesis: *Memory is not storage. Memory is verified experience that improves futu
 
 ## To continue right now
 
-1. Run session-start hard gate before any implementation command: `powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1`. If it fails, stop and fix memory wiring first.
+1. Run session-start hard gate before any implementation command: `powershell -ExecutionPolicy Bypass -File scripts/session-start-gate.ps1`. If it fails, stop and fix memory wiring first. If Hermes Desktop was repaired, updated, or put its venv first on PATH, run `powershell -ExecutionPolicy Bypass -File scripts/ams-env-doctor.ps1`; AMS must use the repo workspace interpreter, not Hermes' ambient Python.
 2. Load project memories: `memory_search({query: "agentic memory system state", scope: "project:agentic-memory-system", limit: 10, mode: "hybrid"})` — returns the canonical state entry [mem_343df0ac, updated to reflect all 4 done] plus the rest. Don't rely on `memory_load_session` alone — verified in cold-start that it can return cross-scope results.
 3. Decide next phase. Options:
    - **Implement** in dependency order: SC v0.3 Phase 1 → Codex memory C Phase 0+1 → ACS D Phase 1. Each phase has its own acceptance battery in the spec.

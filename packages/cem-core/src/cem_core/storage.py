@@ -8,6 +8,8 @@ from .models import (
     ActionBriefRecord,
     ActionDecisionReceipt,
     ActionInfluenceEvent,
+    AgentOnboardingContract,
+    AgentOnboardingReceipt,
     AgentTrace,
     BehaviorInvariant,
     ExperienceAttribution,
@@ -84,6 +86,12 @@ class CEMStore(Protocol):
     def save_multi_agent_governance_receipt(self, receipt: MultiAgentGovernanceReceipt) -> None: ...
     def get_multi_agent_governance_receipt(self, receipt_id: str) -> MultiAgentGovernanceReceipt: ...
     def list_multi_agent_governance_receipts(self) -> list[MultiAgentGovernanceReceipt]: ...
+    def save_agent_onboarding_contract(self, contract: AgentOnboardingContract) -> None: ...
+    def get_agent_onboarding_contract(self, contract_id: str) -> AgentOnboardingContract: ...
+    def list_agent_onboarding_contracts(self) -> list[AgentOnboardingContract]: ...
+    def save_agent_onboarding_receipt(self, receipt: AgentOnboardingReceipt) -> None: ...
+    def get_agent_onboarding_receipt(self, receipt_id: str) -> AgentOnboardingReceipt: ...
+    def list_agent_onboarding_receipts(self) -> list[AgentOnboardingReceipt]: ...
 
 
 class SQLiteStore:
@@ -223,6 +231,20 @@ class SQLiteStore:
                     envelope_id TEXT NOT NULL,
                     verdict TEXT NOT NULL,
                     recipient_applicability TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS agent_onboarding_contracts (
+                    contract_id TEXT PRIMARY KEY,
+                    agent_id TEXT NOT NULL,
+                    runtime_surface TEXT NOT NULL,
+                    operational_status TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS agent_onboarding_receipts (
+                    receipt_id TEXT PRIMARY KEY,
+                    contract_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
                 """
@@ -746,6 +768,70 @@ class SQLiteStore:
             rows = conn.execute("SELECT payload FROM multi_agent_governance_receipts ORDER BY rowid").fetchall()
         return [MultiAgentGovernanceReceipt.model_validate_json(row[0]) for row in rows]
 
+    def save_agent_onboarding_contract(self, contract: AgentOnboardingContract) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agent_onboarding_contracts(
+                    contract_id, agent_id, runtime_surface, operational_status, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    contract.contract_id,
+                    contract.agent_id,
+                    contract.runtime_surface,
+                    contract.operational_status,
+                    contract.model_dump_json(),
+                ),
+            )
+
+    def get_agent_onboarding_contract(self, contract_id: str) -> AgentOnboardingContract:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM agent_onboarding_contracts WHERE contract_id = ?",
+                (contract_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Agent onboarding contract not found: {contract_id}")
+        return AgentOnboardingContract.model_validate_json(row[0])
+
+    def list_agent_onboarding_contracts(self) -> list[AgentOnboardingContract]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM agent_onboarding_contracts ORDER BY rowid").fetchall()
+        return [AgentOnboardingContract.model_validate_json(row[0]) for row in rows]
+
+    def save_agent_onboarding_receipt(self, receipt: AgentOnboardingReceipt) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO agent_onboarding_receipts(
+                    receipt_id, contract_id, agent_id, status, payload
+                ) VALUES(?, ?, ?, ?, ?)
+                """,
+                (
+                    receipt.receipt_id,
+                    receipt.contract_id,
+                    receipt.agent_id,
+                    receipt.status,
+                    receipt.model_dump_json(),
+                ),
+            )
+
+    def get_agent_onboarding_receipt(self, receipt_id: str) -> AgentOnboardingReceipt:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM agent_onboarding_receipts WHERE receipt_id = ?",
+                (receipt_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Agent onboarding receipt not found: {receipt_id}")
+        return AgentOnboardingReceipt.model_validate_json(row[0])
+
+    def list_agent_onboarding_receipts(self) -> list[AgentOnboardingReceipt]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload FROM agent_onboarding_receipts ORDER BY rowid").fetchall()
+        return [AgentOnboardingReceipt.model_validate_json(row[0]) for row in rows]
+
 
 class InMemoryStore:
     """Local test/eval backend that exercises the same storage contract without files."""
@@ -771,6 +857,8 @@ class InMemoryStore:
         self._supersession_events: dict[str, str] = {}
         self._shared_experience_envelopes: dict[str, str] = {}
         self._multi_agent_governance_receipts: dict[str, str] = {}
+        self._agent_onboarding_contracts: dict[str, str] = {}
+        self._agent_onboarding_receipts: dict[str, str] = {}
 
     def save_trace(self, trace: AgentTrace) -> None:
         self._traces[trace.trace_id] = trace.model_dump_json()
@@ -1035,4 +1123,34 @@ class InMemoryStore:
         return [
             MultiAgentGovernanceReceipt.model_validate_json(payload)
             for payload in self._multi_agent_governance_receipts.values()
+        ]
+
+    def save_agent_onboarding_contract(self, contract: AgentOnboardingContract) -> None:
+        self._agent_onboarding_contracts[contract.contract_id] = contract.model_dump_json()
+
+    def get_agent_onboarding_contract(self, contract_id: str) -> AgentOnboardingContract:
+        payload = self._agent_onboarding_contracts.get(contract_id)
+        if payload is None:
+            raise KeyError(f"Agent onboarding contract not found: {contract_id}")
+        return AgentOnboardingContract.model_validate_json(payload)
+
+    def list_agent_onboarding_contracts(self) -> list[AgentOnboardingContract]:
+        return [
+            AgentOnboardingContract.model_validate_json(payload)
+            for payload in self._agent_onboarding_contracts.values()
+        ]
+
+    def save_agent_onboarding_receipt(self, receipt: AgentOnboardingReceipt) -> None:
+        self._agent_onboarding_receipts[receipt.receipt_id] = receipt.model_dump_json()
+
+    def get_agent_onboarding_receipt(self, receipt_id: str) -> AgentOnboardingReceipt:
+        payload = self._agent_onboarding_receipts.get(receipt_id)
+        if payload is None:
+            raise KeyError(f"Agent onboarding receipt not found: {receipt_id}")
+        return AgentOnboardingReceipt.model_validate_json(payload)
+
+    def list_agent_onboarding_receipts(self) -> list[AgentOnboardingReceipt]:
+        return [
+            AgentOnboardingReceipt.model_validate_json(payload)
+            for payload in self._agent_onboarding_receipts.values()
         ]

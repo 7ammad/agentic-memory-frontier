@@ -14,6 +14,8 @@ from .models import (
     ActionInfluenceEvent,
     AgentTrace,
     ActionDecisionReceipt,
+    AgentOnboardingContract,
+    AgentOnboardingReceipt,
     DecisionIntent,
     ExperienceAtom,
     ExperienceCard,
@@ -203,6 +205,19 @@ class CEM:
         self.store.save_shared_experience_envelope(envelope)
         self.store.save_multi_agent_governance_receipt(receipt)
         return receipt
+
+    def onboard_agent(self, contract: AgentOnboardingContract) -> AgentOnboardingReceipt:
+        from .agent_onboarding import onboard_agent
+
+        return onboard_agent(self.store, contract)
+
+    def list_onboarded_agents(self) -> list[AgentOnboardingContract]:
+        return self.store.list_agent_onboarding_contracts()
+
+    def audit_onboarded_agent(self, agent_id: str) -> dict[str, object]:
+        from .agent_onboarding import audit_onboarded_agent
+
+        return audit_onboarded_agent(self.store, agent_id)
 
     def _link_contradicting_cards(self, new_card: ExperienceCard) -> None:
         """Bidirectionally link active cards whose claims conflict without a

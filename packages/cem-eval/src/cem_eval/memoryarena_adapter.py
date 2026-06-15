@@ -129,7 +129,9 @@ def score_memoryarena_predictions(
     subtask_count = 0
 
     for task in dataset.tasks:
-        predictions = list(predictions_by_task.get(task.task_id, []))
+        predictions = list(
+            predictions_by_task.get(_prediction_key(task), predictions_by_task.get(task.task_id, []))
+        )
         task_correct = 0
         for subtask in task.subtasks:
             subtask_count += 1
@@ -153,8 +155,12 @@ def score_memoryarena_predictions(
 def score_memoryarena_reference_upper_bound(dataset: MemoryArenaDataset) -> MemoryArenaScore:
     return score_memoryarena_predictions(
         dataset,
-        {task.task_id: [subtask.answer for subtask in task.subtasks] for task in dataset.tasks},
+        {_prediction_key(task): [subtask.answer for subtask in task.subtasks] for task in dataset.tasks},
     )
+
+
+def memoryarena_prediction_key(task: MemoryArenaTask) -> str:
+    return _prediction_key(task)
 
 
 def _load_raw_records(source: Path, *, domain: str | None) -> list[tuple[str, dict[str, Any]]]:
@@ -219,6 +225,10 @@ def _task_from_raw(raw_task: dict[str, Any], *, domain: str) -> MemoryArenaTask:
         subtasks=subtasks,
         raw=raw_task,
     )
+
+
+def _prediction_key(task: MemoryArenaTask) -> str:
+    return f"{task.domain}:{task.task_id}"
 
 
 def _backgrounds(value: Any) -> list[str]:

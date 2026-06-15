@@ -10,6 +10,7 @@ from .memoryarena_adapter import (
     MemoryArenaDataset,
     MemoryArenaScore,
     load_memoryarena_dataset,
+    memoryarena_prediction_key,
     memoryarena_tasks_to_agent_traces,
     score_memoryarena_predictions,
 )
@@ -60,15 +61,16 @@ def run_memoryarena_cem0_eval_from_dataset(
 
     predictions_by_task: dict[str, list[str]] = {}
     for task in dataset.tasks:
+        prediction_key = memoryarena_prediction_key(task)
         task_context = TaskContext(
-            task_id=task.task_id,
+            task_id=prediction_key,
             session_id=f"memoryarena-{task.domain}-{task.task_id}",
             description=" ".join([subtask.question for subtask in task.subtasks]),
             domain_scope="memoryarena",
             task_family=f"memoryarena-{task.domain}",
         )
         brief = cem.retrieve_action_brief(task_context, max_cards=max(1, len(task.subtasks)))
-        predictions_by_task[task.task_id] = brief.recommended_next_actions[: len(task.subtasks)]
+        predictions_by_task[prediction_key] = brief.recommended_next_actions[: len(task.subtasks)]
 
     stored_atoms = cem.store.list_atoms()
     trusted_count = len(

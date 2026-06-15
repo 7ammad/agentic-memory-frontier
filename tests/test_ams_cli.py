@@ -16,6 +16,7 @@ from cem_core.local_memory import _active_product_directive_content
 
 ROOT = Path(__file__).resolve().parents[1]
 AMS = ROOT / "scripts" / "ams.py"
+ENV_DOCTOR = ROOT / "scripts" / "ams-env-doctor.ps1"
 
 
 def test_ams_cli_round_trip_persists_across_subprocesses(tmp_path):
@@ -1288,6 +1289,67 @@ def test_ams_guarded_command_runs_downstream_when_runtime_control_infrastructure
     assert "AMS_GUARD_BLOCKED" not in process.stdout
 
 
+def test_ams_guarded_command_prefers_workspace_python(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    sentinel = tmp_path / "workspace-python-used.txt"
+    downstream = tmp_path / "workspace-python-downstream-ran.txt"
+    (scripts / "ams.py").write_text(
+        "import json\n"
+        "import sys\n"
+        "if 'runtime-control' in sys.argv:\n"
+        "    print(json.dumps({'status': 'allow', 'control_id': 'control_1', 'governed_run_id': 'run_1'}))\n"
+        "elif 'runtime-trace' in sys.argv:\n"
+        "    print(json.dumps({'trace_id': 'trace_1'}))\n"
+        "elif 'governed-run' in sys.argv:\n"
+        "    print(json.dumps({'receipt_id': 'run_1', 'closed': True}))\n"
+        "else:\n"
+        "    raise SystemExit(2)\n",
+        encoding="utf-8",
+    )
+    _write_workspace_python_cmd(workspace, sentinel)
+    hermes_sentinel = tmp_path / "hermes-python-used.txt"
+    hermes_bin = _write_ambient_python_trap(tmp_path, hermes_sentinel)
+    env = os.environ.copy()
+    env["PATH"] = str(hermes_bin) + os.pathsep + env.get("PATH", "")
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "ams-guarded-command.ps1"),
+            "-Workspace",
+            str(workspace),
+            "-Prompt",
+            "ordinary allowed prompt",
+            "-Command",
+            "cmd.exe",
+            "/c",
+            f"echo ran>\"{downstream}\"",
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "AMS_RUNTIME_CONTROL_EXIT: 0" in process.stdout
+    assert downstream.exists()
+    assert sentinel.exists()
+    assert not hermes_sentinel.exists()
+
+
 def test_ams_guarded_command_runs_downstream_when_ams_script_is_missing(tmp_path):
     powershell = shutil.which("powershell")
     if os.name != "nt" or powershell is None:
@@ -1447,6 +1509,95 @@ def test_session_start_gate_warns_and_allows_startup_brief_command_failure(tmp_p
     assert "startup brief database unavailable" in combined_output
     assert "unable to build AMS startup brief" in combined_output
     assert "SESSION_GATE_DEGRADED" in combined_output
+
+
+def test_session_start_gate_prefers_workspace_python(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    sentinel = tmp_path / "session-gate-workspace-python-used.txt"
+    (scripts / "ams.py").write_text(
+        "print('{\"status\":\"allow\",\"block_reasons\":[],\"degraded_reasons\":[],\"brief_id\":\"brief_1\",\"monitor_id\":\"monitor_1\",\"evidence_ids\":[]}')\n",
+        encoding="utf-8",
+    )
+    _write_workspace_python_cmd(workspace, sentinel)
+    hermes_sentinel = tmp_path / "session-gate-hermes-python-used.txt"
+    hermes_bin = _write_ambient_python_trap(tmp_path, hermes_sentinel)
+    env = os.environ.copy()
+    env["PATH"] = str(hermes_bin) + os.pathsep + env.get("PATH", "")
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ROOT / "scripts" / "session-start-gate.ps1"),
+            "-Workspace",
+            str(workspace),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "SESSION_GATE_PASS" in process.stdout
+    assert sentinel.exists()
+    assert not hermes_sentinel.exists()
+
+
+def test_ams_env_doctor_warns_when_hermes_python_is_first_on_path(tmp_path):
+    powershell = shutil.which("powershell")
+    if os.name != "nt" or powershell is None:
+        return
+
+    workspace = tmp_path / "fake-ams"
+    scripts = workspace / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "ams.py").write_text(
+        "print('{\"agent_id\":\"codex\",\"current_session_id\":\"session_test\"}')\n",
+        encoding="utf-8",
+    )
+    workspace_python_sentinel = tmp_path / "doctor-workspace-python-used.txt"
+    _write_workspace_python_cmd(workspace, workspace_python_sentinel)
+    hermes_sentinel = tmp_path / "doctor-hermes-python-used.txt"
+    hermes_bin = _write_ambient_python_forwarder(tmp_path, hermes_sentinel)
+    env = os.environ.copy()
+    env["PATH"] = str(hermes_bin) + os.pathsep + env.get("PATH", "")
+
+    process = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(ENV_DOCTOR),
+            "-Workspace",
+            str(workspace),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert "AMS_ENV_DOCTOR_STATUS: warn" in process.stdout
+    assert "AMS_ENV_DOCTOR_WARN: ambient python appears to come from Hermes" in process.stdout
+    assert workspace_python_sentinel.exists()
+    assert hermes_sentinel.exists()
 
 
 def test_ams_guarded_command_quietly_records_runtime_trace(tmp_path):
@@ -1645,6 +1796,7 @@ def test_active_product_directive_rewrite_removes_legacy_identity_tokens():
 
 def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resume(tmp_path):
     root = tmp_path / "ams"
+    _seed_runtime_control_root(root)
     ledger = tmp_path / "PROJECT-LEDGER.md"
     ledger.write_text("# Project Ledger\n\n## Open Follow-Ups\n\n- existing follow-up\n", encoding="utf-8")
 
@@ -1700,14 +1852,12 @@ def test_ams_cli_correction_capture_records_plan_first_violation_and_blocks_resu
     assert "Correction Capture Controller" in ledger_text
     assert ledger_text.index("LEDGER-CORRECTION") < ledger_text.index("## Open Follow-Ups")
     assert any("avoid continuing after live correction" in action for action in brief["recommended_next_actions"])
-    assert monitor["status"] == "fail"
-    assert _check_status(monitor, "correction_resume_gate_clear") == "fail"
-    assert startup["status"] == "degraded"
+    assert monitor["status"] == "pass"
+    assert _check_status(monitor, "correction_resume_gate_clear") == "pass"
+    assert "active runtime-control gate reported" in _check_detail(monitor, "correction_resume_gate_clear")
+    assert startup["status"] == "allow"
     assert startup["block_reasons"] == []
-    assert any(
-        reason.startswith("monitor_failed:")
-        for reason in startup["degraded_reasons"]
-    )
+    assert startup["degraded_reasons"] == []
 
     control_process = _ams_process(
         root,
@@ -1802,6 +1952,56 @@ def _ams_env(root: Path) -> dict[str, str]:
     if memory_base.exists():
         env["AMS_MEMORY_BASE"] = str(memory_base)
     return env
+
+
+def _write_workspace_python_cmd(workspace: Path, sentinel: Path) -> None:
+    scripts = workspace / ".venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "python.cmd").write_text(
+        "\n".join(
+            [
+                "@ECHO off",
+                f'echo used>"{sentinel}"',
+                f'"{sys.executable}" %*',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_ambient_python_trap(tmp_path: Path, sentinel: Path) -> Path:
+    hermes_bin = tmp_path / "Hermes Desktop" / "venv" / "Scripts"
+    hermes_bin.mkdir(parents=True)
+    (hermes_bin / "python.cmd").write_text(
+        "\n".join(
+            [
+                "@ECHO off",
+                f'echo used>"{sentinel}"',
+                "exit /b 88",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return hermes_bin
+
+
+def _write_ambient_python_forwarder(tmp_path: Path, sentinel: Path) -> Path:
+    hermes_bin = tmp_path / "Hermes Desktop" / "venv" / "Scripts"
+    hermes_bin.mkdir(parents=True)
+    (hermes_bin / "python.cmd").write_text(
+        "\n".join(
+            [
+                "@ECHO off",
+                f'echo used>"{sentinel}"',
+                f'"{sys.executable}" %*',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return hermes_bin
 
 
 def _check_status(monitor: dict, name: str) -> str:

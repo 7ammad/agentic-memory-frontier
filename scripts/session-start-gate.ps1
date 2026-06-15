@@ -18,7 +18,57 @@ if (-not (Test-Path $amsScript)) {
     Warn-SessionGate "missing ams.py at $amsScript"
 }
 
-$output = & python $amsScript startup-brief "continue building Agentic Memory System" --domain agentic-memory-system --json 2>&1
+function Invoke-AmsCli {
+    param([string[]]$Arguments)
+
+    function Invoke-SelectedPython {
+        param([string]$PythonPath, [string[]]$PythonArguments)
+        $previousSkip = $env:AMS_SKIP_PROJECT_PYTHON
+        $env:AMS_SKIP_PROJECT_PYTHON = "1"
+        try {
+            & $PythonPath $amsScript @PythonArguments
+        } finally {
+            if ($null -eq $previousSkip) {
+                Remove-Item Env:\AMS_SKIP_PROJECT_PYTHON -ErrorAction SilentlyContinue
+            } else {
+                $env:AMS_SKIP_PROJECT_PYTHON = $previousSkip
+            }
+        }
+    }
+
+    $pythonCandidates = @(
+        (Join-Path $Workspace ".venv\Scripts\python.exe"),
+        (Join-Path $Workspace ".venv\Scripts\python.cmd"),
+        (Join-Path $Workspace ".venv\bin\python")
+    )
+    foreach ($python in $pythonCandidates) {
+        if (Test-Path -LiteralPath $python) {
+            Invoke-SelectedPython -PythonPath $python -PythonArguments $Arguments
+            return
+        }
+    }
+
+    $projectFile = Join-Path $Workspace "pyproject.toml"
+    $uv = Get-Command "uv" -ErrorAction SilentlyContinue
+    if ((Test-Path -LiteralPath $projectFile) -and ($null -ne $uv)) {
+        $previousSkip = $env:AMS_SKIP_PROJECT_PYTHON
+        $env:AMS_SKIP_PROJECT_PYTHON = "1"
+        try {
+            & $uv.Source "run" "--project=$Workspace" "python" $amsScript @Arguments
+            return
+        } finally {
+            if ($null -eq $previousSkip) {
+                Remove-Item Env:\AMS_SKIP_PROJECT_PYTHON -ErrorAction SilentlyContinue
+            } else {
+                $env:AMS_SKIP_PROJECT_PYTHON = $previousSkip
+            }
+        }
+    }
+
+    & python $amsScript @Arguments
+}
+
+$output = Invoke-AmsCli @("startup-brief", "continue building Agentic Memory System", "--domain", "agentic-memory-system", "--json") 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Output $output
     Warn-SessionGate "unable to build AMS startup brief"

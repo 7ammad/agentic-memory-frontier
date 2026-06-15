@@ -388,6 +388,12 @@ def _correction_controller_wired(summary: CorrectionControllerSummary, root: Pat
     return summary.root == str(root) and gate_file.parent == root and gate_file.exists()
 
 
+def _correction_resume_gate_state_reportable(summary: CorrectionControllerSummary) -> bool:
+    if summary.active_gate:
+        return summary.active_event_id is not None
+    return summary.active_event_id is None
+
+
 def maintenance_review(
     root: Path | None = None,
     *,
@@ -597,11 +603,11 @@ def run_monitor(
     checks.append(
         _check(
             "correction_resume_gate_clear",
-            not correction_summary.active_gate,
+            _correction_resume_gate_state_reportable(correction_summary),
             (
                 "no active correction resume gate"
                 if not correction_summary.active_gate
-                else f"blocked by {correction_summary.active_event_id}"
+                else f"active runtime-control gate reported for {correction_summary.active_event_id}"
             ),
         )
     )

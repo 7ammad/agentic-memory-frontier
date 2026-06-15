@@ -193,6 +193,20 @@ SharedExperienceVisibility = Literal["private", "team", "all_agents"]
 SharedExperienceOwnership = Literal["source_agent", "owner", "shared"]
 GovernanceVerdict = Literal["accept", "reject", "conflict"]
 RecipientApplicability = Literal["applicable", "not_applicable", "needs_review"]
+AgentRuntimeSurface = Literal[
+    "codex_desktop",
+    "hermes_desktop",
+    "hessa",
+    "openclaw",
+    "claude_code_cursor",
+    "cursor_agent",
+    "custom",
+]
+AgentOperationalStatus = Literal["active", "available", "parked", "retired"]
+AgentTrustLevel = Literal["owner", "trusted", "team", "untrusted", "retired"]
+CapabilityRiskLevel = Literal["low", "medium", "high", "critical"]
+CapabilityVerificationStatus = Literal["declared", "smoke_tested", "verified", "disabled"]
+AgentOnboardingStatus = Literal["accepted", "needs_review", "rejected"]
 SituationSourceType = Literal["invariant", "skill"]
 SituationMatchType = Literal[
     "exact_repeat",
@@ -333,6 +347,100 @@ class MultiAgentGovernanceReceipt(StrictModel):
             "winning_authority": self.winning_authority,
             "losing_authority": self.losing_authority,
             "conflict_agent_ids": self.conflict_agent_ids,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class AgentCapabilityContract(StrictModel):
+    capability_id: str = Field(default_factory=lambda: new_id("capability"))
+    name: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    input_contracts: list[str] = Field(min_length=1)
+    output_contracts: list[str] = Field(min_length=1)
+    permissions: list[str] = Field(default_factory=list)
+    risk_level: CapabilityRiskLevel
+    verification_commands: list[str] = Field(min_length=1)
+    status: CapabilityVerificationStatus = "declared"
+    evidence_ids: list[str] = Field(min_length=1)
+
+
+class AgentMemoryContract(StrictModel):
+    memory_lane: Literal["ams_primary"] = "ams_primary"
+    startup_brief_command: str = Field(min_length=1)
+    action_brief_command: str = Field(min_length=1)
+    remember_command: str = Field(min_length=1)
+    correction_capture_command: str = Field(min_length=1)
+    default_domain: str = Field(min_length=1)
+    allowed_scopes: list[ExperienceScopeCandidate] = Field(min_length=1)
+    legacy_memory_policy: str = Field(min_length=1)
+    automation_prompt_prefix: str = Field(min_length=1)
+
+
+class AgentOnboardingTrustPolicy(StrictModel):
+    trusted_agent_ids: list[str] = Field(default_factory=list)
+    require_sender_matches_trace_agent: bool = True
+    default_visibility: SharedExperienceVisibility
+    ownership: SharedExperienceOwnership
+    allowed_shared_scopes: list[ExperienceScopeCandidate] = Field(min_length=1)
+
+
+class AgentOnboardingContract(StrictModel):
+    contract_id: str = Field(default_factory=lambda: new_id("agent_contract"))
+    agent_id: str = Field(min_length=1)
+    display_name: str = Field(min_length=1)
+    runtime_surface: AgentRuntimeSurface
+    operational_status: AgentOperationalStatus
+    trust_level: AgentTrustLevel
+    owner_scope: str = Field(min_length=1)
+    memory_contract: AgentMemoryContract
+    capability_contracts: list[AgentCapabilityContract] = Field(min_length=1)
+    harness_contracts: list[str] = Field(min_length=1)
+    runtime_checks: list[str] = Field(min_length=1)
+    shared_trace_enabled: bool = True
+    default_visibility: SharedExperienceVisibility
+    ownership: SharedExperienceOwnership
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "contract_id": self.contract_id,
+            "agent_id": self.agent_id,
+            "display_name": self.display_name,
+            "runtime_surface": self.runtime_surface,
+            "operational_status": self.operational_status,
+            "trust_level": self.trust_level,
+            "capability_count": len(self.capability_contracts),
+            "harness_contracts": self.harness_contracts,
+            "evidence_ids": self.evidence_ids,
+        }
+
+
+class AgentOnboardingReceipt(StrictModel):
+    receipt_id: str = Field(default_factory=lambda: new_id("agent_onboarding"))
+    contract_id: str
+    agent_id: str
+    status: AgentOnboardingStatus
+    reason: str = Field(min_length=1)
+    runtime_surface: AgentRuntimeSurface
+    operational_status: AgentOperationalStatus
+    trust_policy: AgentOnboardingTrustPolicy | None = None
+    capability_ids: list[str] = Field(default_factory=list)
+    memory_lane_ready: bool = False
+    missing_requirements: list[str] = Field(default_factory=list)
+    runtime_checks: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def audit_summary(self) -> dict[str, object]:
+        return {
+            "receipt_id": self.receipt_id,
+            "contract_id": self.contract_id,
+            "agent_id": self.agent_id,
+            "status": self.status,
+            "runtime_surface": self.runtime_surface,
+            "memory_lane_ready": self.memory_lane_ready,
+            "missing_requirements": self.missing_requirements,
             "evidence_ids": self.evidence_ids,
         }
 

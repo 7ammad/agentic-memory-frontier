@@ -23,8 +23,58 @@ if (-not (Test-Path $amsScript)) {
     }
 }
 
+function Invoke-AmsCli {
+    param([string[]]$Arguments)
+
+    function Invoke-SelectedPython {
+        param([string]$PythonPath, [string[]]$PythonArguments)
+        $previousSkip = $env:AMS_SKIP_PROJECT_PYTHON
+        $env:AMS_SKIP_PROJECT_PYTHON = "1"
+        try {
+            & $PythonPath $amsScript @PythonArguments
+        } finally {
+            if ($null -eq $previousSkip) {
+                Remove-Item Env:\AMS_SKIP_PROJECT_PYTHON -ErrorAction SilentlyContinue
+            } else {
+                $env:AMS_SKIP_PROJECT_PYTHON = $previousSkip
+            }
+        }
+    }
+
+    $pythonCandidates = @(
+        (Join-Path $Workspace ".venv\Scripts\python.exe"),
+        (Join-Path $Workspace ".venv\Scripts\python.cmd"),
+        (Join-Path $Workspace ".venv\bin\python")
+    )
+    foreach ($python in $pythonCandidates) {
+        if (Test-Path -LiteralPath $python) {
+            Invoke-SelectedPython -PythonPath $python -PythonArguments $Arguments
+            return
+        }
+    }
+
+    $projectFile = Join-Path $Workspace "pyproject.toml"
+    $uv = Get-Command "uv" -ErrorAction SilentlyContinue
+    if ((Test-Path -LiteralPath $projectFile) -and ($null -ne $uv)) {
+        $previousSkip = $env:AMS_SKIP_PROJECT_PYTHON
+        $env:AMS_SKIP_PROJECT_PYTHON = "1"
+        try {
+            & $uv.Source "run" "--project=$Workspace" "python" $amsScript @Arguments
+            return
+        } finally {
+            if ($null -eq $previousSkip) {
+                Remove-Item Env:\AMS_SKIP_PROJECT_PYTHON -ErrorAction SilentlyContinue
+            } else {
+                $env:AMS_SKIP_PROJECT_PYTHON = $previousSkip
+            }
+        }
+    }
+
+    & python $amsScript @Arguments
+}
+
 $startedAt = (Get-Date).ToUniversalTime().ToString("o")
-$control = & python $amsScript runtime-control $Prompt --json
+$control = Invoke-AmsCli @("runtime-control", $Prompt, "--json")
 $code = $LASTEXITCODE
 $controlObject = $null
 $controlId = $null
@@ -60,7 +110,6 @@ function Record-AmsRuntimeTrace {
     }
 
     $traceArgs = @(
-        $amsScript,
         "runtime-trace",
         "record",
         "--control-id",
@@ -82,7 +131,7 @@ function Record-AmsRuntimeTrace {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $traceOutput = & python @traceArgs 2>&1
+        $traceOutput = Invoke-AmsCli $traceArgs 2>&1
         $traceCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -109,7 +158,6 @@ function Close-AmsGovernedRun {
     }
 
     $closeArgs = @(
-        $amsScript,
         "governed-run",
         "close",
         "--receipt-id",
@@ -123,7 +171,7 @@ function Close-AmsGovernedRun {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $closeOutput = & python @closeArgs 2>&1
+        $closeOutput = Invoke-AmsCli $closeArgs 2>&1
         $closeCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference

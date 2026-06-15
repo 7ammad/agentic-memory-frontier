@@ -178,15 +178,25 @@ def pin_directive(
     root = _ensure_initialized(root)
     directives = _load_directives(root)
     for directive in directives:
-        if (
-            directive.active
-            and directive.content == content
-            and directive.source == source
-            and directive.scope == scope
-            and directive.domain_scope == domain_scope
-            and directive.task_family == task_family
+        if not directive.active:
+            continue
+        if not _directive_pin_scope_matches(
+            directive,
+            scope=scope,
+            domain_scope=domain_scope,
+            task_family=task_family,
         ):
-            return {"root": str(root), "created": False, "directive": directive.model_dump(mode="json")}
+            continue
+        duplicate_reason = _directive_duplicate_reason(directive, content)
+        if duplicate_reason is not None:
+            return {
+                "root": str(root),
+                "created": False,
+                "duplicate": True,
+                "duplicate_reason": duplicate_reason,
+                "matched_directive_id": directive.directive_id,
+                "directive": directive.model_dump(mode="json"),
+            }
 
     directive = Directive(
         content=content,
@@ -409,6 +419,41 @@ def _load_directives(root: Path) -> list[Directive]:
 def _save_directives(root: Path, directives: list[Directive]) -> None:
     payload = [directive.model_dump(mode="json") for directive in directives]
     _directives_path(root).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _directive_pin_scope_matches(
+    directive: Directive,
+    *,
+    scope: str,
+    domain_scope: str | None,
+    task_family: str | None,
+) -> bool:
+    return (
+        directive.scope == scope
+        and directive.domain_scope == domain_scope
+        and directive.task_family == task_family
+    )
+
+
+def _normalize_directive_text(content: str) -> str:
+    return " ".join(_TOKEN_RE.findall(content.lower()))
+
+
+def _directive_duplicate_reason(directive: Directive, content: str) -> str | None:
+    if _normalize_directive_text(directive.content) == _normalize_directive_text(content):
+        return "normalized_exact_match"
+
+    existing_tokens = _meaningful_tokens(directive.content)
+    incoming_tokens = _meaningful_tokens(content)
+    if len(existing_tokens) < 6 or len(incoming_tokens) < 6:
+        return None
+
+    overlap = existing_tokens & incoming_tokens
+    containment = len(overlap) / min(len(existing_tokens), len(incoming_tokens))
+    jaccard = len(overlap) / len(existing_tokens | incoming_tokens)
+    if containment >= 0.82 and jaccard >= 0.55:
+        return "semantic_token_overlap"
+    return None
 
 
 def _directive_matches(

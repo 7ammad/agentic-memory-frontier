@@ -256,6 +256,32 @@ v2_eval=PASS 13/13 false_blocks=0/0
 phase=AMS V2 Accepted ready=True
 ```
 
+## AMS Agent Onboarding V2 Lock
+
+AMS Agent Onboarding V2 is the named post-V2 product layer for registering
+other agents as governed AMS participants.
+
+Acceptance contract:
+`docs/2026-06-11-ams-agent-onboarding-v2-contract.md`.
+
+Accepted local roster:
+
+- `codex`
+- `hermes`
+- `hessa`
+- `claude-code-cursor`
+- `cursor-agent`
+- `openclaw` as parked but counted
+
+Rejected stale topology:
+
+- `superbrembo` is not an active agent and must not be revived by default.
+
+AMS Agent Onboarding V2 is accepted only when agent identity, runtime surface,
+operational status, owner scope, capability contracts, AMS memory-lane
+commands, harness contracts, runtime checks, visibility/ownership, trust policy,
+persistence, CLI, MCP, and stale-roster rejection are implemented and tested.
+
 ## Planning Order
 
 Work proceeds in this order. Do not skip ahead to platform features.

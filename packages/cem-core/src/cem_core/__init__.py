@@ -9,6 +9,12 @@ from .attribution import (
     V2_ATTRIBUTION_SEED_CORPUS,
     attribute_experience_record,
 )
+from .agent_onboarding import (
+    audit_onboarded_agent,
+    build_hammad_agent_roster,
+    evaluate_onboarding_contract,
+    onboard_agent,
+)
 from .compilers import (
     AuthorityEvidence,
     AuthorityScopeResolver,
@@ -26,6 +32,11 @@ from .models import (
     ActionBriefRecord,
     ActionDecisionReceipt,
     ActionInfluenceEvent,
+    AgentCapabilityContract,
+    AgentMemoryContract,
+    AgentOnboardingContract,
+    AgentOnboardingReceipt,
+    AgentOnboardingTrustPolicy,
     AgentTrace,
     BehaviorInvariant,
     ConfidenceInterval,
@@ -68,6 +79,11 @@ __all__ = [
     "ActionDecisionPoint",
     "ActionDecisionReceipt",
     "ActionInfluenceEvent",
+    "AgentCapabilityContract",
+    "AgentMemoryContract",
+    "AgentOnboardingContract",
+    "AgentOnboardingReceipt",
+    "AgentOnboardingTrustPolicy",
     "AgentTrace",
     "AuthorityEvidence",
     "AuthorityScopeResolver",
@@ -119,7 +135,11 @@ __all__ = [
     "VerificationProbe",
     "VerificationResult",
     "attribute_experience_record",
+    "audit_onboarded_agent",
     "build_shared_trace_envelope",
+    "build_hammad_agent_roster",
     "card_is_inactive",
+    "evaluate_onboarding_contract",
     "import_shared_trace",
+    "onboard_agent",
 ]

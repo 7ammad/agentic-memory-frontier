@@ -19,7 +19,7 @@ def test_memoryarena_cem0_runner_scores_action_brief_predictions(tmp_path):
     assert result.trusted_count == 1
     assert result.quarantined_count == 1
     assert result.action_brief_prediction_count == 1
-    assert result.predictions_by_task == {"approval-task": ["open approvals tab"]}
+    assert result.predictions_by_task == {"workflow_nav:approval-task": ["open approvals tab"]}
     assert result.score.task_count == 1
     assert result.score.subtask_count == 1
     assert result.score.correct_subtask_count == 1

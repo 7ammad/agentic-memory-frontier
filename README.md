@@ -83,6 +83,7 @@ python scripts/ams.py monitor --deep
 python scripts/ams.py startup-brief "continue building Agentic Memory System" --domain agentic-memory-system
 python scripts/ams.py runtime-control "continue building Agentic Memory System" --domain agentic-memory-system
 python scripts/ams.py governed-run close --outcome success --action-taken "ran focused and full pytest"
+powershell -ExecutionPolicy Bypass -File scripts/ams-env-doctor.ps1
 powershell -ExecutionPolicy Bypass -File scripts/ams-guarded-command.ps1 -Prompt "continue building Agentic Memory System" -Command python --version
 powershell -ExecutionPolicy Bypass -File scripts/install-ams-codex-entrypoint.ps1
 python scripts/ams.py correction capture "why are you building before planning" --affected-file package.json
@@ -142,6 +143,8 @@ It also prints the current phase and next step so the overnight monitor runs sho
 `startup-brief` is the first Memory Use Controller surface. It runs a quick monitor, retrieves a bounded action brief, reports required startup directive presence, caps directives/cards/evidence/actions, writes a startup-brief ledger, and returns memory-readiness status. Missing, stale, contradicted, or failed memory returns `degraded` with warnings; it does not block fresh owner-directed work.
 
 `runtime-control` is the enforceable launcher-facing surface. It classifies the prompt, checks the correction resume gate, runs the startup brief, writes a runtime-control receipt, preserves startup degraded warnings, and exits non-zero only on a runtime-control/action-safety block. `scripts/ams-guarded-command.ps1` honors that exit code by refusing to invoke the downstream command when runtime-control blocks.
+
+`scripts/ams-env-doctor.ps1` checks the interpreter boundary before AMS work. It verifies that the workspace Python can import `pydantic`, reports the ambient `python` on PATH, warns when that ambient Python appears to come from Hermes Desktop, and runs a direct `python scripts/ams.py` smoke. A Hermes warning is not a failure by itself; AMS must keep using the workspace interpreter even when Hermes has repaired or changed its own venv.
 
 `governed-run close` finalizes the latest or named governed-run receipt with an observed outcome. It links the startup brief, action brief, and influence id, writes an observational `ActionInfluenceEvent`, and keeps observed outcome separate from verified lift.
 
@@ -507,3 +510,28 @@ python scripts/run_cem_import_shared_trace.py envelope.json --root tmp\cem-share
 ```
 
 The protocol is documented in [docs/cem-0-multi-agent-protocol.md](docs/cem-0-multi-agent-protocol.md). It preserves untrusted shared traces as evidence but prevents them from becoming trusted operational memory by default.
+
+## Agent Onboarding V2
+
+AMS can now register agents as governed participants through explicit
+onboarding contracts instead of informal team names. The current roster is
+Codex, Hermes, Hessa, Claude Code, Cursor, and parked OpenClaw. SuperBrembo is
+intentionally rejected as stale historical topology.
+
+```powershell
+python scripts/ams.py --json agent seed-roster
+python scripts/ams.py --json agent list
+python scripts/ams.py --json agent audit hessa
+python scripts/ams.py --json agent onboard contract.json
+```
+
+Each `AgentOnboardingContract` includes identity, runtime surface, operational
+status, owner scope, capability contracts, AMS startup/action/remember/correction
+commands, harness contracts, runtime checks, visibility/ownership, and evidence
+ids. Accepted agents receive an onboarding receipt and trust policy that
+preserves sender identity and allowed shared scopes.
+
+The same path is exposed over MCP through `cem_onboard_agent`,
+`cem_seed_hammad_agent_roster`, and `cem_list_onboarded_agents`. The acceptance
+contract is documented in
+[docs/2026-06-11-ams-agent-onboarding-v2-contract.md](docs/2026-06-11-ams-agent-onboarding-v2-contract.md).

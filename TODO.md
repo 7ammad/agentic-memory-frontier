@@ -42,6 +42,7 @@ Do not stop at "task complete" when the next unchecked item is clear.
 - `PRODUCT-LOCK.md`
 - `docs/2026-06-10-ams-v2-experience-enforcement-plan.md`
 - `docs/2026-06-10-ams-v2-acceptance-contract.md`
+- `docs/2026-06-11-ams-agent-onboarding-v2-contract.md`
 - `research/2026-05-27-plan-1-causal-experience-memory-foundation.md`
 - `specs/2026-05-27-cem-0-memguard-kernel-spec.md`
 - `sessions/2026-05-27-cem-0-session-handoff.md`
@@ -119,6 +120,38 @@ Acceptance contract: `docs/2026-06-10-ams-v2-acceptance-contract.md`.
       and context-pollution evals.
 - [x] Phase 10 - Operator proof and release lock: fresh-root V2 operator proof,
       dashboard/monitor V2 status, review receipts, and product-lock update.
+
+### 16. AMS Agent Onboarding V2
+
+AMS Agent Onboarding V2 is the named post-V2 product layer for bringing other
+agents into AMS without scope pollution or stale topology. It is not a skeleton,
+not the old universal API idea, and not the deferred ACS relay. It is the full
+local onboarding path: identity, capability contracts, AMS memory-lane
+contracts, harness contracts, runtime checks, trust policy, persistence, CLI,
+MCP, docs, and tests.
+
+Acceptance contract:
+`docs/2026-06-11-ams-agent-onboarding-v2-contract.md`.
+
+- [x] Current roster corrected: Codex, Hermes, Hessa, Claude Code, Cursor, and
+      parked OpenClaw.
+      SuperBrembo is rejected as stale historical topology.
+- [x] Added `AgentOnboardingContract`, `AgentCapabilityContract`,
+      `AgentMemoryContract`, `AgentOnboardingTrustPolicy`, and
+      `AgentOnboardingReceipt`.
+- [x] Added default roster builder with capability, permission, risk,
+      verification, memory-lane, harness, and evidence contracts.
+- [x] Added stale-agent rejection so SuperBrembo cannot become an active AMS
+      onboarding participant.
+- [x] Added SQLite and in-memory persistence for onboarding contracts and
+      receipts.
+- [x] Added CEM methods for onboarding, listing, and auditing agents.
+- [x] Added MCP tools: `cem_onboard_agent`, `cem_seed_hammad_agent_roster`,
+      and `cem_list_onboarded_agents`.
+- [x] Added CLI commands: `agent seed-roster`, `agent list`, `agent audit`,
+      and `agent onboard`.
+- [x] Added focused tests for roster correctness, stale rejection, contract
+      validation, persistence, CLI, and MCP.
 
 ### 0. Foundation Lock
 

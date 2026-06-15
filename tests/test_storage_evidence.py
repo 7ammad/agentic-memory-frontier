@@ -4,6 +4,11 @@ from cem_core.models import (
     ActionBriefRecord,
     ActionDecisionReceipt,
     ActionInfluenceEvent,
+    AgentCapabilityContract,
+    AgentMemoryContract,
+    AgentOnboardingContract,
+    AgentOnboardingReceipt,
+    AgentOnboardingTrustPolicy,
     BehaviorInvariant,
     DecisionIntent,
     ExperienceAttribution,
@@ -279,6 +284,71 @@ def test_shared_experience_governance_roundtrip_in_both_backends(tmp_path):
         assert store.list_shared_experience_envelopes() == [envelope]
         assert store.get_multi_agent_governance_receipt(receipt.governance_receipt_id) == receipt
         assert store.list_multi_agent_governance_receipts() == [receipt]
+
+
+def test_agent_onboarding_contract_and_receipt_roundtrip_in_both_backends(tmp_path):
+    for store in _stores(tmp_path):
+        contract = AgentOnboardingContract(
+            agent_id="hermes",
+            display_name="Hermes",
+            runtime_surface="hermes_desktop",
+            operational_status="active",
+            trust_level="trusted",
+            owner_scope="desktop/runtime agent lane",
+            memory_contract=AgentMemoryContract(
+                startup_brief_command='python "C:\\Dev\\Builds\\Agentic Memory System\\scripts\\ams.py" startup-brief "{task}" --domain "{domain}" --json',
+                action_brief_command='python "C:\\Dev\\Builds\\Agentic Memory System\\scripts\\ams.py" brief "{task}" --domain "{domain}"',
+                remember_command='python "C:\\Dev\\Builds\\Agentic Memory System\\scripts\\ams.py" remember "{lesson}" --kind fact --outcome success --domain "{domain}" --agent-id hermes',
+                correction_capture_command='python "C:\\Dev\\Builds\\Agentic Memory System\\scripts\\ams.py" correction capture "{correction}" --domain "{domain}"',
+                default_domain="coding",
+                allowed_scopes=["global_agent_behavior", "agent", "project"],
+                legacy_memory_policy="AMS is primary; legacy memory is evidence only",
+                automation_prompt_prefix="Pull AMS startup/action briefs before work.",
+            ),
+            capability_contracts=[
+                AgentCapabilityContract(
+                    name="desktop_runtime",
+                    description="operate Hermes Desktop runtime",
+                    input_contracts=["AMS brief loaded"],
+                    output_contracts=["verified receipt emitted"],
+                    permissions=["desktop_runtime"],
+                    risk_level="high",
+                    verification_commands=["python scripts/ams.py startup-brief smoke --domain coding --json"],
+                    evidence_ids=["owner_roster_hermes"],
+                )
+            ],
+            harness_contracts=["codex-execution-contract"],
+            runtime_checks=["python scripts/ams.py brief smoke --domain coding"],
+            default_visibility="team",
+            ownership="source_agent",
+            evidence_ids=["owner_roster_hermes"],
+        )
+        receipt = AgentOnboardingReceipt(
+            contract_id=contract.contract_id,
+            agent_id="hermes",
+            status="accepted",
+            reason="accepted",
+            runtime_surface="hermes_desktop",
+            operational_status="active",
+            trust_policy=AgentOnboardingTrustPolicy(
+                trusted_agent_ids=["hermes"],
+                default_visibility="team",
+                ownership="source_agent",
+                allowed_shared_scopes=["global_agent_behavior", "agent"],
+            ),
+            capability_ids=[contract.capability_contracts[0].capability_id],
+            memory_lane_ready=True,
+            runtime_checks=contract.runtime_checks,
+            evidence_ids=[contract.contract_id],
+        )
+
+        store.save_agent_onboarding_contract(contract)
+        store.save_agent_onboarding_receipt(receipt)
+
+        assert store.get_agent_onboarding_contract(contract.contract_id) == contract
+        assert store.list_agent_onboarding_contracts() == [contract]
+        assert store.get_agent_onboarding_receipt(receipt.receipt_id) == receipt
+        assert store.list_agent_onboarding_receipts() == [receipt]
 
 
 def test_missing_probe_raises_keyerror(tmp_path):

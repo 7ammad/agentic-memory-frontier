@@ -4,6 +4,74 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-06-12
+
+### Fixed
+
+- Promoted Claude Code and Cursor from implied "active coding agents" to
+  first-class AMS Agent Onboarding V2 roster entries with accepted contracts,
+  capability contracts, memory-lane contracts, runtime surfaces, trust policy,
+  CLI seed/audit proof, and tests.
+
+### Verified
+
+- Focused proof:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py tests/test_mcp_tools.py -q`
+  -> **9 passed**.
+- Live CLI smoke:
+  `.venv\Scripts\python.exe scripts\ams.py --root tmp\ams-agent-onboarding-six-smoke --json agent seed-roster`
+  -> `accepted_count=6` with Codex, Hermes, Hessa, Claude Code, Cursor, and
+  OpenClaw. Sequential audits for `claude-code-cursor` and `cursor-agent`
+  returned accepted contracts and receipts.
+- Onboarding/storage/MCP cluster:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py tests/test_mcp_tools.py tests/test_storage_evidence.py -q`
+  -> **22 passed**.
+- Full suite: `.venv\Scripts\python.exe -m pytest -q` -> **passed**.
+
+## 2026-06-11
+
+### Added
+
+- Built **AMS Agent Onboarding V2** as the named post-V2 local onboarding layer
+  for governed agents: identity, runtime surface, operational status, owner
+  scope, capability contracts, AMS memory-lane contracts, harness contracts,
+  runtime checks, visibility/ownership, trust policy, persistence, CLI, MCP, and
+  tests.
+- Added `docs/2026-06-11-ams-agent-onboarding-v2-contract.md` as the acceptance
+  contract for onboarding Codex, Hermes, Hessa, Claude Code, Cursor, and parked
+  OpenClaw.
+- Added `AgentOnboardingContract`, `AgentCapabilityContract`,
+  `AgentMemoryContract`, `AgentOnboardingTrustPolicy`, and
+  `AgentOnboardingReceipt`.
+- Added `packages/cem-core/src/cem_core/agent_onboarding.py` with the current
+  Hammad roster builder and stale-agent rejection.
+- Added `python scripts/ams.py agent seed-roster|list|audit|onboard`.
+- Added MCP tools `cem_onboard_agent`, `cem_seed_hammad_agent_roster`, and
+  `cem_list_onboarded_agents`.
+
+### Changed
+
+- Corrected Codex global harness identity: SuperBrembo is not an active agent;
+  Hermes, Hessa, OpenClaw, Claude Code, Cursor, and Codex are the current
+  constellation.
+
+### Verified
+
+- Red proof before implementation:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py -q`
+  failed on missing `cem_core.agent_onboarding`.
+- Focused green proof:
+  `.venv\Scripts\python.exe -m pytest tests/test_agent_onboarding.py tests/test_mcp_tools.py tests/test_storage_evidence.py -q`
+  -> **22 passed**.
+- Live CLI smoke:
+  `.venv\Scripts\python.exe scripts\ams.py --root tmp\ams-agent-onboarding-smoke --json agent seed-roster`
+  accepted Codex, Hermes, Hessa, Claude Code, Cursor, and OpenClaw; sequential
+  `agent audit hessa` returned the accepted Hessa contract and receipt.
+- Full suite: `.venv\Scripts\python.exe -m pytest -q` -> **passed**.
+- V2 operator proof:
+  `.venv\Scripts\python.exe scripts\run_ams_v2_operator_proof.py --root tmp\ams-v2-onboarding-proof`
+  -> `AMS_V2_OPERATOR_PROOF_PASS`, `v2_eval=PASS 13/13 false_blocks=0/0`.
+
 ## 2026-06-10
 
 ### Added
@@ -79,6 +147,16 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
 - Updated `PRODUCT-LOCK.md` to record AMS V2 as accepted with the terminal proof
   command and expected receipt.
 
+### Fixed
+
+- Fixed AMS CLI environment bootstrapping after live `correction capture`
+  failed under an unrelated PATH `python` without `pydantic`. The root project
+  now declares its Python dependencies for `uv sync`, `scripts/ams.py`
+  bootstraps through the repo `.venv`, and the session/guarded PowerShell
+  launchers prefer the workspace interpreter before ambient `python`.
+- Added `scripts/ams-env-doctor.ps1` and Hermes-style PATH regression coverage
+  so a repaired Hermes Desktop venv can be detected without breaking AMS.
+
 ### Next
 
 - None for AMS V2. Future work must be opened as a named post-V2 phase or as a
@@ -115,6 +193,29 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   returns `status=allow` and the V2 Phase 1 next step.
 - Live `python scripts/ams.py startup-brief "verify AMS V2 Phase 1 runtime capture completion and Phase 2 active status" --domain codex-harness --json`
   returns `status=allow` and the V2 Phase 2 next step.
+- Missing-`pydantic` live failure proof: direct
+  `python scripts/ams.py startup-brief "Fix AMS correction capture missing pydantic failure reported from Hessa new build" --domain agentic-memory-system --json`
+  and `scripts/session-start-gate.ps1` initially failed before the environment
+  bootstrap fix; after the fix both pass.
+- Environment regression group:
+  `.venv\Scripts\python.exe -m pytest tests\test_ams_cli.py -k "workspace_python or startup_brief_command_failure or runtime_control_infrastructure_fails" -q`
+  -> `4 passed`.
+- Hermes conflict regression group:
+  `.venv\Scripts\python.exe -m pytest tests\test_ams_cli.py -k "workspace_python or ams_env_doctor" -q`
+  -> `3 passed` with fake `Hermes Desktop\venv\Scripts\python.cmd` ahead of
+  AMS on PATH.
+- Live environment doctor:
+  `powershell -ExecutionPolicy Bypass -File scripts\ams-env-doctor.ps1`
+  -> `AMS_ENV_DOCTOR_STATUS: warn`, workspace Python
+  `C:\Dev\Builds\Agentic Memory System\.venv\Scripts\python.exe`, ambient
+  Python `C:\Users\7amma\AppData\Local\hermes\hermes-agent\venv\Scripts\python.exe`.
+- Full suite after Hermes isolation hardening:
+  `.venv\Scripts\python.exe -m pytest -q` -> passed.
+- Full suite after the environment/bootstrap fix:
+  `.venv\Scripts\python.exe -m pytest -q` -> passed.
+- Correction capture smoke:
+  `python scripts\ams.py --root tmp\ams-correction-capture-pydantic-smoke --json correction capture "we already said no to treating missing pydantic as unsavable; save this to memory" ...`
+  -> `correction_07f0c32f180946d9ad16dc319a9c38b6`.
 - Phase 2 red->green proof:
   `python -m pytest tests/test_attribution.py -q` failed before implementation
   because `cem_core.attribution` did not exist, then passed after adding
