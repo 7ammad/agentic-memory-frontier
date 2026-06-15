@@ -20,6 +20,9 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   fixture/proxy/no-extractor mode.
 - Added official-evaluator scaffolds with source, data, and credential
   boundaries for HaluMem, MemoryArena, and LongMemEval-V2.
+- Added `docs/official-benchmark-smoke-receipt-2026-06-15.md` with exact
+  official setup, bounded smoke, evidence, and full-run command paths for
+  HaluMem, MemoryArena, and LongMemEval-V2.
 
 ### Changed
 
@@ -47,6 +50,16 @@ Use this file for high-signal changes only: shipped behavior, plan changes, veri
   zero-output bypass: HaluMem proposed/trusted `4/4` with `3` QA answers,
   MemoryArena proposed/trusted `517/329` with `147` local proxy predictions,
   and LongMemEval-V2 proposed/trusted `59/37` with `3` local proxy answers.
+- Official bounded evaluator smokes executed with official repositories or
+  primary-source runner boundaries and real public rows:
+  HaluMem official scorer wrote
+  `tmp\official-evaluators\HaluMem\eval\results\memzero-ams-smoke\memzero_eval_stat_result.json`;
+  LongMemEval-V2 official harness wrote
+  `tmp\official-runs\longmemeval-v2-no-retrieval-smoke\aggregated_metrics.json`;
+  MemoryArena official formal-reasoning boundary wrote
+  `tmp\official-runs\memoryarena-formal-long-context-smoke\json\long_context_grok-4.20-0309-non-reasoning\all_results.json`.
+- Focused official-evaluator repair tests passed:
+  `.venv\Scripts\python.exe -m pytest tests\test_official_evaluator_scaffolds.py tests\test_external_benchmark_natural_language.py tests\test_external_benchmark_report.py tests\test_halumem_runner.py tests\test_memoryarena_runner.py tests\test_longmemeval_v2_runner.py -q`.
 
 ## 2026-06-12
 

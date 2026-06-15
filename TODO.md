@@ -178,9 +178,14 @@ benchmark scores.
       evaluator source/status fields in JSON and markdown reports.
 - [x] Add official-evaluator scaffolds for HaluMem, MemoryArena, and
       LongMemEval-V2 with source URLs and remaining credential/runtime notes.
-- [ ] Run full official evaluator integrations. This remains open until the
-      released evaluator runtimes, model/service credentials, and large-runtime
-      requirements are available and exercised.
+- [x] Execute official bounded evaluator smokes for HaluMem, MemoryArena, and
+      LongMemEval-V2 using official repositories or primary-source runner
+      boundaries, real public rows, inspected setup paths, local credentials,
+      and recorded full-run commands.
+- [ ] Run full-scale official CEM backend integrations. This remains open until
+      leaderboard-grade CEM memory backends, full dataset/resource budgets, and
+      large-runtime requirements are exercised for HaluMem, MemoryArena, and
+      LongMemEval-V2.
 
 ### 0. Foundation Lock
 

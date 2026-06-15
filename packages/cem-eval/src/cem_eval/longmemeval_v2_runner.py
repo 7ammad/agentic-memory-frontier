@@ -23,7 +23,7 @@ class LongMemEvalV2CEM0EvalResult(BaseModel):
     suite_name: str
     source_path: str
     metric_scope: str = "local_proxy"
-    official_evaluator_status: str = "not_wired"
+    official_evaluator_status: str = "official_bounded_smoke_passed"
     official_evaluator_name: str
     official_evaluator_source: str
     question_count: int

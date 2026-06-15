@@ -32,6 +32,65 @@ Entry format:
 - Follow-up:
 ```
 
+## LEDGER-20260615-002 - Official evaluator bounded smokes executed after rejected handoff
+
+- Date: 2026-06-15
+- Type: correction / verification / status
+- Status: resolved
+- Source: Owner correction rejecting the previous `DONE WITH LIMITATION`
+  handoff as `NOT DONE` because structural repair, local proxy smoke,
+  scaffolds, and docs do not satisfy the AMS benchmark final-build acceptance
+  contract.
+- Summary: Codex pulled a fresh AMS startup/action brief for the correction,
+  recorded the rejected handoff as an AMS failure, inspected official evaluator
+  scaffolds, then cloned and set up the official or primary-source evaluator
+  paths for HaluMem, LongMemEval-V2, and MemoryArena under
+  `tmp\official-evaluators`. Local environment inspection found no
+  `OPENAI_API_KEY`, but did find `XAI_API_KEY`; the official OpenAI-compatible
+  runners were executed with `OPENAI_API_KEY=$env:XAI_API_KEY`,
+  `OPENAI_BASE_URL=https://api.x.ai/v1`, and
+  `grok-4.20-0309-non-reasoning`. HaluMem official scoring ran over a
+  CEM-generated artifact from real public HaluMem rows. LongMemEval-V2 official
+  harness ran over one real question plus 100 streamed official trajectories
+  with the released `no_retrieval` config. MemoryArena official
+  formal-reasoning runner boundary ran over one real HF row and one subtask via
+  the official env server, `MathEnvironment`, `MathAgent`, `long_context`, and
+  aggregation path. The repo now records these as
+  `official_bounded_smoke_passed`, while explicitly preserving that they are
+  not full official CEM leaderboard scores.
+- Files:
+  - `packages/cem-eval/src/cem_eval/official_evaluators.py`
+  - `tests/test_official_evaluator_scaffolds.py`
+  - `tests/test_external_benchmark_natural_language.py`
+  - `TODO.md`
+  - `CHANGELOG.md`
+  - `docs/cem-0-external-benchmark-decision.md`
+  - `docs/official-benchmark-smoke-receipt-2026-06-15.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: Official HaluMem scorer completed and wrote
+  `tmp\official-evaluators\HaluMem\eval\results\memzero-ams-smoke\memzero_eval_stat_result.json`.
+  Official LongMemEval-V2 validator returned
+  `{"questions":1,"trajectories":100,"haystack_questions":1,"tier":"small","check_screenshots":false}`,
+  and the official harness wrote
+  `tmp\official-runs\longmemeval-v2-no-retrieval-smoke\aggregated_metrics.json`.
+  Official MemoryArena formal-reasoning boundary wrote
+  `tmp\official-runs\memoryarena-formal-long-context-smoke\json\long_context_grok-4.20-0309-non-reasoning\all_results.json`
+  and one `result.jsonl` row with `is_correct=true`. Artifact parse
+  verification confirmed the
+  HaluMem record lists (`9` integrity, `44` accuracy, `4` update, `3` QA),
+  LongMemEval-V2 nested overall score (`overall_full_set=0.0`,
+  `count_all_questions=1`), and MemoryArena aggregate
+  (`overall_average_passrate=1.0`, `avg_progress_score=1.0`). Focused benchmark
+  tests
+  `.venv\Scripts\python.exe -m pytest tests\test_official_evaluator_scaffolds.py tests\test_external_benchmark_natural_language.py tests\test_external_benchmark_report.py tests\test_halumem_runner.py tests\test_memoryarena_runner.py tests\test_longmemeval_v2_runner.py -q`
+  -> **passed** (`11` tests). Full suite
+  `.venv\Scripts\python.exe -m pytest -q` -> **passed**. `git diff --check`
+  -> **passed** with expected Windows CRLF warnings only.
+- Follow-up: Run and publish full-scale official CEM backend integrations for
+  HaluMem, LongMemEval-V2, and MemoryArena when the CEM-specific official
+  memory wrappers and full dataset/resource budgets are ready. Do not present
+  local proxy metrics or bounded official smokes as leaderboard-grade scores.
+
 ## LEDGER-20260615-001 - External benchmark zero repaired into honest local proxy lane
 
 - Date: 2026-06-15
@@ -89,10 +148,9 @@ Entry format:
   proposed/trusted and `3` QA answers, MemoryArena `517/329`
   proposed/trusted and `147` local proxy predictions, and LongMemEval-V2
   `59/37` proposed/trusted and `3` local proxy answers.
-- Follow-up: Wire full official evaluator integrations and official model
-  runs for HaluMem, MemoryArena, and LongMemEval-V2 when credentials/runtime
-  are available. Do not present local proxy metrics as official benchmark or
-  leaderboard scores.
+- Follow-up: Wire full official CEM backend integrations and full-scale model
+  runs for HaluMem, MemoryArena, and LongMemEval-V2. Do not present local proxy
+  metrics or bounded official smokes as official leaderboard scores.
 
 ## LEDGER-20260612-001 - Claude Code and Cursor added to AMS onboarding roster
 

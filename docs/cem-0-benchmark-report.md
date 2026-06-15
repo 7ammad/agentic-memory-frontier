@@ -286,20 +286,24 @@ It fails by default on zero proposed/output rows.
 
 The current report does not prove:
 
-- official HaluMem performance;
-- official MemoryArena performance;
-- official LongMemEval-V2 performance;
+- full official HaluMem performance over the complete public dataset;
+- official MemoryArena CEM performance through a CEM memory-system backend;
+- official LongMemEval-V2 CEM performance through a CEM memory module;
 - action influence measurement from real agent traces;
 - vendor token-cost claims.
 
-Those remain unchecked in `TODO.md`.
+Official bounded smokes for HaluMem, MemoryArena, and LongMemEval-V2 executed
+on 2026-06-15 and are recorded in
+[`official-benchmark-smoke-receipt-2026-06-15.md`](official-benchmark-smoke-receipt-2026-06-15.md).
+They prove the official runner boundaries can execute locally on real public
+rows. They do not turn local proxy metrics into official benchmark metrics.
 
 ## Next Required Work
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
 1. Keep the real-data external smoke/report nonzero under the zero-output gate.
-2. Wire official evaluator execution for HaluMem, MemoryArena, and
-   LongMemEval-V2 once credentials/runtime are available.
-3. Compare local proxy metrics to official metrics only after the official
-   evaluator boundary is exercised.
+2. Wire full official CEM backend execution for HaluMem, MemoryArena, and
+   LongMemEval-V2.
+3. Compare local proxy metrics to official metrics only after each official CEM
+   backend run executes at the same data scope.

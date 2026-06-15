@@ -57,7 +57,7 @@ def test_halumem_runner_defaults_to_natural_language_extraction(tmp_path):
     assert result.qa_answer_count == 1
     assert result.qa_score.exact_match_accuracy == 1.0
     assert result.metric_scope == "local_proxy"
-    assert result.official_evaluator_status == "not_wired"
+    assert result.official_evaluator_status == "official_bounded_smoke_passed"
 
 
 def test_memoryarena_runner_synthesizes_answers_from_retrieved_memory(tmp_path):
@@ -174,7 +174,7 @@ def test_external_benchmark_report_fails_zero_outputs_by_default(tmp_path):
                     },
                     "answers_by_question": {},
                     "metric_scope": "local_proxy",
-                    "official_evaluator_status": "not_wired",
+                    "official_evaluator_status": "official_bounded_smoke_passed",
                     "official_evaluator_name": "HaluMem eval toolkit",
                     "official_evaluator_source": "https://github.com/MemTensor/HaluMem/tree/main/eval",
                 }

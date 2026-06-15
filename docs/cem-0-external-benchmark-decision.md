@@ -51,6 +51,52 @@ Repair direction:
 - report generation fails on zero proposed/output counts unless the caller
   explicitly marks a fixture, proxy diagnostic, or no-extractor diagnostic.
 
+## 2026-06-15 Official Bounded Smoke Evidence
+
+Correction receipt:
+[`official-benchmark-smoke-receipt-2026-06-15.md`](official-benchmark-smoke-receipt-2026-06-15.md).
+
+The official evaluator boundary has now been exercised in bounded smoke form
+for all three suites with official repositories or primary-source runner code
+and real public dataset rows:
+
+- HaluMem official scorer: cloned `MemTensor/HaluMem` at
+  `c29025f43b347f68fc36a06bee8ed29b4dc6c3fb`, downloaded real
+  `IAAR-Shanghai/HaluMem` rows, generated a CEM artifact for three public
+  sessions, and ran `eval/evaluation.py` through
+  `evaluation.main('memzero', 'ams-smoke', user_num=1, max_workers=1)`.
+  Evidence:
+  `tmp\official-evaluators\HaluMem\eval\results\memzero-ams-smoke\memzero_eval_stat_result.json`.
+- LongMemEval-V2 official harness: cloned `xiaowu0162/LongMemEval-V2` at
+  `8e8b92a3cece71af6af0d3aa2d7957df49dd9f65`, validated a one-question,
+  100-trajectory subset from `xiaowu0162/longmemeval-v2`, and ran
+  `evaluation/harness.py` with the official `no_retrieval` memory config.
+  Evidence:
+  `tmp\official-runs\longmemeval-v2-no-retrieval-smoke\aggregated_metrics.json`.
+- MemoryArena official formal-reasoning boundary: cloned
+  `ZexueHe/MemoryArena` at `6cd9de14b71915e39ac742a20dc33785e14b6aab`,
+  downloaded a real `ZexueHe/memoryarena` `formal_reasoning_math` row, started
+  the official env server, and ran the official `MathEnvironment`,
+  `MathAgent`, `long_context` memory system, and `eval_and_print_result`
+  aggregation path over one subtask. Evidence:
+  `tmp\official-runs\memoryarena-formal-long-context-smoke\json\long_context_grok-4.20-0309-non-reasoning\all_results.json`.
+
+What this claims:
+
+- the official setup path, data path, credential path, and bounded evaluator
+  execution path were inspected and exercised for all three suites;
+- HaluMem produced an official scorer output over a CEM-generated artifact;
+- LongMemEval-V2 and MemoryArena official runner boundaries executed on real
+  public rows.
+
+What this still does not claim:
+
+- a full official leaderboard-grade CEM score;
+- a LongMemEval-V2 CEM backend implementation inside the official memory
+  module contract;
+- a MemoryArena CEM memory-system implementation or web-shopping run;
+- that local proxy metrics are official benchmark metrics.
+
 ## Current Implementation Slice
 
 CEM-0 now has a local HaluMem adapter that:
@@ -80,9 +126,10 @@ This is not a published HaluMem benchmark score yet.
 
 The current adapter and runner prove local ingestion, write-path execution,
 local proxy extraction scoring, and local proxy QA scoring against the
-official-style schema. A real HaluMem benchmark result still requires the
-released HaluMem eval toolkit, its memory-system wrapper contract, and the
-required model/service credentials.
+official-style schema. The bounded official HaluMem scorer smoke proves the
+official evaluation code path can execute locally, but a full official HaluMem
+benchmark result still requires the full public dataset run and the selected
+memory-system wrapper contract.
 
 ## MemoryArena Adapter Slice
 
