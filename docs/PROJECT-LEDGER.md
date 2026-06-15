@@ -32,6 +32,68 @@ Entry format:
 - Follow-up:
 ```
 
+## LEDGER-20260615-001 - External benchmark zero repaired into honest local proxy lane
+
+- Date: 2026-06-15
+- Type: mistake / implementation / verification
+- Status: active
+- Source: Real public external benchmark runs under
+  `tmp\external-benchmarks-real-20260615\runs\` returned zero proposed/output
+  behavior for HaluMem, MemoryArena, and LongMemEval-V2.
+- Summary: The zero-output root cause was structural: `DeterministicExtractor`
+  only read explicit fixture markers, and non-fixture external benchmark lanes
+  still defaulted to it. Real benchmark text is natural language, so extraction
+  returned no atoms and downstream answer/action surfaces stayed empty. AMS now
+  has a `NaturalLanguageExtractor` behind the `MemoryExtractor` protocol, keeps
+  marker extraction for fixtures, defaults non-fixture external runners to the
+  natural-language lane, adds answer synthesis over retrieved evidence, logs
+  model/prompt provenance for extracted atoms, and hard-fails real report runs
+  when proposed/output counts are zero unless the run is explicitly marked as a
+  fixture/proxy/no-extractor mode. Reports and docs now label current scores as
+  local proxies, not official benchmark scores.
+- Files:
+  - `packages/cem-core/src/cem_core/extractor.py`
+  - `packages/cem-core/src/cem_core/__init__.py`
+  - `packages/cem-eval/src/cem_eval/answering.py`
+  - `packages/cem-eval/src/cem_eval/official_evaluators.py`
+  - `packages/cem-eval/src/cem_eval/halumem_adapter.py`
+  - `packages/cem-eval/src/cem_eval/halumem_runner.py`
+  - `packages/cem-eval/src/cem_eval/memoryarena_runner.py`
+  - `packages/cem-eval/src/cem_eval/longmemeval_v2_runner.py`
+  - `packages/cem-eval/src/cem_eval/reports.py`
+  - `scripts/run_external_benchmark_report.py`
+  - `scripts/run_halumem_cem0_eval.py`
+  - `scripts/run_memoryarena_cem0_eval.py`
+  - `scripts/run_longmemeval_v2_cem0_eval.py`
+  - `tests/test_natural_language_extractor.py`
+  - `tests/test_external_benchmark_natural_language.py`
+  - `tests/test_external_benchmark_report.py`
+  - `README.md`
+  - `TODO.md`
+  - `PRODUCT-LOCK.md`
+  - `docs/cem-0-benchmark-report.md`
+  - `docs/cem-0-external-benchmark-decision.md`
+  - `CHANGELOG.md`
+  - `docs/PROJECT-LEDGER.md`
+- Verification: Focused red proof first failed on missing
+  `NaturalLanguageExtractor` and missing `BenchmarkZeroOutputError`; after
+  implementation the focused extractor/benchmark/report tests passed. Full
+  suite `.venv\Scripts\python.exe -m pytest -q` passed. V2 operator proof
+  `.venv\Scripts\python.exe scripts\run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final-build`
+  passed. Synthetic eval `.venv\Scripts\python.exe scripts\run_synthetic_eval.py`
+  passed with false-memory resistance and contradiction metrics intact. Deep
+  monitor `.venv\Scripts\python.exe scripts\ams.py monitor --deep --json`
+  reported pass. A bounded real-data smoke under
+  `tmp\external-benchmarks-real-20260615\runs-final-build-smoke\` produced
+  nonzero extraction/output without a zero-output bypass: HaluMem `4/4`
+  proposed/trusted and `3` QA answers, MemoryArena `517/329`
+  proposed/trusted and `147` local proxy predictions, and LongMemEval-V2
+  `59/37` proposed/trusted and `3` local proxy answers.
+- Follow-up: Wire full official evaluator integrations and official model
+  runs for HaluMem, MemoryArena, and LongMemEval-V2 when credentials/runtime
+  are available. Do not present local proxy metrics as official benchmark or
+  leaderboard scores.
+
 ## LEDGER-20260612-001 - Claude Code and Cursor added to AMS onboarding roster
 
 - Date: 2026-06-12

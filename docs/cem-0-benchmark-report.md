@@ -32,6 +32,12 @@ git diff --check
 
 The current suite is a deterministic local CEM-0 fixture. The extractor is marker-based on purpose so regressions are reproducible. The contradiction detector is a V0 scoped key/value detector, not the final reasoning layer.
 
+Post-V2 external benchmark note (2026-06-15): the synthetic/V2 greens are
+governance-layer evidence over controlled inputs. They are not natural-language
+memory capability evidence. The external benchmark lane now has a separate
+natural-language extractor and local-proxy answer synthesis path, plus a
+zero-output report gate.
+
 Current fixture coverage:
 
 | Case family | Covered |
@@ -225,7 +231,7 @@ CEM-backed write-path command:
 python scripts/run_halumem_cem0_eval.py path\to\halumem.json
 ```
 
-CEM-0's HaluMem runner ingests HaluMem sessions as traces, runs `ingest -> propose -> validate -> promote`, and reports separate proposed-candidate and trusted-memory extraction scores.
+CEM-0's HaluMem runner ingests HaluMem sessions as traces, runs `ingest -> propose -> validate -> promote`, reports separate proposed-candidate and trusted-memory extraction scores, and synthesizes local proxy QA answers from retrieved trusted memory.
 
 CEM-0 also includes a local MemoryArena-style adapter that can load JSON, JSONL, or directories of JSON/JSONL files, normalize ordered subtasks from `questions`, `answers`, and `backgrounds`, convert tasks into `AgentTrace` records, and score predictions with progress score and task success rate.
 
@@ -241,7 +247,9 @@ CEM-backed action-brief command:
 python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
-CEM-0's MemoryArena runner ingests tasks as traces, runs the write path, retrieves Action Brief recommendations, and scores those recommendations against expected subtask answers.
+CEM-0's MemoryArena runner ingests tasks as traces, runs the write path,
+retrieves Action Brief evidence, synthesizes local proxy answers, and scores
+those answers against expected subtask answers.
 
 CEM-0 also includes a local LongMemEval-V2 adapter that loads a dataset root with `questions.jsonl`, `trajectories.jsonl`, and optional `haystacks/*.json`, converts trajectories into `AgentTrace` records, and scores exact answers plus haystack-member retrieval.
 
@@ -257,7 +265,10 @@ CEM-backed trajectory/retrieval command:
 python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
 ```
 
-CEM-0's LongMemEval-V2 runner ingests trajectories as traces, runs the write path, retrieves Action Brief answers for questions, and scores both exact answer output and haystack-member trajectory retrieval.
+CEM-0's LongMemEval-V2 runner ingests trajectories as traces, runs the write
+path, retrieves Action Brief evidence for questions, synthesizes local proxy
+answers, and scores both exact answer output and haystack-member trajectory
+retrieval.
 
 Unified external report command:
 
@@ -265,15 +276,19 @@ Unified external report command:
 python scripts/run_external_benchmark_report.py --halumem-result halumem.json --memoryarena-result memoryarena.json --longmemeval-v2-result longmemeval.json --markdown
 ```
 
-The unified report object combines CEM-backed HaluMem, MemoryArena, and LongMemEval-V2 runner outputs into one machine-readable report with proposed/trusted/quarantined counts, suite primary metrics, secondary metric maps, and validation reason-code counts.
+The unified report object combines CEM-backed HaluMem, MemoryArena, and
+LongMemEval-V2 runner outputs into one machine-readable local-proxy report with
+proposed/trusted/quarantined counts, `local_proxy_*` primary metrics, secondary
+metric maps, validation reason-code counts, and official-evaluator provenance.
+It fails by default on zero proposed/output rows.
 
 ## Not Proven Yet
 
 The current report does not prove:
 
-- external HaluMem performance;
-- MemoryArena performance;
-- LongMemEval-V2 performance;
+- official HaluMem performance;
+- official MemoryArena performance;
+- official LongMemEval-V2 performance;
 - action influence measurement from real agent traces;
 - vendor token-cost claims.
 
@@ -283,6 +298,8 @@ Those remain unchecked in `TODO.md`.
 
 To move from V0 synthetic proof toward a stronger CEM-0 proof:
 
-1. Run the CEM-backed HaluMem runner on the downloaded real dataset and compare proposed versus trusted memory scores.
-2. Run the unified report over real downloaded benchmark outputs once available.
-3. Replace marker extraction only after the deterministic suite is strong enough to protect behavior.
+1. Keep the real-data external smoke/report nonzero under the zero-output gate.
+2. Wire official evaluator execution for HaluMem, MemoryArena, and
+   LongMemEval-V2 once credentials/runtime are available.
+3. Compare local proxy metrics to official metrics only after the official
+   evaluator boundary is exercised.

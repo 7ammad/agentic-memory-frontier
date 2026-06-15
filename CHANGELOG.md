@@ -4,6 +4,50 @@ Canonical repo-level timeline for Agentic Memory System changes.
 
 Use this file for high-signal changes only: shipped behavior, plan changes, verification results, newly discovered gaps, mistakes, and status changes. Put deeper reasoning and follow-up detail in `docs/PROJECT-LEDGER.md`.
 
+## 2026-06-15
+
+### Added
+
+- Opened **Post-V2 External Benchmark Final Build** as the named follow-up
+  phase after AMS V2 governance acceptance.
+- Added a natural-language extraction lane behind the `MemoryExtractor`
+  protocol while preserving `DeterministicExtractor` for fixture/marker tests.
+- Added retrieve-to-answer local proxy synthesis for HaluMem QA,
+  MemoryArena, and LongMemEval-V2 so external adapters no longer compare
+  raw recommended actions as final answers.
+- Added zero-output hard gating for external benchmark reports: real runs fail
+  loudly when proposed/output counts are zero unless explicitly marked
+  fixture/proxy/no-extractor mode.
+- Added official-evaluator scaffolds with source, data, and credential
+  boundaries for HaluMem, MemoryArena, and LongMemEval-V2.
+
+### Changed
+
+- Renamed external report suite/metrics to local proxy names:
+  `cem0_external_benchmarks_local_proxy`,
+  `local_proxy_trusted_extraction_f1`, `local_proxy_progress_score`, and
+  `local_proxy_exact_match_accuracy`.
+- Updated docs/product lock to state the true boundary: AMS V2 governance is
+  accepted, while public natural-language benchmark performance is a post-V2
+  capability track and local proxy scores are not official leaderboard scores.
+
+### Verified
+
+- Focused red proof failed first on missing natural extractor and zero-output
+  gate, then the focused benchmark/extractor suite passed.
+- Full suite: `.venv\Scripts\python.exe -m pytest -q` -> **passed**.
+- V2 operator proof:
+  `.venv\Scripts\python.exe scripts\run_ams_v2_operator_proof.py --root tmp\ams-v2-operator-proof-final-build`
+  -> **passed**.
+- Synthetic eval: `.venv\Scripts\python.exe scripts\run_synthetic_eval.py`
+  -> **passed**, including false-memory resistance and contradiction metrics.
+- Deep monitor: `.venv\Scripts\python.exe scripts\ams.py monitor --deep --json`
+  -> **pass**.
+- Bounded real-data smoke produced nonzero extraction/output without using the
+  zero-output bypass: HaluMem proposed/trusted `4/4` with `3` QA answers,
+  MemoryArena proposed/trusted `517/329` with `147` local proxy predictions,
+  and LongMemEval-V2 proposed/trusted `59/37` with `3` local proxy answers.
+
 ## 2026-06-12
 
 ### Fixed

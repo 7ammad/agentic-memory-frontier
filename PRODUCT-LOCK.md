@@ -217,6 +217,18 @@ Post-v1 phase opened:
   smaller substitute.
 - Status: accepted after the V2 terminal operator proof.
 
+Post-V2 phase opened:
+
+- External Benchmark Final Build.
+- Status: active as of 2026-06-15.
+- Scope: repair the real public benchmark zero-output finding by adding a
+  natural-language extraction lane, answer synthesis, zero-output gates, local
+  proxy metric labeling, and official evaluator provenance.
+- Boundary: AMS V2 governance remains accepted. Internal synthetic/V2 greens
+  prove governance-layer behavior, not official natural-language benchmark
+  performance. Official HaluMem, MemoryArena, and LongMemEval-V2 scores require
+  the released evaluator runtimes plus any required model/service credentials.
+
 ## AMS V2 Acceptance Lock
 
 AMS V2 is accepted because the complete local experience-enforcement path has

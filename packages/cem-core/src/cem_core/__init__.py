@@ -21,7 +21,7 @@ from .compilers import (
     BehaviorInvariantCompiler,
     SkillCompiler,
 )
-from .extractor import DeterministicExtractor, MemoryExtractor
+from .extractor import DeterministicExtractor, MemoryExtractor, NaturalLanguageExtractor
 from .kernel import CEM, card_is_inactive
 from .matching import SituationMatcher
 from .policy import ActionDecisionPoint, PolicyBindingLayer
@@ -106,6 +106,7 @@ __all__ = [
     "MemoryAudit",
     "MemoryExtractor",
     "MCPToolDefinition",
+    "NaturalLanguageExtractor",
     "InMemoryStore",
     "MultiAgentGovernanceLayer",
     "MultiAgentGovernanceReceipt",

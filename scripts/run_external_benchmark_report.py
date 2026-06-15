@@ -30,12 +30,25 @@ def main() -> int:
         help="JSON output from run_longmemeval_v2_cem0_eval.py.",
     )
     parser.add_argument("--markdown", action="store_true", help="Render markdown instead of JSON.")
+    parser.add_argument(
+        "--allow-zero-output",
+        action="store_true",
+        help="Allow zero proposed/output rows only for explicit fixture/proxy/no-extractor diagnostics.",
+    )
+    parser.add_argument(
+        "--zero-output-mode",
+        choices=["fixture", "proxy", "no-extractor"],
+        default=None,
+        help="Required diagnostic mode when --allow-zero-output is set.",
+    )
     args = parser.parse_args()
 
     report = build_external_benchmark_report_from_json_files(
         halumem_result_path=args.halumem_result,
         memoryarena_result_path=args.memoryarena_result,
         longmemeval_v2_result_path=args.longmemeval_v2_result,
+        allow_zero_output=args.allow_zero_output,
+        zero_output_mode=args.zero_output_mode,
     )
     if args.markdown:
         print(render_external_benchmark_report_markdown(report), end="")

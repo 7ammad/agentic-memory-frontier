@@ -1,8 +1,9 @@
 # CEM-0 External Benchmark Decision
 
 Date: 2026-05-27
+Updated: 2026-06-15
 
-Status: HaluMem first
+Status: post-V2 external benchmark capability phase active
 
 ## Decision
 
@@ -23,6 +24,32 @@ MemoryArena and LongMemEval-V2 are relevant, but they test broader memory-action
 - MemoryArena project: https://memoryarena.github.io/
 - LongMemEval-V2 project: https://xiaowu0162.github.io/longmemeval-v2/
 - LongMemEval-V2 dataset: https://huggingface.co/datasets/xiaowu0162/longmemeval-v2
+
+## 2026-06-15 Reality Check
+
+The first real downloaded public-data run exposed a structural zero: the
+external runners inherited the marker-only `DeterministicExtractor`, so natural
+language benchmark text produced no atoms and every downstream output was empty.
+That result is now treated as a failed capability measurement, not a baseline.
+
+Verified zero-output run:
+
+- HaluMem local proxy: 0 proposed/trusted/output and 14,919 omitted reference
+  memory points.
+- MemoryArena local proxy: 0 proposed/trusted/output across 4,850 subtasks.
+- LongMemEval-V2 local proxy: 0 proposed/trusted/output across 451 questions.
+
+Repair direction:
+
+- non-fixture external runners default to the grounded
+  `NaturalLanguageExtractor`;
+- deterministic marker extraction remains available only through fixture mode;
+- answer-producing runners now synthesize local proxy answers from retrieved
+  memory instead of comparing raw Action Brief actions as final answers;
+- unified reports prefix proxy metrics with `local_proxy_*` and include official
+  evaluator source/status fields;
+- report generation fails on zero proposed/output counts unless the caller
+  explicitly marks a fixture, proxy diagnostic, or no-extractor diagnostic.
 
 ## Current Implementation Slice
 
@@ -45,13 +72,17 @@ The HaluMem slice now also includes a CEM-backed runner:
 python scripts/run_halumem_cem0_eval.py path\to\halumem.json
 ```
 
-That runner ingests HaluMem sessions as traces, runs CEM-0's current `ingest -> propose -> validate -> promote` write path, and reports separate scores for proposed candidates versus final trusted memory.
+That runner ingests HaluMem sessions as traces, runs CEM-0's current `ingest -> propose -> validate -> promote` write path, reports separate scores for proposed candidates versus final trusted memory, and synthesizes local proxy QA answers from retrieved trusted memory.
 
 ## What This Does Not Claim
 
 This is not a published HaluMem benchmark score yet.
 
-The current adapter and runner prove local ingestion, write-path execution, and scoring against the official-style schema. A real benchmark result still requires running CEM-0 or a wrapped memory system over the downloaded HaluMem dataset and comparing against baselines.
+The current adapter and runner prove local ingestion, write-path execution,
+local proxy extraction scoring, and local proxy QA scoring against the
+official-style schema. A real HaluMem benchmark result still requires the
+released HaluMem eval toolkit, its memory-system wrapper contract, and the
+required model/service credentials.
 
 ## MemoryArena Adapter Slice
 
@@ -74,9 +105,11 @@ The MemoryArena slice now also includes a CEM-backed runner:
 python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
-That runner ingests MemoryArena tasks as traces, runs CEM-0's current write path, retrieves Action Brief recommendations for each task, and scores those recommendations against expected subtask answers.
+That runner ingests MemoryArena tasks as traces, runs CEM-0's current write path, retrieves Action Brief recommendations for each task, synthesizes local proxy answers from retrieved memory, and scores those answers against expected subtask answers.
 
-This is not a full MemoryArena result yet. It is the local adapter and runner layer needed before wiring real agent execution and broader CEM-0 action-brief ablations over MemoryArena tasks.
+This is not a full MemoryArena result yet. It is the local adapter and proxy
+runner layer needed before wiring the official MemoryArena environment gym and
+agent loop.
 
 ## LongMemEval-V2 Adapter Slice
 
@@ -100,9 +133,11 @@ The LongMemEval-V2 slice now also includes a CEM-backed runner:
 python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
 ```
 
-That runner ingests LongMemEval-V2 trajectories as traces, runs CEM-0's current write path, retrieves Action Brief answers for each question, and scores both exact answers and retrieved trajectory IDs against the configured haystack.
+That runner ingests LongMemEval-V2 trajectories as traces, runs CEM-0's current write path, retrieves Action Brief evidence for each question, synthesizes local proxy answers, and scores both exact answers and retrieved trajectory IDs against the configured haystack.
 
-This is not a full LongMemEval-V2 benchmark result yet. It is the local adapter and runner layer needed before CEM-0 can compare action briefs, raw trajectory retrieval, and unvalidated memory against the real web-environment tasks.
+This is not a full LongMemEval-V2 benchmark result yet. It is the local adapter
+and proxy runner layer needed before CEM-0 can run the official evaluator,
+checksum validation, answer evaluator, and latency runner.
 
 ## Unified External Report Slice
 
@@ -112,4 +147,8 @@ CEM-0 now has a unified external benchmark report object and CLI:
 python scripts/run_external_benchmark_report.py --halumem-result halumem.json --memoryarena-result memoryarena.json --longmemeval-v2-result longmemeval.json --markdown
 ```
 
-The report combines saved CEM-backed runner outputs into one machine-readable object with suite counts, proposed/trusted/quarantined totals, suite primary metrics, secondary metric maps, and validation reason-code counts. It is a reporting layer over local runner output, not a claim of external benchmark performance.
+The report combines saved CEM-backed runner outputs into one machine-readable
+object with suite counts, proposed/trusted/quarantined totals, local-proxy
+primary metrics, secondary metric maps, validation reason-code counts, and
+official-evaluator provenance fields. It is a reporting layer over local proxy
+runner output, not a claim of official benchmark performance.

@@ -438,6 +438,10 @@ python scripts/run_halumem_cem0_eval.py path\to\halumem.json
 ```
 
 The AMS-backed runner ingests HaluMem sessions as traces, proposes atoms, validates and promotes them, then scores both proposed candidates and final trusted memory against HaluMem reference memory points.
+Normal runner mode uses the grounded `NaturalLanguageExtractor`; use `--fixture-mode`
+only for legacy marker fixtures. The runner also synthesizes local proxy QA
+answers from retrieved trusted memory. Official HaluMem evaluation still requires
+the released HaluMem eval toolkit and model/service credentials.
 
 ## MemoryArena Adapter Smoke
 
@@ -455,7 +459,11 @@ Run AMS Action Brief scoring against a local MemoryArena export:
 python scripts/run_memoryarena_cem0_eval.py path\to\memoryarena.json --domain bundled_shopping
 ```
 
-The AMS-backed runner ingests MemoryArena tasks as traces, validates promoted experience, retrieves action briefs for each task, and scores the recommended actions against expected subtask answers.
+The AMS-backed runner ingests MemoryArena tasks as traces, validates promoted
+experience, retrieves action briefs for each task, synthesizes local proxy
+answers from retrieved memory, and scores those answers against expected subtask
+answers. Normal mode uses natural-language extraction; `--fixture-mode` is only
+for deterministic marker fixtures. This is not an official MemoryArena score.
 
 ## LongMemEval-V2 Adapter Smoke
 
@@ -473,7 +481,11 @@ Run AMS Action Brief scoring against a local LongMemEval-V2 dataset root:
 python scripts/run_longmemeval_v2_cem0_eval.py path\to\longmemeval-v2
 ```
 
-The AMS-backed runner ingests trajectories as traces, validates promoted experience, retrieves action briefs for each question, and scores both exact answer output and haystack-member trajectory retrieval.
+The AMS-backed runner ingests trajectories as traces, validates promoted
+experience, retrieves action briefs for each question, synthesizes local proxy
+answers from retrieved memory, and scores exact answer output plus haystack-member
+trajectory retrieval. Official LongMemEval-V2 scoring still requires the released
+evaluation environment, answer evaluator, checksum validation, and latency runner.
 
 ## External Benchmark Report
 
@@ -483,7 +495,12 @@ Combine saved JSON outputs from the AMS-backed external runners:
 python scripts/run_external_benchmark_report.py --halumem-result halumem.json --memoryarena-result memoryarena.json --longmemeval-v2-result longmemeval.json --markdown
 ```
 
-The report object normalizes runner outputs into one table with proposed/trusted/quarantined counts, the primary metric for each suite, secondary metric maps, and validation reason-code counts.
+The report object normalizes runner outputs into one table with
+proposed/trusted/quarantined counts, local-proxy primary metrics, secondary
+metric maps, validation reason-code counts, and official-evaluator provenance.
+It fails by default if any included real run has zero proposed or output counts;
+`--allow-zero-output --zero-output-mode fixture|proxy|no-extractor` is only for
+explicit diagnostics.
 
 ## Storage Backends
 

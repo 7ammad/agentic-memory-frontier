@@ -23,6 +23,11 @@ def main() -> int:
     parser.add_argument("dataset_root", help="Directory containing questions.jsonl and trajectories.jsonl.")
     parser.add_argument("--haystack-name", default="lme_v2_small", help="Haystack JSON stem to score retrieval against.")
     parser.add_argument("--root", default=None, help="Directory for temporary CEM-0 eval storage.")
+    parser.add_argument(
+        "--fixture-mode",
+        action="store_true",
+        help="Use the deterministic marker extractor for legacy fixtures instead of natural-language extraction.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root) if args.root else Path(tempfile.mkdtemp(prefix="cem-longmemeval-v2-"))
@@ -30,6 +35,7 @@ def main() -> int:
         args.dataset_root,
         root,
         haystack_name=args.haystack_name,
+        fixture_mode=args.fixture_mode,
     )
     print(json.dumps({"root": str(root), "result": result.model_dump()}, indent=2))
     return 0

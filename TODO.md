@@ -60,6 +60,10 @@ V2 contract -> experience graph -> attribution -> invariants/skills -> matching
 Older backend adapters and MCP integration remain infrastructure. They should be
 used only where they serve the V2 experience-enforcement proof.
 
+Post-V2 work now has one active named phase: external benchmark final build.
+AMS V2 governance remains accepted; this phase measures and repairs
+natural-language memory capability on real public benchmark data.
+
 ## Guardrails
 
 - Preserve the full AMS V2 scope; do not rename it, downgrade it, or trim it
@@ -152,6 +156,31 @@ Acceptance contract:
       and `agent onboard`.
 - [x] Added focused tests for roster correctness, stale rejection, contract
       validation, persistence, CLI, and MCP.
+
+### 17. Post-V2 External Benchmark Final Build
+
+The 2026-06-15 real downloaded public-data run proved that the old external
+runner layer could ingest benchmark rows while producing zero memory/output,
+because it silently used the marker-only fixture extractor. This phase repairs
+that structural zero and keeps local proxy results separate from official
+benchmark scores.
+
+- [x] Record the real-data zero finding as a post-V2 capability gap, not as an
+      AMS V2 governance regression.
+- [x] Add `NaturalLanguageExtractor` behind the existing `MemoryExtractor`
+      protocol while keeping `DeterministicExtractor` for fixtures.
+- [x] Make non-fixture external runners default to natural-language extraction;
+      expose `--fixture-mode` for legacy marker fixtures.
+- [x] Add retrieve-to-answer local proxy synthesis for HaluMem QA,
+      MemoryArena, and LongMemEval-V2.
+- [x] Add a zero-output hard gate to unified external reports.
+- [x] Prefix local proxy metrics with `local_proxy_*` and include official
+      evaluator source/status fields in JSON and markdown reports.
+- [x] Add official-evaluator scaffolds for HaluMem, MemoryArena, and
+      LongMemEval-V2 with source URLs and remaining credential/runtime notes.
+- [ ] Run full official evaluator integrations. This remains open until the
+      released evaluator runtimes, model/service credentials, and large-runtime
+      requirements are available and exercised.
 
 ### 0. Foundation Lock
 

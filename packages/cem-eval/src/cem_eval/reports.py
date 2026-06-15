@@ -17,6 +17,10 @@ TReportResult = TypeVar("TReportResult", bound=BaseModel)
 class ExternalBenchmarkReportRow(BaseModel):
     suite_name: str
     source_path: str
+    metric_scope: str
+    official_evaluator_status: str
+    official_evaluator_name: str
+    official_evaluator_source: str
     item_count_label: str
     item_count: int
     proposed_count: int
@@ -30,7 +34,7 @@ class ExternalBenchmarkReportRow(BaseModel):
 
 
 class ExternalBenchmarkReport(BaseModel):
-    suite_name: str = "cem0_external_benchmarks"
+    suite_name: str = "cem0_external_benchmarks_local_proxy"
     suite_count: int
     total_proposed_count: int
     total_trusted_count: int
@@ -38,11 +42,17 @@ class ExternalBenchmarkReport(BaseModel):
     rows: list[ExternalBenchmarkReportRow]
 
 
+class BenchmarkZeroOutputError(RuntimeError):
+    pass
+
+
 def build_external_benchmark_report(
     *,
     halumem: HaluMemCEM0EvalResult | None = None,
     memoryarena: MemoryArenaCEM0EvalResult | None = None,
     longmemeval_v2: LongMemEvalV2CEM0EvalResult | None = None,
+    allow_zero_output: bool = False,
+    zero_output_mode: str | None = None,
 ) -> ExternalBenchmarkReport:
     rows: list[ExternalBenchmarkReportRow] = []
     if halumem is not None:
@@ -51,13 +61,19 @@ def build_external_benchmark_report(
         rows.append(_memoryarena_report_row(memoryarena))
     if longmemeval_v2 is not None:
         rows.append(_longmemeval_v2_report_row(longmemeval_v2))
-    return ExternalBenchmarkReport(
+    report = ExternalBenchmarkReport(
         suite_count=len(rows),
         total_proposed_count=sum(row.proposed_count for row in rows),
         total_trusted_count=sum(row.trusted_count for row in rows),
         total_quarantined_count=sum(row.quarantined_count for row in rows),
         rows=rows,
     )
+    validate_external_benchmark_report_outputs(
+        report,
+        allow_zero_output=allow_zero_output,
+        zero_output_mode=zero_output_mode,
+    )
+    return report
 
 
 def build_external_benchmark_report_from_json_files(
@@ -65,6 +81,8 @@ def build_external_benchmark_report_from_json_files(
     halumem_result_path: str | Path | None = None,
     memoryarena_result_path: str | Path | None = None,
     longmemeval_v2_result_path: str | Path | None = None,
+    allow_zero_output: bool = False,
+    zero_output_mode: str | None = None,
 ) -> ExternalBenchmarkReport:
     return build_external_benchmark_report(
         halumem=(
@@ -82,6 +100,8 @@ def build_external_benchmark_report_from_json_files(
             if longmemeval_v2_result_path is not None
             else None
         ),
+        allow_zero_output=allow_zero_output,
+        zero_output_mode=zero_output_mode,
     )
 
 
@@ -89,8 +109,8 @@ def render_external_benchmark_report_markdown(report: ExternalBenchmarkReport) -
     lines = [
         f"# {report.suite_name} Report",
         "",
-        "| Suite | Items | Proposed | Trusted | Quarantined | Outputs | Primary metric | Value | Decision reasons |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |",
+        "| Suite | Scope | Items | Proposed | Trusted | Quarantined | Outputs | Primary metric | Value | Official evaluator | Decision reasons |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |",
     ]
     for row in report.rows:
         lines.append(
@@ -98,6 +118,7 @@ def render_external_benchmark_report_markdown(report: ExternalBenchmarkReport) -
             + " | ".join(
                 [
                     row.suite_name,
+                    row.metric_scope,
                     f"{row.item_count} {row.item_count_label}",
                     str(row.proposed_count),
                     str(row.trusted_count),
@@ -105,6 +126,7 @@ def render_external_benchmark_report_markdown(report: ExternalBenchmarkReport) -
                     str(row.output_count),
                     row.primary_metric_name,
                     _format_float(row.primary_metric_value),
+                    f"{row.official_evaluator_status}: {row.official_evaluator_name}",
                     _format_reason_counts(row.decision_reason_counts),
                 ]
             )
@@ -120,6 +142,32 @@ def render_external_benchmark_report_markdown(report: ExternalBenchmarkReport) -
             lines.append("- none")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def validate_external_benchmark_report_outputs(
+    report: ExternalBenchmarkReport,
+    *,
+    allow_zero_output: bool = False,
+    zero_output_mode: str | None = None,
+) -> None:
+    if allow_zero_output:
+        if zero_output_mode not in {"fixture", "proxy", "no-extractor"}:
+            raise ValueError(
+                "zero-output bypass requires zero_output_mode fixture, proxy, or no-extractor"
+            )
+        return
+    zero_rows = [
+        row.suite_name
+        for row in report.rows
+        if row.proposed_count == 0 or row.output_count == 0
+    ]
+    if zero_rows:
+        raise BenchmarkZeroOutputError(
+            "External benchmark report has zero proposed/output counts for: "
+            + ", ".join(zero_rows)
+            + ". Re-run with explicit allow_zero_output and zero_output_mode only for "
+            "fixture, proxy, or no-extractor diagnostics."
+        )
 
 
 def render_synthetic_eval_markdown(result: SyntheticEvalResult) -> str:
@@ -368,13 +416,17 @@ def _halumem_report_row(result: HaluMemCEM0EvalResult) -> ExternalBenchmarkRepor
     return ExternalBenchmarkReportRow(
         suite_name=result.suite_name,
         source_path=result.source_path,
+        metric_scope=result.metric_scope,
+        official_evaluator_status=result.official_evaluator_status,
+        official_evaluator_name=result.official_evaluator_name,
+        official_evaluator_source=result.official_evaluator_source,
         item_count_label="sessions",
         item_count=result.session_count,
         proposed_count=result.proposed_count,
         trusted_count=result.trusted_count,
         quarantined_count=result.quarantined_count,
-        output_count=result.trusted_score.candidate_memory_count,
-        primary_metric_name="trusted_extraction_f1",
+        output_count=max(result.trusted_score.candidate_memory_count, result.qa_answer_count),
+        primary_metric_name="local_proxy_trusted_extraction_f1",
         primary_metric_value=result.trusted_score.extraction_f1,
         secondary_metrics={
             "proposed_extraction_precision": result.proposed_score.extraction_precision,
@@ -386,6 +438,8 @@ def _halumem_report_row(result: HaluMemCEM0EvalResult) -> ExternalBenchmarkRepor
             "trusted_qa_evidence_recall": result.trusted_score.qa_evidence_recall,
             "trusted_hallucinated_memory_count": float(result.trusted_score.hallucinated_memory_count),
             "trusted_omitted_memory_count": float(result.trusted_score.omitted_memory_count),
+            "local_proxy_qa_answered_count": float(result.qa_score.answered_count),
+            "local_proxy_qa_exact_match_accuracy": result.qa_score.exact_match_accuracy,
         },
         decision_reason_counts=_reason_counts(result.decision_reason_codes),
     )
@@ -395,13 +449,17 @@ def _memoryarena_report_row(result: MemoryArenaCEM0EvalResult) -> ExternalBenchm
     return ExternalBenchmarkReportRow(
         suite_name=result.suite_name,
         source_path=result.source_path,
+        metric_scope=result.metric_scope,
+        official_evaluator_status=result.official_evaluator_status,
+        official_evaluator_name=result.official_evaluator_name,
+        official_evaluator_source=result.official_evaluator_source,
         item_count_label="tasks",
         item_count=result.task_count,
         proposed_count=result.proposed_count,
         trusted_count=result.trusted_count,
         quarantined_count=result.quarantined_count,
         output_count=result.action_brief_prediction_count,
-        primary_metric_name="progress_score",
+        primary_metric_name="local_proxy_progress_score",
         primary_metric_value=result.score.progress_score,
         secondary_metrics={
             "task_success_rate": result.score.task_success_rate,
@@ -417,13 +475,17 @@ def _longmemeval_v2_report_row(result: LongMemEvalV2CEM0EvalResult) -> ExternalB
     return ExternalBenchmarkReportRow(
         suite_name=result.suite_name,
         source_path=result.source_path,
+        metric_scope=result.metric_scope,
+        official_evaluator_status=result.official_evaluator_status,
+        official_evaluator_name=result.official_evaluator_name,
+        official_evaluator_source=result.official_evaluator_source,
         item_count_label="questions",
         item_count=result.question_count,
         proposed_count=result.proposed_count,
         trusted_count=result.trusted_count,
         quarantined_count=result.quarantined_count,
         output_count=result.action_brief_answer_count,
-        primary_metric_name="exact_match_accuracy",
+        primary_metric_name="local_proxy_exact_match_accuracy",
         primary_metric_value=result.answer_score.exact_match_accuracy,
         secondary_metrics={
             "answered_count": float(result.answer_score.answered_count),
